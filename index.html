@@ -10,27 +10,22 @@
       --card-bg: #ffffff;
       --text-main: #2c3e50;
       --primary-blue: #3498db;
-      --color-form1: #e8f4f8; /* 藍 */
-      --color-form2: #e8f8f5; /* 綠 */
-      --color-form3: #fadbd8; /* 紅 */
-      --color-form4: #fdebd0; /* 橘 */
-      --color-form5: #f2f4f4; /* 灰/紫 */
-      --status-surgery: #f1c40f;
-      --status-resting: #2ecc71;
-      --status-dead: #34495e;
+      --color-form1: #e8f4f8;
+      --color-form2: #e8f8f5;
+      --color-form3: #fadbd8;
+      --color-form4: #fdebd0;
+      --color-form5: #f2f4f4;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; padding: 10px; }
 
-    /* App 容器模擬手機/小螢幕 */
     .app-container {
       width: 100%; max-width: 480px; background: #fff; border-radius: 20px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; position: relative; min-height: 92vh;
       display: flex; flex-direction: column;
     }
 
-    /* 頂部 Header */
     .header {
       background: #bce0fd; padding: 15px 20px; display: flex; justify-content: space-between; align-items: flex-start;
       border-bottom: 2px solid #2c3e50;
@@ -38,22 +33,19 @@
     .header-title h1 { font-size: 20px; font-weight: bold; color: #000; }
     .header-title h2 { font-size: 16px; color: #333; }
     .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-    .user-badge { background: #d0e1fd; padding: 3px 12px; border-radius: 12px; border: 1px solid #333; font-size: 13px; font-weight: 500; }
+    .user-badge { padding: 3px 12px; border-radius: 12px; border: 1px solid #333; font-size: 13px; font-weight: bold; }
     .lang-btn { background: #dcdde1; border: 1px solid #333; border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
     .update-time { font-size: 11px; color: #555; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
     .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s; }
     .refresh-icon:hover { transform: rotate(180deg); }
 
-    /* 主頁面板 */
     .main-content { padding: 15px; flex: 1; overflow-y: auto; }
 
-    /* 動態與排程卡片 */
     .dashboard-card { border: 2px solid #000; border-radius: 16px; padding: 12px; margin-bottom: 15px; background: #fff; }
     .status-badge { background: #f39c12; color: #000; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; float: right; }
     .schedule-item { display: flex; align-items: center; margin-top: 8px; font-size: 13px; color: #666; cursor: pointer; }
-    .schedule-tag { border: 1px solid #333; border-radius: 10px; padding: 1px 8px; font-size: 11px; margin-right: 8px; }
+    .schedule-tag { border: 1px solid #333; border-radius: 10px; padding: 1px 8px; font-size: 11px; margin-right: 8px; font-weight: bold; }
 
-    /* 快捷動作按鈕 */
     .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
     .btn-action {
       padding: 12px; border-radius: 20px; border: 2px solid #000; font-weight: bold; font-size: 14px;
@@ -61,12 +53,11 @@
     }
     .btn-action:active { transform: scale(0.98); }
     .btn-disabled { opacity: 0.4; cursor: not-allowed !important; pointer-events: none; }
-    .btn-today { background: #c5e1a5; grid-column: span 1; }
-    .btn-tomorrow { background: #80cbc4; grid-column: span 1; }
-    .btn-reserve { background: #e0e0e0; grid-column: span 1; }
-    .btn-makeup { background: #ffcc80; grid-column: span 1; }
+    .btn-today { background: #c5e1a5; }
+    .btn-tomorrow { background: #80cbc4; }
+    .btn-reserve { background: #e0e0e0; }
+    .btn-makeup { background: #ffcc80; }
 
-    /* 時間軸區域 */
     .timeline-container { position: relative; padding-left: 30px; margin-top: 10px; }
     .timeline-line { position: absolute; left: 12px; top: 0; bottom: 0; width: 4px; background: #000; }
     .timeline-item { position: relative; margin-bottom: 15px; cursor: pointer; }
@@ -74,7 +65,6 @@
     .timeline-card { background: #fff; border-radius: 12px; padding: 10px 12px; border: 1px solid #ccc; }
     .timeline-card.today { background: #fff9c4; border: 2px solid #fbc02d; }
 
-    /* 懸浮 + 按鈕與 Modal Overlay */
     .fab {
       position: absolute; right: 20px; bottom: 20px; width: 50px; height: 50px;
       background: #555; color: #fff; border-radius: 50%; display: flex; align-items: center;
@@ -91,7 +81,6 @@
       margin-bottom: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
 
-    /* 通用自訂視窗 (Modal) */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
       display: none; align-items: center; justify-content: center; z-index: 999;
@@ -107,7 +96,6 @@
     .modal-btn-confirm { background: #2ecc71; color: #fff; }
     .modal-btn-cancel { background: #e74c3c; color: #fff; }
 
-    /* 表單頁面與側邊邊籤 Navigation */
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       background: #fff; z-index: 100; flex-direction: column;
@@ -120,21 +108,18 @@
     .form-content { flex: 1; padding: 15px; overflow-y: auto; }
     .form-footer { padding: 12px; border-top: 1px solid #ccc; display: flex; justify-content: space-between; background: #fafafa; }
 
-    /* 表單元素樣式 */
     .form-group { margin-bottom: 15px; }
     .form-group label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 5px; }
     .form-control { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
     .checkbox-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: 13px; }
     .field-desc { font-size: 11px; color: #7f8c8d; margin-top: 2px; line-height: 1.3; }
 
-    /* 測試面板 */
     .test-panel {
       position: absolute; bottom: 0; left: 0; right: 0; background: #34495e; color: #fff;
       padding: 8px 12px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; z-index: 50;
     }
     .test-panel input { padding: 2px 4px; border-radius: 4px; border: none; font-size: 11px; }
 
-    /* 登入 / 註冊 頁面 */
     .auth-container {
       position: absolute; top:0; left:0; right:0; bottom:0; background: #fff; z-index: 200;
       padding: 30px 20px; display: flex; flex-direction: column; justify-content: center;
@@ -143,15 +128,21 @@
     .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ccc; }
     .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: bold; }
     .auth-tab.active { border-bottom: 3px solid #3498db; color: #3498db; }
+
+    .error-msg { color: #e74c3c; font-size: 11px; font-weight: bold; margin-top: 4px; display: none; }
   </style>
 </head>
 <body>
 
 <div class="app-container">
 
-  <!-- 1. 登入 / 註冊 遮罩頁面 -->
+  <!-- 1. 登入 / 註冊 遮罩頁面 (雙軌語系) -->
   <div id="authPage" class="auth-container">
-    <div class="auth-title">智慧實驗日誌 E-labnote</div>
+    <div style="position: absolute; top: 15px; right: 20px;">
+      <button id="authLangBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
+    </div>
+
+    <div class="auth-title" id="txtAuthTitle">智慧實驗日誌 E-labnote</div>
     <div class="auth-tabs">
       <div id="tabLogin" class="auth-tab active" onclick="switchAuthTab('login')">登入</div>
       <div id="tabRegister" class="auth-tab" onclick="switchAuthTab('register')">註冊</div>
@@ -160,41 +151,54 @@
     <!-- 登入 Form -->
     <div id="loginForm">
       <div class="form-group">
-        <label id="lblUserSelect">選擇會員帳號 (同步來自 Google 會員中心)</label>
+        <label id="lblUserSelect">選擇會員帳號</label>
         <select id="selLoginUser" class="form-control">
-          <option value="">載入中...</option>
+          <option value="">同步會員中心資料中...</option>
         </select>
       </div>
       <div class="form-group">
-        <label id="lblPassword">密碼</label>
+        <label id="lblPassword">識別密碼</label>
         <input type="password" id="txtLoginPwd" class="form-control" placeholder="請輸入密碼">
       </div>
-      <button class="btn-action btn-today" style="width:100%;" onclick="performLogin()">登入</button>
-      <button class="btn-action btn-reserve" style="width:100%; margin-top:10px;" onclick="guestLogin()">訪客登入 (僅查看)</button>
+      <button id="btnLoginSubmit" class="btn-action btn-today" style="width:100%;" onclick="performLogin()">登入</button>
+      <button id="btnGuestSubmit" class="btn-action btn-reserve" style="width:100%; margin-top:10px;" onclick="guestLogin()">訪客登入 (僅查看)</button>
     </div>
 
     <!-- 註冊 Form -->
     <div id="registerForm" style="display:none;">
       <div class="form-group">
-        <label>會員名稱</label>
-        <input type="text" id="txtRegName" class="form-control" placeholder="例如：Daniel">
+        <label id="lblRegName">會員名稱 (不可重複)</label>
+        <input type="text" id="txtRegName" class="form-control" placeholder="例如：Daniel" oninput="checkDuplicateName()">
+        <div id="msgDuplicateName" class="error-msg">⚠️ 此名稱已被使用，請更換其他名稱</div>
       </div>
       <div class="form-group">
-        <label>電子信箱</label>
+        <label id="lblRegEmail">電子信箱</label>
         <input type="email" id="txtRegEmail" class="form-control" placeholder="user@gmail.com">
       </div>
       <div class="form-group">
-        <label>設定識別密碼</label>
+        <label id="lblRegRole">身份別</label>
+        <select id="selRegRole" class="form-control">
+          <option value="協作會員">協作會員 (Collaborator)</option>
+          <option value="一般會員">一般會員 (General Member)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="lblRegPwd">設定識別密碼</label>
         <input type="password" id="txtRegPwd" class="form-control">
       </div>
       <div class="form-group">
-        <label>預設介面語言</label>
+        <label id="lblRegColor">個人代表色 (不可重複)</label>
+        <select id="selRegColor" class="form-control">
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="lblRegLang">預設介面語言</label>
         <select id="selRegLang" class="form-control">
           <option value="ZH">中文 (Traditional Chinese)</option>
           <option value="EN">English</option>
         </select>
       </div>
-      <button class="btn-action btn-tomorrow" style="width:100%;" onclick="performRegister()">註冊新帳號</button>
+      <button id="btnRegisterSubmit" class="btn-action btn-tomorrow" style="width:100%;" onclick="performRegister()">註冊新帳號</button>
     </div>
   </div>
 
@@ -206,7 +210,7 @@
     </div>
     <div class="header-right">
       <div style="display:flex; gap:5px; align-items:center;">
-        <div id="userBadge" class="user-badge">未登入</div>
+        <div id="userBadge" class="user-badge" style="background:#e0e0e0;">未登入</div>
         <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
       </div>
       <div class="update-time">
@@ -218,8 +222,6 @@
 
   <!-- 3. 主頁面內容 -->
   <div class="main-content">
-
-    <!-- 最新動態與排程 -->
     <div class="dashboard-card">
       <div id="statusBadge" class="status-badge" style="display:none;">--</div>
       <div id="txtCurrentExpUser" style="font-size:12px; font-weight:bold; color:#3498db; margin-bottom:4px;">載入中...</div>
@@ -227,14 +229,13 @@
       <hr style="margin:10px 0; border:0; border-top:1px solid #eee;">
       
       <div id="scheduleSection" onclick="openScheduleCenter()">
-        <div style="font-size:12px; font-weight:bold; color:#888; margin-bottom:4px;">未來排程 (最靠近兩筆)</div>
+        <div id="txtScheduleHeader" style="font-size:12px; font-weight:bold; color:#888; margin-bottom:4px;">未來排程 (最靠近兩筆)</div>
         <div id="scheduleList">
           <div class="schedule-item"><span class="schedule-tag">--</span><span>載入中...</span></div>
         </div>
       </div>
     </div>
 
-    <!-- 四大操作按鈕 -->
     <div class="action-grid">
       <button id="btnTodayExp" class="btn-action btn-today" onclick="handleTodayExperiment()">今日實驗登錄</button>
       <button id="btnTomorrowPrep" class="btn-action btn-tomorrow" onclick="handleTomorrowPrep()">明日準備</button>
@@ -242,39 +243,32 @@
       <button id="btnMakeupExp" class="btn-action btn-makeup" onclick="openForm('FORM_001_1', true)">實驗補登</button>
     </div>
 
-    <!-- 歷史時間軸 -->
     <div id="timelineContainer" class="timeline-container" onclick="openRecordCenter()">
       <div class="timeline-line"></div>
     </div>
-
   </div>
 
-  <!-- 4. 懸浮 + 選單與 Overlay -->
   <div id="fabMenuOverlay" class="fab-menu-overlay" onclick="closeFabMenu()">
-    <div class="fab-menu-item" onclick="openScheduleCenter()">排程中心</div>
-    <div class="fab-menu-item" onclick="openRecordCenter()">紀錄中心</div>
-    <div class="fab-menu-item" onclick="openEditProfile()">更改個人資訊</div>
-    <div class="fab-menu-item" style="background:#e74c3c; color:#fff;" onclick="closeFabMenu()">關閉</div>
+    <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
+    <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄中心</div>
+    <div class="fab-menu-item" id="menuProfile" onclick="openEditProfile()">更改個人資訊</div>
+    <div class="fab-menu-item" id="menuClose" style="background:#e74c3c; color:#fff;" onclick="closeFabMenu()">關閉</div>
   </div>
   <div class="fab" onclick="toggleFabMenu()">+</div>
 
-  <!-- 5. 測試面板 (可自訂模擬系統時間) -->
   <div id="testPanel" class="test-panel">
     <span>[測試面板] 系統時間:</span>
     <input type="date" id="testDateInput" value="2026-07-25" onchange="onTestDateChange()">
     <span style="cursor:pointer;" onclick="toggleTestPanel(false)">❌</span>
   </div>
 
-  <!-- 6. 通用互動表單 Modal 頁面 -->
   <div id="formPageContainer" class="form-page-container">
     <div class="form-header" id="formHeader">
       <h3 id="formTitle">表單名稱</h3>
       <button style="border:none; background:transparent; font-size:18px; cursor:pointer;" onclick="closeFormPage()">❌</button>
     </div>
     <div class="form-body">
-      <!-- 側邊頁籤 -->
       <div id="formSidebar" class="form-sidebar"></div>
-      <!-- 表單內容區 -->
       <div id="formContent" class="form-content"></div>
     </div>
     <div class="form-footer">
@@ -283,7 +277,6 @@
     </div>
   </div>
 
-  <!-- 7. 值日生系統風格警示彈窗 (Custom Alert/Confirm Modal) -->
   <div id="customModalBackdrop" class="custom-modal-backdrop">
     <div class="custom-modal">
       <h3 id="modalTitle">系統提示</h3>
@@ -297,16 +290,21 @@
 </div>
 
 <script>
-  /* ==========================================================================
-     一、 後端 API & CSV 試算表連結全同步設定
-     ========================================================================== */
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw0xNdgsPy-uxYAgwxMs8Z583seaGU94Y3mbs8fNqSefekpgjNwD29iLnCisKgzDYvkzQ/exec";
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwvsd4fRN4qgWBL2ku7E_r-DekIiVtikpvjyVLRqOiGWPPb1sts3Mj10bMiX9n_zoO1tw/exec";
   
   const URL_MEMBERS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=280963157&single=true&output=csv";
   const URL_FORMS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=0&single=true&output=csv";
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
-  // 全域 State（零預設假資料，全從 Google 試算表同步）
+  const PRESET_COLORS = [
+    { name: "天藍色 (Sky Blue)", hex: "#81d4fa" },
+    { name: "薄荷綠 (Mint Green)", hex: "#a5d6a7" },
+    { name: "珊瑚粉 (Coral Pink)", hex: "#ffab91" },
+    { name: "紫羅蘭 (Violet)", hex: "#ce93d8" },
+    { name: "檸檬黃 (Lemon Yellow)", hex: "#fff59d" },
+    { name: "淡橙色 (Light Orange)", hex: "#ffe082" }
+  ];
+
   let state = {
     currentUser: null,
     isGuest: false,
@@ -318,31 +316,24 @@
     formDataCache: {}
   };
 
-  /* ==========================================================================
-     二、 系統初始化與與 Google 試算表同步讀取 (Read Sync)
-     ========================================================================== */
   window.addEventListener('DOMContentLoaded', async () => {
     toggleTestPanel(state.showTestPanel);
+    applyLanguage();
     await refreshDashboard();
   });
 
-  // 全面同步三張試算表
   async function refreshDashboard() {
     const now = new Date();
-    document.getElementById('txtUpdateTime').innerText = `更新時間 : ${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('txtUpdateTime').innerText = `${state.currentLang==='ZH'?'更新時間':'Updated'}: ${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-    // 1. 同步會員中心
     await fetchMembersFromSheet();
-    // 2. 同步資料中心
     await fetchDataCenterFromSheet();
 
-    // 3. 渲染主 UI
     renderMainDashboardUI();
     renderTimeline();
     updateDashboardButtons();
   }
 
-  // 從 Google 試算表讀取「會員中心」
   async function fetchMembersFromSheet() {
     try {
       const res = await fetch(URL_MEMBERS);
@@ -355,19 +346,44 @@
           members.push({
             name: rows[i][0].trim(),
             email: rows[i][1] ? rows[i][1].trim() : '',
-            role: rows[i][4] ? rows[i][4].trim() : '研究員',
+            color: rows[i][3] ? rows[i][3].trim() : '#e0e0e0',
+            role: rows[i][4] ? rows[i][4].trim() : '協作會員', // E欄: 身份別
             lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
           });
         }
       }
       state.membersList = members;
       initAuthDropdown();
+      initColorDropdown();
     } catch(err) {
       console.error("同步會員中心失敗:", err);
     }
   }
 
-  // 從 Google 試算表讀取「資料中心」
+  function checkDuplicateName() {
+    const nameInput = document.getElementById('txtRegName').value.trim().toLowerCase();
+    const isDuplicate = state.membersList.some(m => m.name.toLowerCase() === nameInput);
+    
+    document.getElementById('msgDuplicateName').style.display = isDuplicate ? 'block' : 'none';
+    document.getElementById('btnRegisterSubmit').classList.toggle('btn-disabled', isDuplicate);
+  }
+
+  function initColorDropdown() {
+    const usedColors = state.membersList.map(m => m.color.toLowerCase());
+    const selColor = document.getElementById('selRegColor');
+    
+    const available = PRESET_COLORS.filter(c => !usedColors.includes(c.hex.toLowerCase()));
+    
+    if(available.length === 0) {
+      selColor.innerHTML = `<option value="">${state.currentLang==='ZH'?'全數顏色已被使用':'All colors taken'}</option>`;
+      return;
+    }
+
+    selColor.innerHTML = available.map(c => `
+      <option value="${c.hex}">${c.name}</option>
+    `).join('');
+  }
+
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -376,7 +392,7 @@
       
       const records = [];
       for(let i = 1; i < rows.length; i++) {
-        if(rows[i][0]) { // A欄: 實驗日期
+        if(rows[i][0]) {
           records.push({
             date: rows[i][0].trim(),
             user: rows[i][1] ? rows[i][1].trim() : '',
@@ -393,7 +409,6 @@
     }
   }
 
-  // 工具：簡易 CSV 解析器
   function parseCSV(text) {
     return text.split('\n').map(r => r.split(','));
   }
@@ -401,14 +416,13 @@
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
     if(state.membersList.length === 0) {
-      sel.innerHTML = `<option value="">無會員資料</option>`;
+      sel.innerHTML = `<option value="">${state.currentLang==='ZH'?'無會員資料':'No Members'}</option>`;
       return;
     }
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
   function renderMainDashboardUI() {
-    // 渲染最新一筆動態
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate);
     if(todayExps.length > 0) {
       const active = todayExps[0];
@@ -419,10 +433,9 @@
     } else {
       document.getElementById('statusBadge').style.display = 'none';
       document.getElementById('txtCurrentExpUser').innerText = state.simulatedDate;
-      document.getElementById('txtCurrentExpTitle').innerText = "本日無進行中實驗";
+      document.getElementById('txtCurrentExpTitle').innerText = state.currentLang==='ZH'?"本日無進行中實驗":"No active experiments today";
     }
 
-    // 渲染未來排程最靠近兩筆
     const futureExps = state.dataCenter
       .filter(d => new Date(d.date) > new Date(state.simulatedDate))
       .sort((a,b) => new Date(a.date) - new Date(b.date))
@@ -430,20 +443,21 @@
 
     const scheduleContainer = document.getElementById('scheduleList');
     if(futureExps.length > 0) {
-      scheduleContainer.innerHTML = futureExps.map(f => `
-        <div class="schedule-item">
-          <span class="schedule-tag" style="background:#e3f2fd; color:#1976d2;">${f.date.slice(5)} ${f.user}</span>
-          <span>${f.info}</span>
-        </div>
-      `).join('');
+      scheduleContainer.innerHTML = futureExps.map(f => {
+        const userObj = state.membersList.find(m => m.name === f.user);
+        const userColor = userObj ? userObj.color : '#e0e0e0';
+        return `
+          <div class="schedule-item">
+            <span class="schedule-tag" style="background:${userColor}; color:#000;">${f.date.slice(5)} ${f.user}</span>
+            <span>${f.info}</span>
+          </div>
+        `;
+      }).join('');
     } else {
-      scheduleContainer.innerHTML = `<div class="schedule-item" style="color:#aaa;">無未來預約排程</div>`;
+      scheduleContainer.innerHTML = `<div class="schedule-item" style="color:#aaa;">${state.currentLang==='ZH'?'無未來預約排程':'No upcoming schedule'}</div>`;
     }
   }
 
-  /* ==========================================================================
-     三、 寫入同步機制 (Write Sync to GAS API)
-     ========================================================================== */
   async function syncToGoogleSheet(actionType, payload) {
     try {
       await fetch(GAS_API_URL, {
@@ -452,15 +466,12 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: actionType, ...payload })
       });
-      console.log(`[GAS API] 同步成功: ${actionType}`);
+      console.log(`[GAS API] 同步發送成功: ${actionType}`);
     } catch(err) {
       console.error(`[GAS API] 同步失敗:`, err);
     }
   }
 
-  /* ==========================================================================
-     四、 登入 / 註冊 & 語系切換
-     ========================================================================== */
   function switchAuthTab(tab) {
     document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
     document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
@@ -476,38 +487,51 @@
       state.isGuest = false;
       state.currentLang = user.lang || "ZH";
       document.getElementById('authPage').style.display = 'none';
-      document.getElementById('userBadge').innerText = user.name;
+      
+      const badge = document.getElementById('userBadge');
+      badge.innerText = user.name;
+      badge.style.background = user.color || '#e0e0e0';
+
       applyLanguage();
       refreshDashboard();
-      showCustomAlert("登入成功", `歡迎回來，${user.name}！`);
+      showCustomAlert(state.currentLang==='ZH'?"登入成功":"Login Success", `歡迎回來 / Welcome, ${user.name}！`);
     }
   }
 
   function guestLogin() {
-    state.currentUser = { name: "訪客", role: "Guest" };
+    state.currentUser = { name: "訪客", role: "Guest", color: "#e0e0e0" };
     state.isGuest = true;
     document.getElementById('authPage').style.display = 'none';
-    document.getElementById('userBadge').innerText = "訪客";
+    document.getElementById('userBadge').innerText = state.currentLang==='ZH'?"訪客":"Guest";
     applyLanguage();
     refreshDashboard();
-    showCustomAlert("訪客模式", "已以訪客身份登入，登錄按鈕功能將受限。");
+    showCustomAlert(state.currentLang==='ZH'?"訪客模式":"Guest Mode", "已以訪客身份登入，登錄按鈕功能將受限。");
   }
 
   async function performRegister() {
     const name = document.getElementById('txtRegName').value.trim();
     const email = document.getElementById('txtRegEmail').value.trim();
+    const role = document.getElementById('selRegRole').value;
+    const password = document.getElementById('txtRegPwd').value.trim();
+    const color = document.getElementById('selRegColor').value;
     const lang = document.getElementById('selRegLang').value;
-    if(!name || !email) { showCustomAlert("錯誤", "請完整填寫姓名與 Email"); return; }
+
+    if(!name || !email) { showCustomAlert("錯誤 / Error", "請完整填寫姓名與 Email"); return; }
     
-    const newUser = { name, email, lang, role: "研究員" };
+    if(state.membersList.some(m => m.name.toLowerCase() === name.toLowerCase())) {
+      showCustomAlert("註冊失敗 / Failed", "會員名稱已存在，請使用其他名稱！");
+      return;
+    }
+
+    const newUser = { name, email, role, password, color, lang };
     state.membersList.push(newUser);
 
-    // 同步新會員至 Google 試算表
     await syncToGoogleSheet("registerUser", newUser);
 
     initAuthDropdown();
+    initColorDropdown();
     switchAuthTab('login');
-    showCustomAlert("註冊成功", "註冊完成！資料已同步回會員中心，請選擇帳號登入。");
+    showCustomAlert("註冊成功 / Success", "註冊資料已同步寫入會員中心！請選擇帳號登入。");
   }
 
   function toggleLanguage() {
@@ -515,19 +539,43 @@
     applyLanguage();
   }
 
+  // 雙軌語系切換實作
   function applyLanguage() {
     const isZH = state.currentLang === "ZH";
     document.getElementById('langToggleBtn').innerText = isZH ? "ZN" : "EN";
+    document.getElementById('authLangBtn').innerText = isZH ? "ZN" : "EN";
+    
+    // Auth 頁面
+    document.getElementById('txtAuthTitle').innerText = isZH ? "智慧實驗日誌 E-labnote" : "Smart E-labnote";
+    document.getElementById('tabLogin').innerText = isZH ? "登入" : "Login";
+    document.getElementById('tabRegister').innerText = isZH ? "註冊" : "Register";
+    document.getElementById('lblUserSelect').innerText = isZH ? "選擇會員帳號" : "Select User Account";
+    document.getElementById('lblPassword').innerText = isZH ? "識別密碼" : "Password";
+    document.getElementById('btnLoginSubmit').innerText = isZH ? "登入" : "Login";
+    document.getElementById('btnGuestSubmit').innerText = isZH ? "訪客登入 (僅查看)" : "Guest Login (Read Only)";
+    
+    document.getElementById('lblRegName').innerText = isZH ? "會員名稱 (不可重複)" : "Username (Unique)";
+    document.getElementById('lblRegEmail').innerText = isZH ? "電子信箱" : "Email Address";
+    document.getElementById('lblRegRole').innerText = isZH ? "身份別" : "Membership Role";
+    document.getElementById('lblRegPwd').innerText = isZH ? "設定識別密碼" : "Set Password";
+    document.getElementById('lblRegColor').innerText = isZH ? "個人代表色 (不可重複)" : "User Color (Unique)";
+    document.getElementById('lblRegLang').innerText = isZH ? "預設介面語言" : "Default Language";
+    document.getElementById('btnRegisterSubmit').innerText = isZH ? "註冊新帳號" : "Register Account";
+
+    // 主頁面
     document.getElementById('appTitle').innerText = isZH ? "智慧實驗日誌" : "Smart E-Labnote";
     document.getElementById('btnTodayExp').innerText = isZH ? "今日實驗登錄" : "Today Exp";
     document.getElementById('btnTomorrowPrep').innerText = isZH ? "明日準備" : "Tomorrow Prep";
     document.getElementById('btnReserveExp').innerText = isZH ? "實驗預約" : "Reserve Exp";
     document.getElementById('btnMakeupExp').innerText = isZH ? "實驗補登" : "Makeup Exp";
+    
+    document.getElementById('menuSchedule').innerText = isZH ? "排程中心" : "Schedule Center";
+    document.getElementById('menuRecord').innerText = isZH ? "紀錄中心" : "Record Center";
+    document.getElementById('menuProfile').innerText = isZH ? "更改個人資訊" : "Edit Profile";
+    document.getElementById('menuClose').innerText = isZH ? "關閉" : "Close";
+    document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
   }
 
-  /* ==========================================================================
-     五、 時間與 UI 按鈕狀態控制
-     ========================================================================== */
   function onTestDateChange() {
     state.simulatedDate = document.getElementById('testDateInput').value;
     refreshDashboard();
@@ -566,18 +614,21 @@
     const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
     
     if(sorted.length === 0) {
-      container.innerHTML = html + `<div style="padding:10px; color:#888;">今日無實驗紀錄</div>`;
+      container.innerHTML = html + `<div style="padding:10px; color:#888;">${state.currentLang==='ZH'?'今日無實驗紀錄':'No experiment records today'}</div>`;
       return;
     }
 
     sorted.forEach(item => {
       const isToday = item.date === state.simulatedDate;
+      const userObj = state.membersList.find(m => m.name === item.user);
+      const userColor = userObj ? userObj.color : '#e0e0e0';
+
       html += `
         <div class="timeline-item">
           <div class="timeline-node"></div>
           <div class="timeline-card ${isToday ? 'today' : ''}">
             <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:12px;">
-              <span>${item.date} <span style="border:1px solid #333; border-radius:10px; padding:0 6px;">${item.user}</span></span>
+              <span>${item.date} <span style="background:${userColor}; border:1px solid #333; border-radius:10px; padding:0 6px;">${item.user}</span></span>
               <span style="color:#e67e22;">${item.status}</span>
             </div>
             <div style="font-size:13px; margin-top:4px;">${item.info}</div>
@@ -589,9 +640,6 @@
     container.innerHTML = html;
   }
 
-  /* ==========================================================================
-     六、 表單引擎 (Form Engine) & 狀態更新
-     ========================================================================== */
   let currentFormCtx = {
     formId: '',
     pages: [],
@@ -612,7 +660,7 @@
       case "休息中": openForm("FORM_004"); break;
       case "訊號搜集完成": openForm("FORM_005"); break;
       case "開始善後": openForm("FORM_006"); break;
-      default: showCustomAlert("提示", `當前實驗狀態為 [${todayExp.status}]，無後續表單。`);
+      default: showCustomAlert("提示 / Alert", `當前實驗狀態為 [${todayExp.status}]，無後續表單。`);
     }
   }
 
@@ -719,7 +767,7 @@
 
     document.getElementById('btnFormPrev').style.display = currentFormCtx.currentPageIdx === 0 ? 'none' : 'inline-block';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-    document.getElementById('btnFormNext').innerText = isLastPage ? '提交' : '下一頁';
+    document.getElementById('btnFormNext').innerText = isLastPage ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
   }
 
   function saveFormFieldData(fieldId, val) {
@@ -777,9 +825,6 @@
     document.getElementById('formPageContainer').style.display = 'none';
   }
 
-  /* ==========================================================================
-     七、 狀態異動與提交至 Google Apps Script (GAS)
-     ========================================================================== */
   async function triggerStatusUpdateOnPage1(formId) {
     const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
     if(!todayExp) return;
@@ -793,7 +838,6 @@
 
     todayExp.status = newStatus;
     
-    // 即時同步至 GAS API
     await syncToGoogleSheet("updateStatus", {
       date: todayExp.date,
       user: todayExp.user,
@@ -821,7 +865,6 @@
 
     if(currentFormCtx.isMakeup) targetStatus = "實驗結束";
 
-    // 寫入 GAS Web App
     await syncToGoogleSheet("submitForm", {
       date: state.simulatedDate,
       user: state.currentUser ? state.currentUser.name : "Daniel",
@@ -834,12 +877,9 @@
 
     closeFormPage();
     await refreshDashboard();
-    showCustomAlert("提交成功", `表單已成功寫入 Google 試算表！\n實驗狀態更變為：[${targetStatus}]`);
+    showCustomAlert("提交成功 / Submitted", `表單已成功寫入 Google 試算表！\n實驗狀態更變為：[${targetStatus}]`);
   }
 
-  /* ==========================================================================
-     八、 跨表單動態計算與試算表資料提取
-     ========================================================================== */
   function calculateFetchDetail(key) {
     const exp = state.dataCenter.find(d => d.date === state.simulatedDate) || state.dataCenter[0] || {};
     
@@ -855,9 +895,6 @@
     return "尚無資料";
   }
 
-  /* ==========================================================================
-     九、 表單結構定義 (Form Contexts)
-     ========================================================================== */
   function getFormStructure(formId) {
     if(formId === "FORM_001_1" || formId === "FORM_001_2") {
       return [
@@ -942,14 +979,11 @@
     ];
   }
 
-  /* ==========================================================================
-     十、 值日生風格 Modal 控制
-     ========================================================================== */
   function showCustomAlert(title, message) {
     document.getElementById('modalTitle').innerText = title;
     document.getElementById('modalMessage').innerText = message;
     document.getElementById('modalBtnGroup').innerHTML = `
-      <button class="modal-btn modal-btn-confirm" onclick="closeCustomModal(true)">確定</button>
+      <button class="modal-btn modal-btn-confirm" onclick="closeCustomModal(true)">${state.currentLang==='ZH'?'確定':'OK'}</button>
     `;
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
@@ -983,12 +1017,12 @@
     document.getElementById('fabMenuOverlay').style.display = 'none';
   }
 
-  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心", "開啟排程中心面板 (殼)。"); }
-  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心", "開啟實驗紀錄中心面板 (殼)。"); }
+  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心 / Schedule", "開啟排程中心面板 (殼)。"); }
+  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心 / Record", "開啟實驗紀錄中心面板 (殼)。"); }
   function openEditProfile() {
     closeFabMenu();
     if(state.currentUser) {
-      showCustomAlert("更改個人資訊", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}`);
+      showCustomAlert("個人資訊 / Profile", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}\n身份 : ${state.currentUser.role}`);
     }
   }
 </script>
