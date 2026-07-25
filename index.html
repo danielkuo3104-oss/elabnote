@@ -23,11 +23,11 @@
       --border-color: #e2e8f0;
       --border-focus: #38bdf8;
       
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 14px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
       
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
       --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 
@@ -36,14 +36,14 @@
     body { background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
 
     .app-container {
-      width: 100%; max-width: 480px; background: var(--bg-main); min-height: 100vh;
-      display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      width: 100%; max-width: 480px; background: var(--bg-main); height: 100vh;
+      display: flex; flex-direction: column; position: relative; overflow: hidden;
     }
 
-    /* 頂部 Header */
+    /* Header */
     .header {
-      background: var(--card-bg); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;
+      background: var(--card-bg); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border-color); z-index: 10; padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
     }
     .header-title h1 { font-size: 17px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
     .header-title h1::before { content: ""; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
@@ -56,7 +56,7 @@
     .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s; }
     .refresh-icon:active { transform: rotate(180deg); }
 
-    .main-content { padding: 16px; flex: 1; overflow-y: auto; }
+    .main-content { padding: 16px; flex: 1; overflow-y: auto; padding-bottom: 80px; }
 
     .dashboard-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
     .status-badge { background: #fef3c7; color: var(--warning); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; border: 1px solid #fde68a; }
@@ -69,7 +69,7 @@
       cursor: pointer; text-align: center; transition: all 0.15s; background: var(--card-bg); color: var(--text-primary); box-shadow: var(--shadow-sm);
     }
     .btn-action:active { transform: translateY(1px); }
-    .btn-disabled { opacity: 0.4; cursor: not-allowed !important; pointer-events: none; background: #f1f5f9; color: var(--text-muted); }
+    .btn-disabled { opacity: 0.35; cursor: not-allowed !important; pointer-events: none; background: #f1f5f9; color: var(--text-muted); border-color: #e2e8f0; }
     
     .btn-today { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
     .btn-tomorrow { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
@@ -83,22 +83,27 @@
     .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
 
+    /* 修正後的 FAB 浮動按鈕與選單 */
     .fab {
-      position: fixed; right: calc(50% - 220px); bottom: 24px; width: 48px; height: 48px;
+      position: fixed; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 50px; height: 50px;
       background: var(--text-primary); color: #fff; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 22px; cursor: pointer; border: none; box-shadow: var(--shadow-md); z-index: 10;
+      justify-content: center; font-size: 26px; cursor: pointer; border: none; box-shadow: var(--shadow-md); z-index: 300;
+      transition: transform 0.25s ease, background-color 0.2s;
     }
-    @media (max-width: 480px) { .fab { right: 20px; } }
+    .fab.active { transform: rotate(135deg); background: var(--danger); }
 
     .fab-menu-overlay {
-      position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.3);
-      backdrop-filter: blur(4px); display: none; flex-direction: column; justify-content: flex-end; align-items: flex-end; padding: 80px 20px; z-index: 9;
+      position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px); display: none; flex-direction: column; justify-content: flex-end; align-items: flex-end;
+      padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 85px) 20px; z-index: 250;
     }
     .fab-menu-item {
       background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 20px;
-      margin-bottom: 10px; font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: var(--shadow-md); color: var(--text-primary);
+      margin-top: 10px; font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: var(--shadow-md); color: var(--text-primary);
+      width: 160px; text-align: center; border: 1px solid var(--border-color);
     }
 
+    /* Modal 提示框 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
@@ -114,28 +119,48 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    /* 動態渲染表單 */
+    /* 表單頁面修復：固定 Header 與 Footer，僅中間可滾動 */
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: var(--card-bg); z-index: 100; flex-direction: column;
+      background: var(--card-bg); z-index: 100; flex-direction: column; height: 100vh;
     }
-    .form-header { padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); }
+    .form-header {
+      padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-main); padding-top: calc(env(safe-area-inset-top, 0px) + 14px); flex-shrink: 0;
+    }
     .form-body { flex: 1; display: flex; overflow: hidden; position: relative; }
-    .form-sidebar { width: 95px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; }
-    .sidebar-bookmark { padding: 12px 8px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); font-weight: 500; }
+    .form-sidebar { width: 100px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-bookmark { padding: 14px 8px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); font-weight: 500; line-height: 1.3; }
     .sidebar-bookmark.active { background: var(--card-bg); font-weight: 700; color: var(--primary); border-left: 3px solid var(--primary); }
-    .form-content { flex: 1; padding: 16px; overflow-y: auto; }
-    .form-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; background: var(--card-bg); }
+    
+    .form-content { flex: 1; padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    
+    .form-footer {
+      padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px) 16px;
+      border-top: 1px solid var(--border-color); display: flex; gap: 12px; justify-content: space-between;
+      background: var(--card-bg); flex-shrink: 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.03);
+    }
+    .btn-footer { flex: 1; padding: 12px; border-radius: var(--radius-sm); font-weight: 700; font-size: 14px; cursor: pointer; border: 1px solid var(--border-color); text-align: center; }
+    .btn-footer-prev { background: var(--bg-main); color: var(--text-secondary); }
+    .btn-footer-next { background: var(--primary); color: #fff; border: none; }
 
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 6px; color: var(--text-primary); }
+    /* 重構：選項卡片（Option Cards）解決排版太擠問題 */
+    .form-group { margin-bottom: 18px; }
+    .form-group > label { display: block; font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--text-primary); }
     .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-main); color: var(--text-primary); outline: none; }
     .form-control:focus { border-color: var(--border-focus); background: #fff; }
     
-    .checkbox-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 13px; color: var(--text-primary); }
-    .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
-    .section-header { font-size: 12px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 6px 10px; border-radius: 4px; margin: 12px 0 8px 0; }
-    .warning-box { font-size: 11px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; padding: 8px 10px; border-radius: var(--radius-sm); margin-top: 4px; }
+    /* 可點擊選項卡片 */
+    .option-card {
+      display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg-main);
+      border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+    }
+    .option-card.selected { background: var(--primary-light); border-color: var(--border-focus); }
+    .option-card input[type="radio"], .option-card input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); }
+    .option-card label { font-size: 13px; font-weight: 500; color: var(--text-primary); cursor: pointer; flex: 1; }
+
+    .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+    .section-header { font-size: 12px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 6px 10px; border-radius: 4px; margin: 16px 0 10px 0; }
 
     .auth-container {
       position: absolute; top:0; left:0; right:0; bottom:0; background: var(--card-bg); z-index: 200;
@@ -153,11 +178,6 @@
   <link rel="icon" type="image/png" href="icon-2.0.png?v=2.0">
   <link rel="apple-touch-icon" href="icon-2.0.png?v=2.0">
   <link rel="manifest" href="manifest.json?v=2.0">
-  
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="e-Lab">
   <meta name="theme-color" content="#ffffff">
 </head>
 <body>
@@ -176,7 +196,6 @@
       <div id="tabRegister" class="auth-tab" onclick="switchAuthTab('register')">註冊</div>
     </div>
 
-    <!-- 登入 Form -->
     <div id="loginForm">
       <div class="form-group">
         <label id="lblUserSelect">選擇會員帳號</label>
@@ -192,7 +211,6 @@
       <button id="btnGuestSubmit" class="btn-action btn-reserve" style="width:100%; margin-top:10px;" onclick="guestLogin()">訪客登入 (僅查看)</button>
     </div>
 
-    <!-- 註冊 Form -->
     <div id="registerForm" style="display:none;">
       <div class="form-group">
         <label id="lblRegName">會員名稱 (不可重複)</label>
@@ -216,8 +234,7 @@
       </div>
       <div class="form-group">
         <label id="lblRegColor">個人代表色 (不可重複)</label>
-        <select id="selRegColor" class="form-control">
-        </select>
+        <select id="selRegColor" class="form-control"></select>
       </div>
       <div class="form-group">
         <label id="lblRegLang">預設介面語言</label>
@@ -242,7 +259,7 @@
         <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
       </div>
       <div class="update-time">
-        <span id="txtUpdateTime">更新時間 : 載入中...</span>
+        <span id="txtUpdateTime">更新 : 載入中...</span>
         <span class="refresh-icon" title="一鍵刷新" onclick="refreshDashboard()">🔄</span>
       </div>
     </div>
@@ -276,27 +293,30 @@
     </div>
   </div>
 
+  <!-- FAB 與遮罩選單 -->
   <div id="fabMenuOverlay" class="fab-menu-overlay" onclick="closeFabMenu()">
     <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
     <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄中心</div>
     <div class="fab-menu-item" id="menuProfile" onclick="openEditProfile()">更改個人資訊</div>
     <div class="fab-menu-item" id="menuLogout" style="color:var(--danger);" onclick="performLogout()">登出系統</div>
-    <div class="fab-menu-item" id="menuClose" style="color:var(--text-muted);" onclick="closeFabMenu()">關閉</div>
   </div>
-  <div class="fab" onclick="toggleFabMenu()">+</div>
+  <div id="fabBtn" class="fab" onclick="toggleFabMenu()">+</div>
 
+  <!-- 固定 Footer 的表單頁面 -->
   <div id="formPageContainer" class="form-page-container">
-    <div class="form-header" id="formHeader">
+    <div class="form-header">
       <h3 id="formTitle" style="font-size: 15px; font-weight: 700;">表單名稱</h3>
-      <button style="border:none; background:transparent; font-size:18px; cursor:pointer;" onclick="closeFormPage()">❌</button>
+      <button style="border:none; background:transparent; font-size:20px; cursor:pointer;" onclick="closeFormPage()">✕</button>
     </div>
+    
     <div class="form-body">
       <div id="formSidebar" class="form-sidebar"></div>
       <div id="formContent" class="form-content"></div>
     </div>
+    
     <div class="form-footer">
-      <button id="btnFormPrev" class="modal-btn" onclick="prevFormPage()">上一頁</button>
-      <button id="btnFormNext" class="modal-btn modal-btn-confirm" onclick="nextFormPage()">下一頁</button>
+      <button id="btnFormPrev" class="btn-footer btn-footer-prev" onclick="prevFormPage()">上一頁</button>
+      <button id="btnFormNext" class="btn-footer btn-footer-next" onclick="nextFormPage()">下一頁</button>
     </div>
   </div>
 
@@ -356,7 +376,7 @@
     updateDashboardButtons();
   }
 
-  // 全能 Google 試算表表單動態解析器
+  // 試算表表單解析器
   async function fetchAndParseFormsFromSheet() {
     try {
       const res = await fetch(URL_FORMS);
@@ -371,10 +391,7 @@
       for (let colIdx = 0; colIdx < headerRow.length; colIdx++) {
         const cellVal = (headerRow[colIdx] || "").trim();
         if (cellVal.startsWith("FORM_")) {
-          formBlocks.push({
-            formId: cellVal,
-            startCol: colIdx
-          });
+          formBlocks.push({ formId: cellVal, startCol: colIdx });
         }
       }
 
@@ -396,7 +413,6 @@
 
           if (!rawLabel && !rawType) continue;
 
-          // 1. 分頁解析 【...】[Page X]
           if (rawLabel.includes("【") && rawLabel.includes("】")) {
             const pageTitle = rawLabel.replace(/【|】/g, "").trim();
             currentPage = { title: pageTitle, fields: [] };
@@ -410,42 +426,24 @@
             pages.push(currentPage);
           }
 
-          // 2. 區塊標題 [#]
           if (rawType.includes("[#]")) {
-            currentPage.fields.push({
-              type: "section",
-              label: rawLabel
-            });
+            currentPage.fields.push({ type: "section", label: rawLabel });
             lastParentField = null;
             continue;
           }
 
-          // 3. 單選題 [radio]
           if (rawType.includes("[radio]")) {
-            lastParentField = {
-              id: `field_${r}_${col}`,
-              label: rawLabel,
-              type: "radio",
-              options: []
-            };
+            lastParentField = { id: `field_${r}_${col}`, label: rawLabel, type: "radio", options: [] };
             currentPage.fields.push(lastParentField);
           } 
-          // 4. 多選題組 [checkbox_group]
           else if (rawType.includes("[checkbox_group]")) {
-            lastParentField = {
-              id: `field_${r}_${col}`,
-              label: rawLabel,
-              type: "checkbox_group",
-              options: []
-            };
+            lastParentField = { id: `field_${r}_${col}`, label: rawLabel, type: "checkbox_group", options: [] };
             currentPage.fields.push(lastParentField);
           }
-          // 5. 子選項 [option] 或帶有輸入框子選項 [option_input]
           else if ((rawType.includes("[option]") || rawType.includes("[option_input]")) && lastParentField) {
             const optName = rawLabel.replace(/^-\s*/, '');
             const hasInput = rawType.includes("[option_input]");
             
-            // 提取跳頁/提交動作，如 [goto: Page 2] 或 [submit]
             let action = null;
             if (rawType.includes("[goto:")) {
               const match = rawType.match(/\[goto:\s*(Page\s*\d+)\]/i);
@@ -454,7 +452,6 @@
               action = { type: "submit" };
             }
 
-            // 提取狀態變更指令，如 [status: 登錄狀態-休息中]
             let statusTag = null;
             if (rawType.includes("[status:")) {
               const match = rawType.match(/\[status:\s*([^\]]+)\]/i);
@@ -469,29 +466,15 @@
               placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "請說明..."
             });
           } 
-          // 6. 一般核對框 [c]
           else if (rawType.includes("[c]") || rawType.includes("[checkbox]")) {
             currentPage.fields.push({
               id: `field_${r}_${col}`,
               label: rawLabel.replace(/^-\s*/, ''),
               type: "checkbox",
-              desc: rawDesc,
-              warning: rawType.includes("[warning]") ? rawType.split("[warning]")[1]?.trim() : null
+              desc: rawDesc
             });
             lastParentField = null;
           } 
-          // 7. 公式列 [formula]
-          else if (rawType.includes("[formula]")) {
-            currentPage.fields.push({
-              id: `field_${r}_${col}`,
-              label: rawLabel,
-              type: "formula",
-              formulaStr: rawType.match(/\[formula:\s*([^\]]+)\]/)?.[1] || "",
-              unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || ""
-            });
-            lastParentField = null;
-          }
-          // 8. 會員下拉選單 [v] \會員中心\A2:A
           else if (rawType.includes("[v]")) {
             currentPage.fields.push({
               id: `field_${r}_${col}`,
@@ -501,7 +484,6 @@
             });
             lastParentField = null;
           }
-          // 9. 數據輸入框 [number] / [text] / [datetime]
           else if (rawType.includes("[number]") || rawType.includes("[text]") || rawType.includes("[datetime]")) {
             currentPage.fields.push({
               id: `field_${r}_${col}`,
@@ -511,17 +493,6 @@
               unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || "",
               placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "",
               desc: rawDesc
-            });
-            lastParentField = null;
-          }
-          // 10. 資料庫連動詳情 [fetch_detail]
-          else if (rawType.includes("[fetch_detail]") || rawType.includes("fetch_detail:")) {
-            const detailKey = rawType.match(/\[fetch_detail:\s*([^\]]+)\]/)?.[1] || rawOption;
-            currentPage.fields.push({
-              id: `field_${r}_${col}`,
-              label: rawLabel,
-              type: "fetch_detail",
-              detailKey: detailKey
             });
             lastParentField = null;
           }
@@ -583,10 +554,9 @@
     const available = PRESET_COLORS.filter(c => !usedColors.includes(c.hex.toLowerCase()));
     
     if(available.length === 0) {
-      selColor.innerHTML = `<option value="">${state.currentLang==='ZH'?'全數顏色已被使用':'All colors taken'}</option>`;
+      selColor.innerHTML = `<option value="">全數顏色已被使用</option>`;
       return;
     }
-
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
@@ -603,9 +573,7 @@
             date: rows[i][0].trim(),
             user: rows[i][1] ? rows[i][1].trim() : '',
             status: rows[i][2] ? rows[i][2].trim() : '',
-            info: rows[i][3] ? rows[i][3].trim() : '',
-            O2_init: rows[i][5] ? rows[i][5].trim() : '160',
-            Iso_init: rows[i][5] ? rows[i][5].trim() : '500.23'
+            info: rows[i][3] ? rows[i][3].trim() : ''
           });
         }
       }
@@ -615,14 +583,12 @@
     }
   }
 
-  function parseCSV(text) {
-    return text.split('\n').map(r => r.split(','));
-  }
+  function parseCSV(text) { return text.split('\n').map(r => r.split(',')); }
 
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
     if(state.membersList.length === 0) {
-      sel.innerHTML = `<option value="">${state.currentLang==='ZH'?'無會員資料':'No Members'}</option>`;
+      sel.innerHTML = `<option value="">無會員資料</option>`;
       return;
     }
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
@@ -667,15 +633,11 @@
   async function syncToGoogleSheet(actionType, payload) {
     try {
       await fetch(GAS_API_URL, {
-        method: "POST",
-        mode: "no-cors",
+        method: "POST", mode: "no-cors",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: actionType, ...payload })
       });
-      console.log(`[GAS API] 同步發送成功: ${actionType}`);
-    } catch(err) {
-      console.error(`[GAS API] 同步失敗:`, err);
-    }
+    } catch(err) { console.error(`同步失敗:`, err); }
   }
 
   function switchAuthTab(tab) {
@@ -691,13 +653,11 @@
     const user = state.membersList.find(m => m.name === selectedName);
 
     if (!user) {
-      showCustomAlert(state.currentLang === 'ZH' ? "提示" : "Alert", state.currentLang === 'ZH' ? "請選擇會員帳號" : "Select an account");
-      return;
+      showCustomAlert("提示", "請選擇會員帳號"); return;
     }
 
     if (user.password && inputPwd !== user.password) {
-      showCustomAlert(state.currentLang === 'ZH' ? "登入失敗" : "Login Failed", state.currentLang === 'ZH' ? "識別密碼錯誤，請重新輸入！" : "Incorrect password.");
-      return;
+      showCustomAlert("登入失敗", "識別密碼錯誤，請重新輸入！"); return;
     }
 
     state.currentUser = user;
@@ -711,38 +671,31 @@
 
     applyLanguage();
     refreshDashboard();
-    
-    showCustomAlert(state.currentLang === 'ZH' ? "登入成功" : "Welcome", state.currentLang === 'ZH' ? `歡迎回來，${user.name}！` : `Welcome back, ${user.name}!`);
+    showCustomAlert("登入成功", `歡迎回來，${user.name}！`);
   }
 
   function guestLogin() {
     state.currentUser = { name: "訪客", role: "Guest", color: "#f1f5f9" };
     state.isGuest = true;
     document.getElementById('authPage').style.display = 'none';
-    document.getElementById('userBadge').innerText = state.currentLang==='ZH'?"訪客":"Guest";
+    document.getElementById('userBadge').innerText = "訪客";
     applyLanguage();
     refreshDashboard();
-    showCustomAlert(state.currentLang==='ZH'?"訪客模式":"Guest Mode", "已以訪客身份登入，登錄功能受限。");
+    showCustomAlert("訪客模式", "已以訪客身份登入，登錄按鈕已全數受限。");
   }
 
   function performLogout() {
     closeFabMenu();
-    showCustomConfirm(
-      state.currentLang === 'ZH' ? "確認登出" : "Logout",
-      state.currentLang === 'ZH' ? "確定要登出當前帳號嗎？" : "Are you sure you want to log out?",
-      state.currentLang === 'ZH' ? "取消" : "Cancel",
-      state.currentLang === 'ZH' ? "登出" : "Logout",
-      (confirmed) => {
-        if (confirmed) {
-          state.currentUser = null;
-          state.isGuest = false;
-          document.getElementById('txtLoginPwd').value = "";
-          document.getElementById('userBadge').innerText = state.currentLang === 'ZH' ? "未登入" : "Not Logged In";
-          document.getElementById('authPage').style.display = 'flex';
-          refreshDashboard();
-        }
+    showCustomConfirm("確認登出", "確定要登出當前帳號嗎？", "取消", "登出", (confirmed) => {
+      if (confirmed) {
+        state.currentUser = null;
+        state.isGuest = false;
+        document.getElementById('txtLoginPwd').value = "";
+        document.getElementById('userBadge').innerText = "未登入";
+        document.getElementById('authPage').style.display = 'flex';
+        refreshDashboard();
       }
-    );
+    });
   }
 
   async function performRegister() {
@@ -753,22 +706,20 @@
     const color = document.getElementById('selRegColor').value;
     const lang = document.getElementById('selRegLang').value;
 
-    if(!name || !email) { showCustomAlert("錯誤 / Error", "請完整填寫姓名與 Email"); return; }
+    if(!name || !email) { showCustomAlert("錯誤", "請完整填寫姓名與 Email"); return; }
     
     if(state.membersList.some(m => m.name.toLowerCase() === name.toLowerCase())) {
-      showCustomAlert("註冊失敗 / Failed", "會員名稱已存在，請使用其他名稱！");
-      return;
+      showCustomAlert("註冊失敗", "會員名稱已存在！"); return;
     }
 
     const newUser = { name, email, role, password, color, lang };
     state.membersList.push(newUser);
-
     await syncToGoogleSheet("registerUser", newUser);
 
     initAuthDropdown();
     initColorDropdown();
     switchAuthTab('login');
-    showCustomAlert("註冊成功 / Success", "註冊資料已同步寫入會員中心！請選擇帳號登入。");
+    showCustomAlert("註冊成功", "註冊資料已同步寫入！請選擇帳號登入。");
   }
 
   function toggleLanguage() {
@@ -788,14 +739,6 @@
     document.getElementById('lblPassword').innerText = isZH ? "識別密碼" : "Password";
     document.getElementById('btnLoginSubmit').innerText = isZH ? "登入" : "Login";
     document.getElementById('btnGuestSubmit').innerText = isZH ? "訪客登入 (僅查看)" : "Guest Login (Read Only)";
-    
-    document.getElementById('lblRegName').innerText = isZH ? "會員名稱 (不可重複)" : "Username (Unique)";
-    document.getElementById('lblRegEmail').innerText = isZH ? "電子信箱" : "Email Address";
-    document.getElementById('lblRegRole').innerText = isZH ? "身份別" : "Membership Role";
-    document.getElementById('lblRegPwd').innerText = isZH ? "設定識別密碼" : "Set Password";
-    document.getElementById('lblRegColor').innerText = isZH ? "個人代表色 (不可重複)" : "User Color (Unique)";
-    document.getElementById('lblRegLang').innerText = isZH ? "預設介面語言" : "Default Language";
-    document.getElementById('btnRegisterSubmit').innerText = isZH ? "註冊新帳號" : "Register Account";
 
     document.getElementById('appTitle').innerText = isZH ? "智慧實驗日誌" : "Smart E-Labnote";
     document.getElementById('btnTodayExp').innerText = isZH ? "今日實驗登錄" : "Today Exp";
@@ -807,10 +750,10 @@
     document.getElementById('menuRecord').innerText = isZH ? "紀錄中心" : "Record Center";
     document.getElementById('menuProfile').innerText = isZH ? "更改個人資訊" : "Edit Profile";
     document.getElementById('menuLogout').innerText = isZH ? "登出系統" : "Logout";
-    document.getElementById('menuClose').innerText = isZH ? "關閉" : "Close";
     document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
   }
 
+  // 1. 訪客按鈕權限修復：訪客登入時，全部 4 個按鈕一律停用！
   function updateDashboardButtons() {
     const todayHasExp = state.dataCenter.some(d => d.date === state.simulatedDate);
     const d = new Date(state.simulatedDate);
@@ -822,7 +765,7 @@
       document.getElementById('btnTodayExp').classList.add('btn-disabled');
       document.getElementById('btnTomorrowPrep').classList.add('btn-disabled');
       document.getElementById('btnReserveExp').classList.add('btn-disabled');
-      document.getElementById('btnMakeupExp').classList.remove('btn-disabled');
+      document.getElementById('btnMakeupExp').classList.add('btn-disabled'); // 👈 訪客補登按鈕同步禁用！
       return;
     }
 
@@ -835,11 +778,10 @@
   function renderTimeline() {
     const container = document.getElementById('timelineContainer');
     let html = `<div class="timeline-line"></div>`;
-
     const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
     
     if(sorted.length === 0) {
-      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">${state.currentLang==='ZH'?'今日無實驗紀錄':'No experiment records today'}</div>`;
+      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">今日無實驗紀錄</div>`;
       return;
     }
 
@@ -866,13 +808,7 @@
   }
 
   let currentFormCtx = {
-    formId: '',
-    pages: [],
-    currentPageIdx: 0,
-    data: {},
-    isMakeup: false,
-    selectedAction: null,
-    selectedStatusTag: null
+    formId: '', pages: [], currentPageIdx: 0, data: {}, isMakeup: false, selectedAction: null, selectedStatusTag: null
   };
 
   function handleTodayExperiment() {
@@ -887,7 +823,7 @@
       case "休息中": openForm("FORM_004"); break;
       case "訊號搜集完成": openForm("FORM_005"); break;
       case "開始善後": openForm("FORM_006"); break;
-      default: showCustomAlert("提示 / Alert", `當前實驗狀態為 [${todayExp.status}]，無後續表單。`);
+      default: showCustomAlert("提示", `當前實驗狀態為 [${todayExp.status}]，無後續表單。`);
     }
   }
 
@@ -922,12 +858,12 @@
     `).join('');
   }
 
-  // 表單渲染器：精準渲染試算表定義的所有題型
+  // 3. 重構渲染器：使用獨立 option-card 徹底解決排版太擠、分不清上下問題
   function renderFormCurrentPage() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
 
-    let html = `<h4 style="margin-bottom:16px; font-size:13px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
+    let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
 
     page.fields.forEach(field => {
       const val = currentFormCtx.data[field.id] || field.default || "";
@@ -954,23 +890,15 @@
           </div>
         `;
       }
-      else if (field.type === "formula") {
-        html += `
-          <div class="form-group" style="background:var(--primary-light); padding:10px; border-radius:var(--radius-sm);">
-            <label style="color:var(--primary);">${field.label}</label>
-            <div style="font-size:14px; font-weight:700; color:var(--text-primary);" id="calc_${field.id}">${val || '根據公式自動計算...'} ${field.unit}</div>
-          </div>
-        `;
-      }
       else if (field.type === "checkbox") {
         const checked = currentFormCtx.data[field.id] ? 'checked' : '';
+        const isSelected = !!currentFormCtx.data[field.id];
         html += `
-          <div class="checkbox-item">
-            <input type="checkbox" id="${field.id}" ${checked} onchange="saveFormFieldData('${field.id}', this.checked)">
+          <div class="option-card ${isSelected ? 'selected' : ''}" onclick="toggleOptionCheckbox('${field.id}')">
+            <input type="checkbox" id="${field.id}" ${checked} onclick="event.stopPropagation()" onchange="saveFormFieldData('${field.id}', this.checked); renderFormCurrentPage();">
             <div>
               <label for="${field.id}">${field.label}</label>
               ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
-              ${field.warning ? `<div class="warning-box">${field.warning}</div>` : ''}
             </div>
           </div>
         `;
@@ -979,15 +907,15 @@
         html += `<div class="form-group"><label>${field.label}</label>`;
         field.options.forEach((opt, idx) => {
           const optName = typeof opt === 'string' ? opt : opt.name;
-          const checked = val === optName ? 'checked' : '';
+          const isSelected = val === optName;
           const optId = `${field.id}_opt_${idx}`;
           
           html += `
-            <div style="margin-bottom:8px; font-size:13px;">
-              <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${checked} onchange="handleRadioSelect('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}')">
+            <div class="option-card ${isSelected ? 'selected' : ''}" onclick="selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}')">
+              <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation()">
               <label for="${optId}">${optName}</label>
-              ${opt.hasInput ? `<input type="text" class="form-control" style="margin-top:4px;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
             </div>
+            ${(opt.hasInput && isSelected) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
           `;
         });
         html += `</div>`;
@@ -999,53 +927,49 @@
           const isChecked = currentFormCtx.data[field.id] && currentFormCtx.data[field.id].includes(optName);
           
           html += `
-            <div class="checkbox-item">
-              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onchange="handleCheckboxGroupSelect('${field.id}', '${optName}', this.checked)">
-              <div>
-                <label for="${field.id}_${idx}">${optName}</label>
-                ${opt.hasInput ? `<input type="text" class="form-control" style="margin-top:4px;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
-              </div>
+            <div class="option-card ${isChecked ? 'selected' : ''}" onclick="toggleCheckboxGroupOption('${field.id}', '${optName}')">
+              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation()">
+              <label for="${field.id}_${idx}">${optName}</label>
             </div>
+            ${(opt.hasInput && isChecked) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
           `;
         });
         html += `</div>`;
-      }
-      else if (field.type === "fetch_detail") {
-        const detailText = calculateFetchDetail(field.detailKey);
-        html += `
-          <div class="form-group" style="background:#fffbeb; padding:12px; border-radius:var(--radius-sm); border:1px solid #fde68a;">
-            <label style="color:#b45309;">${field.label}</label>
-            <pre style="font-size:12px; background:#fff; padding:8px; border-radius:4px; color:var(--text-primary); margin-top:6px;">${detailText}</pre>
-          </div>
-        `;
       }
     });
 
     container.innerHTML = html;
 
-    document.getElementById('btnFormPrev').style.display = currentFormCtx.currentPageIdx === 0 ? 'none' : 'inline-block';
+    // 4. 固定 Footer 按鈕文字邏輯修復
+    document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-    document.getElementById('btnFormNext').innerText = (isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit')) ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+    const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
+    document.getElementById('btnFormNext').innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
   }
 
-  function handleRadioSelect(fieldId, val, action, statusTag) {
-    saveFormFieldData(fieldId, val);
+  function selectOptionRadio(fieldId, optName, action, statusTag) {
+    saveFormFieldData(fieldId, optName);
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
-    
-    // 更新「下一頁 / 提交」按鈕文字
-    const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-    document.getElementById('btnFormNext').innerText = (isLastPage || (action && action.type === 'submit')) ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+    renderFormCurrentPage();
   }
 
-  function handleCheckboxGroupSelect(fieldId, val, isChecked) {
+  function toggleOptionCheckbox(fieldId) {
+    const currentVal = !currentFormCtx.data[fieldId];
+    saveFormFieldData(fieldId, currentVal);
+    renderFormCurrentPage();
+  }
+
+  function toggleCheckboxGroupOption(fieldId, optName) {
     if (!currentFormCtx.data[fieldId]) currentFormCtx.data[fieldId] = [];
-    if (isChecked) {
-      if (!currentFormCtx.data[fieldId].includes(val)) currentFormCtx.data[fieldId].push(val);
+    const idx = currentFormCtx.data[fieldId].indexOf(optName);
+    if (idx > -1) {
+      currentFormCtx.data[fieldId].splice(idx, 1);
     } else {
-      currentFormCtx.data[fieldId] = currentFormCtx.data[fieldId].filter(v => v !== val);
+      currentFormCtx.data[fieldId].push(optName);
     }
     state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
+    renderFormCurrentPage();
   }
 
   function saveFormFieldData(fieldId, val) {
@@ -1062,14 +986,13 @@
   }
 
   function nextFormPage() {
-    // 判斷單選題帶出的條件跳頁或提交動作
     if (currentFormCtx.selectedAction) {
       if (currentFormCtx.selectedAction.type === 'submit') {
         submitFormFinal();
         return;
       }
       else if (currentFormCtx.selectedAction.type === 'goto') {
-        const targetPageTitle = currentFormCtx.selectedAction.target; // 例如 "Page 2"
+        const targetPageTitle = currentFormCtx.selectedAction.target;
         const targetIdx = currentFormCtx.pages.findIndex(p => p.title.toLowerCase().includes(targetPageTitle.toLowerCase()));
         if (targetIdx !== -1) {
           currentFormCtx.currentPageIdx = targetIdx;
@@ -1116,26 +1039,13 @@
 
     closeFormPage();
     await refreshDashboard();
-    showCustomAlert("提交成功 / Submitted", `表單已成功寫入 Google 試算表！\n實驗狀態更變為：[${targetStatus}]`);
-  }
-
-  function calculateFetchDetail(key) {
-    const exp = state.dataCenter.find(d => d.date === state.simulatedDate) || state.dataCenter[0] || {};
-    if(key === "O2_and_Isoflurane_usage") {
-      return `O2：${exp.O2_init || 160}→120\nIsoflurane：${exp.Iso_init || 500.23}→485.54`;
-    } 
-    else if(key === "NaCl_and_Isoflurane_usage") {
-      return `NaCl：${exp.user || 'Daniel'}, July 25, 9g\nIsoflurane：${exp.user || 'Daniel'}, July 25, 14.69g`;
-    }
-    return "尚無資料";
+    showCustomAlert("提交成功", `表單已成功寫入！\n實驗狀態更變為：[${targetStatus}]`);
   }
 
   function showCustomAlert(title, message) {
     document.getElementById('modalTitle').innerText = title;
     document.getElementById('modalMessage').innerText = message;
-    document.getElementById('modalBtnGroup').innerHTML = `
-      <button class="modal-btn modal-btn-confirm" onclick="closeCustomModal(true)">${state.currentLang==='ZH'?'確定':'OK'}</button>
-    `;
+    document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">確定</button>`;
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
@@ -1155,25 +1065,29 @@
     if(window.confirmCallback) window.confirmCallback(choice);
   }
 
-  function closeCustomModal() {
-    document.getElementById('customModalBackdrop').style.display = 'none';
-  }
+  function closeCustomModal() { document.getElementById('customModalBackdrop').style.display = 'none'; }
 
+  // 2. 懸浮按鈕 (+) 遮擋與動畫修復
   function toggleFabMenu() {
     const overlay = document.getElementById('fabMenuOverlay');
-    overlay.style.display = overlay.style.display === 'flex' ? 'none' : 'flex';
+    const btn = document.getElementById('fabBtn');
+    const isOpening = overlay.style.display !== 'flex';
+    
+    overlay.style.display = isOpening ? 'flex' : 'none';
+    btn.classList.toggle('active', isOpening);
   }
 
   function closeFabMenu() {
     document.getElementById('fabMenuOverlay').style.display = 'none';
+    document.getElementById('fabBtn').classList.remove('active');
   }
 
-  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心 / Schedule", "開啟排程中心面板。"); }
-  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心 / Record", "開啟實驗紀錄中心面板。"); }
+  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心", "開啟排程中心面板。"); }
+  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心", "開啟實驗紀錄中心面板。"); }
   function openEditProfile() {
     closeFabMenu();
     if(state.currentUser) {
-      showCustomAlert("個人資訊 / Profile", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}\n身份 : ${state.currentUser.role}`);
+      showCustomAlert("個人資訊", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}\n身份 : ${state.currentUser.role}`);
     }
   }
 </script>
