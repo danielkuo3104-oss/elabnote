@@ -133,9 +133,13 @@
   </style>
 
 
-  <!-- 加上 ?v=2.0 強制瀏覽器重新向伺服器拉取最新圖片 -->
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-2.0.png?v=2.0">
+  <!-- 1. 標準網頁分頁圖示 (不加 sizes，讓 Chrome 標籤頁順利讀取) -->
+  <link rel="icon" type="image/png" href="icon-2.0.png?v=2.0">
+  
+  <!-- 2. Apple / PWA 觸控圖示 -->
   <link rel="apple-touch-icon" href="icon-2.0.png?v=2.0">
+  
+  <!-- 3. Web App Manifest -->
   <link rel="manifest" href="manifest.json?v=2.0">
   
   <!-- 3. 新版跨平台 Web App Meta 標籤 (解決 Deprecated 警告) -->
