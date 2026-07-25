@@ -1,7 +1,7 @@
 {
   "name": "智慧實驗日誌 E-labnote",
   "short_name": "e-Lab",
-  "description": "智慧實驗日誌與數據追蹤系統",
+  "description": "E-labnote",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#bce0fd",
