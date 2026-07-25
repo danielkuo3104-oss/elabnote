@@ -6,19 +6,18 @@
   <title>智慧實驗日誌 E-labnote</title>
   <style>
     :root {
-      /* 專業臨床實驗室配色 */
       --bg-main: #f8fafc;
       --card-bg: #ffffff;
       --text-primary: #0f172a;
       --text-secondary: #334155;
       --text-muted: #64748b;
       
-      --primary: #0284c7;        /* Lab Blue */
-      --primary-dark: #0369a1;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
       --primary-light: #f0f9ff;
       
-      --success: #059669;        /* Clinical Green */
-      --warning: #d97706;        /* Alert Amber */
+      --success: #059669;
+      --warning: #d97706;
       --danger: #dc2626;
       
       --border-color: #e2e8f0;
@@ -29,84 +28,45 @@
       --radius-lg: 14px;
       
       --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     
-    body { 
-      background-color: var(--bg-main); 
-      color: var(--text-primary); 
-      display: flex; 
-      justify-content: center; 
-      align-items: flex-start;
-      min-height: 100vh;
-    }
+    body { background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
 
     .app-container {
-      width: 100%; 
-      max-width: 480px; 
-      background: var(--bg-main); 
-      min-height: 100vh;
-      display: flex; 
-      flex-direction: column;
-      position: relative;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      width: 100%; max-width: 480px; background: var(--bg-main); min-height: 100vh;
+      display: flex; flex-direction: column; position: relative; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
     }
 
-    /* 專業頂部導覽列 */
+    /* 頂部 Header */
     .header {
-      background: var(--card-bg); 
-      padding: 16px 20px; 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-      border-bottom: 1px solid var(--border-color);
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      background: var(--card-bg); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;
     }
-    .header-title h1 { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.3px; display: flex; align-items: center; gap: 6px; }
+    .header-title h1 { font-size: 17px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
     .header-title h1::before { content: ""; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
-    .header-title h2 { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-left: 10px; }
+    .header-title h2 { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-left: 10px; }
     
     .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-    .user-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); }
-    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .lang-btn:active { background: var(--primary-light); }
-    .update-time { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; display: flex; align-items: center; gap: 4px; }
-    .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s ease; }
+    .user-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
+    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .update-time { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, monospace; display: flex; align-items: center; gap: 4px; }
+    .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s; }
     .refresh-icon:active { transform: rotate(180deg); }
 
     .main-content { padding: 16px; flex: 1; overflow-y: auto; }
 
-    /* 實驗狀態儀表板卡片 */
-    .dashboard-card { 
-      background: var(--card-bg); 
-      border: 1px solid var(--border-color); 
-      border-radius: var(--radius-lg); 
-      padding: 16px; 
-      margin-bottom: 16px; 
-      box-shadow: var(--shadow-sm);
-    }
+    .dashboard-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
     .status-badge { background: #fef3c7; color: var(--warning); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; border: 1px solid #fde68a; }
     .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
     .schedule-tag { border-radius: 4px; padding: 2px 8px; font-size: 11px; margin-right: 8px; font-weight: 600; font-family: ui-monospace, monospace; }
 
-    /* 行動按鈕區（高質感醫用風格） */
     .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
     .btn-action {
-      padding: 14px 12px; 
-      border-radius: var(--radius-md); 
-      border: 1px solid var(--border-color); 
-      font-weight: 600; 
-      font-size: 13px;
-      cursor: pointer; 
-      text-align: center; 
-      transition: all 0.15s ease;
-      background: var(--card-bg);
-      color: var(--text-primary);
-      box-shadow: var(--shadow-sm);
+      padding: 14px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); font-weight: 600; font-size: 13px;
+      cursor: pointer; text-align: center; transition: all 0.15s; background: var(--card-bg); color: var(--text-primary); box-shadow: var(--shadow-sm);
     }
     .btn-action:active { transform: translateY(1px); }
     .btn-disabled { opacity: 0.4; cursor: not-allowed !important; pointer-events: none; background: #f1f5f9; color: var(--text-muted); }
@@ -116,7 +76,6 @@
     .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
     .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
-    /* 實驗時間軸 */
     .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; }
     .timeline-line { position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: var(--border-color); }
     .timeline-item { position: relative; margin-bottom: 14px; cursor: pointer; }
@@ -124,27 +83,22 @@
     .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
 
-    /* 功能浮動按鈕 */
     .fab {
       position: fixed; right: calc(50% - 220px); bottom: 24px; width: 48px; height: 48px;
       background: var(--text-primary); color: #fff; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 22px; cursor: pointer; border: none; box-shadow: var(--shadow-md);
-      z-index: 10; transition: transform 0.2s;
+      justify-content: center; font-size: 22px; cursor: pointer; border: none; box-shadow: var(--shadow-md); z-index: 10;
     }
-    .fab:active { transform: scale(0.95); }
     @media (max-width: 480px) { .fab { right: 20px; } }
 
     .fab-menu-overlay {
       position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.3);
-      backdrop-filter: blur(4px); display: none; flex-direction: column; justify-content: flex-end;
-      align-items: flex-end; padding: 80px 20px; z-index: 9;
+      backdrop-filter: blur(4px); display: none; flex-direction: column; justify-content: flex-end; align-items: flex-end; padding: 80px 20px; z-index: 9;
     }
     .fab-menu-item {
       background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 20px;
       margin-bottom: 10px; font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: var(--shadow-md); color: var(--text-primary);
     }
 
-    /* 專業 Modal 提示框 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
@@ -160,14 +114,14 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    /* 表單頁面 */
+    /* 動態渲染表單 */
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       background: var(--card-bg); z-index: 100; flex-direction: column;
     }
     .form-header { padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); }
     .form-body { flex: 1; display: flex; overflow: hidden; position: relative; }
-    .form-sidebar { width: 90px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; }
+    .form-sidebar { width: 95px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; }
     .sidebar-bookmark { padding: 12px 8px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); font-weight: 500; }
     .sidebar-bookmark.active { background: var(--card-bg); font-weight: 700; color: var(--primary); border-left: 3px solid var(--primary); }
     .form-content { flex: 1; padding: 16px; overflow-y: auto; }
@@ -175,28 +129,19 @@
 
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 6px; color: var(--text-primary); }
-    .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-main); color: var(--text-primary); outline: none; transition: border-color 0.2s; }
+    .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-main); color: var(--text-primary); outline: none; }
     .form-control:focus { border-color: var(--border-focus); background: #fff; }
+    
     .checkbox-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 13px; color: var(--text-primary); }
     .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+    .section-header { font-size: 12px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 6px 10px; border-radius: 4px; margin: 12px 0 8px 0; }
+    .warning-box { font-size: 11px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; padding: 8px 10px; border-radius: var(--radius-sm); margin-top: 4px; }
 
-    .test-panel {
-      position: absolute; bottom: 0; left: 0; right: 0; background: var(--text-primary); color: #fff;
-      padding: 8px 16px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; z-index: 50;
-    }
-    .test-panel input { padding: 2px 6px; border-radius: 4px; border: none; font-size: 11px; }
-
-    /* 登入頁面（徹底解決瀏海/狀態列重疊） */
     .auth-container {
       position: absolute; top:0; left:0; right:0; bottom:0; background: var(--card-bg); z-index: 200;
       padding: 24px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto;
     }
-    .auth-header-bar {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 24px;
-      padding-top: env(safe-area-inset-top, 10px);
-    }
+    .auth-header-bar { display: flex; justify-content: flex-end; margin-bottom: 24px; padding-top: env(safe-area-inset-top, 10px); }
     .auth-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 24px; color: var(--text-primary); letter-spacing: -0.5px; }
     .auth-tabs { display: flex; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); }
     .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-muted); }
@@ -293,7 +238,7 @@
     </div>
     <div class="header-right">
       <div style="display:flex; gap:6px; align-items:center;">
-        <div id="userBadge" class="user-badge">未登入</div>
+        <div id="userBadge" class="user-badge" onclick="performLogout()" title="點擊登出">未登入</div>
         <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
       </div>
       <div class="update-time">
@@ -335,15 +280,10 @@
     <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
     <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄中心</div>
     <div class="fab-menu-item" id="menuProfile" onclick="openEditProfile()">更改個人資訊</div>
-    <div class="fab-menu-item" id="menuClose" style="color:var(--danger);" onclick="closeFabMenu()">關閉</div>
+    <div class="fab-menu-item" id="menuLogout" style="color:var(--danger);" onclick="performLogout()">登出系統</div>
+    <div class="fab-menu-item" id="menuClose" style="color:var(--text-muted);" onclick="closeFabMenu()">關閉</div>
   </div>
   <div class="fab" onclick="toggleFabMenu()">+</div>
-
-  <div id="testPanel" class="test-panel">
-    <span>[測試面板] 系統時間:</span>
-    <input type="date" id="testDateInput" value="2026-07-25" onchange="onTestDateChange()">
-    <span style="cursor:pointer;" onclick="toggleTestPanel(false)">❌</span>
-  </div>
 
   <div id="formPageContainer" class="form-page-container">
     <div class="form-header" id="formHeader">
@@ -392,15 +332,15 @@
     isGuest: false,
     currentLang: "ZH",
     simulatedDate: "2026-07-25",
-    showTestPanel: true,
     membersList: [],
     dataCenter: [],
-    formDataCache: {}
+    formDataCache: {},
+    dynamicForms: {}
   };
 
   window.addEventListener('DOMContentLoaded', async () => {
-    toggleTestPanel(state.showTestPanel);
     applyLanguage();
+    await fetchAndParseFormsFromSheet();
     await refreshDashboard();
   });
 
@@ -416,7 +356,193 @@
     updateDashboardButtons();
   }
 
-  // 1. 完整解析 CSV 並讀取 F 欄位識別密碼
+  // 全能 Google 試算表表單動態解析器
+  async function fetchAndParseFormsFromSheet() {
+    try {
+      const res = await fetch(URL_FORMS);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+
+      if (rows.length < 2) return;
+
+      const headerRow = rows[0];
+      const formBlocks = [];
+
+      for (let colIdx = 0; colIdx < headerRow.length; colIdx++) {
+        const cellVal = (headerRow[colIdx] || "").trim();
+        if (cellVal.startsWith("FORM_")) {
+          formBlocks.push({
+            formId: cellVal,
+            startCol: colIdx
+          });
+        }
+      }
+
+      const parsedForms = {};
+
+      formBlocks.forEach(block => {
+        const formId = block.formId;
+        const col = block.startCol;
+        
+        const pages = [];
+        let currentPage = null;
+        let lastParentField = null;
+
+        for (let r = 2; r < rows.length; r++) {
+          const rawLabel = (rows[r][col] || "").trim();
+          const rawType = (rows[r][col + 1] || "").trim();
+          const rawOption = (rows[r][col + 2] || "").trim();
+          const rawDesc = (rows[r][col + 3] || "").trim();
+
+          if (!rawLabel && !rawType) continue;
+
+          // 1. 分頁解析 【...】[Page X]
+          if (rawLabel.includes("【") && rawLabel.includes("】")) {
+            const pageTitle = rawLabel.replace(/【|】/g, "").trim();
+            currentPage = { title: pageTitle, fields: [] };
+            pages.push(currentPage);
+            lastParentField = null;
+            continue;
+          }
+
+          if (!currentPage) {
+            currentPage = { title: "Page 1 基本資訊", fields: [] };
+            pages.push(currentPage);
+          }
+
+          // 2. 區塊標題 [#]
+          if (rawType.includes("[#]")) {
+            currentPage.fields.push({
+              type: "section",
+              label: rawLabel
+            });
+            lastParentField = null;
+            continue;
+          }
+
+          // 3. 單選題 [radio]
+          if (rawType.includes("[radio]")) {
+            lastParentField = {
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "radio",
+              options: []
+            };
+            currentPage.fields.push(lastParentField);
+          } 
+          // 4. 多選題組 [checkbox_group]
+          else if (rawType.includes("[checkbox_group]")) {
+            lastParentField = {
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "checkbox_group",
+              options: []
+            };
+            currentPage.fields.push(lastParentField);
+          }
+          // 5. 子選項 [option] 或帶有輸入框子選項 [option_input]
+          else if ((rawType.includes("[option]") || rawType.includes("[option_input]")) && lastParentField) {
+            const optName = rawLabel.replace(/^-\s*/, '');
+            const hasInput = rawType.includes("[option_input]");
+            
+            // 提取跳頁/提交動作，如 [goto: Page 2] 或 [submit]
+            let action = null;
+            if (rawType.includes("[goto:")) {
+              const match = rawType.match(/\[goto:\s*(Page\s*\d+)\]/i);
+              if (match) action = { type: "goto", target: match[1] };
+            } else if (rawType.includes("[submit]")) {
+              action = { type: "submit" };
+            }
+
+            // 提取狀態變更指令，如 [status: 登錄狀態-休息中]
+            let statusTag = null;
+            if (rawType.includes("[status:")) {
+              const match = rawType.match(/\[status:\s*([^\]]+)\]/i);
+              if (match) statusTag = match[1];
+            }
+
+            lastParentField.options.push({
+              name: optName,
+              hasInput: hasInput,
+              action: action,
+              statusTag: statusTag,
+              placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "請說明..."
+            });
+          } 
+          // 6. 一般核對框 [c]
+          else if (rawType.includes("[c]") || rawType.includes("[checkbox]")) {
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel.replace(/^-\s*/, ''),
+              type: "checkbox",
+              desc: rawDesc,
+              warning: rawType.includes("[warning]") ? rawType.split("[warning]")[1]?.trim() : null
+            });
+            lastParentField = null;
+          } 
+          // 7. 公式列 [formula]
+          else if (rawType.includes("[formula]")) {
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "formula",
+              formulaStr: rawType.match(/\[formula:\s*([^\]]+)\]/)?.[1] || "",
+              unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || ""
+            });
+            lastParentField = null;
+          }
+          // 8. 會員下拉選單 [v] \會員中心\A2:A
+          else if (rawType.includes("[v]")) {
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "user_select",
+              default: state.currentUser ? state.currentUser.name : "Daniel"
+            });
+            lastParentField = null;
+          }
+          // 9. 數據輸入框 [number] / [text] / [datetime]
+          else if (rawType.includes("[number]") || rawType.includes("[text]") || rawType.includes("[datetime]")) {
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: rawType.includes("[number]") ? "number" : "text",
+              default: rawType.match(/\[default:\s*([^\]]+)\]/)?.[1] || (rawLabel.includes("日期") ? state.simulatedDate : ""),
+              unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || "",
+              placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "",
+              desc: rawDesc
+            });
+            lastParentField = null;
+          }
+          // 10. 資料庫連動詳情 [fetch_detail]
+          else if (rawType.includes("[fetch_detail]") || rawType.includes("fetch_detail:")) {
+            const detailKey = rawType.match(/\[fetch_detail:\s*([^\]]+)\]/)?.[1] || rawOption;
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "fetch_detail",
+              detailKey: detailKey
+            });
+            lastParentField = null;
+          }
+        }
+
+        parsedForms[formId] = pages;
+      });
+
+      state.dynamicForms = parsedForms;
+    } catch (err) {
+      console.error("動態解析表單中心失敗:", err);
+    }
+  }
+
+  function getFormStructure(formId) {
+    if (state.dynamicForms && state.dynamicForms[formId]) {
+      return state.dynamicForms[formId];
+    }
+    return [{ title: "Page 1 基本資訊", fields: [{ id: "fallback_1", label: "同步試算表中...", type: "checkbox" }] }];
+  }
+
   async function fetchMembersFromSheet() {
     try {
       const res = await fetch(URL_MEMBERS);
@@ -431,7 +557,7 @@
             email: rows[i][1] ? rows[i][1].trim() : '',
             color: rows[i][3] ? rows[i][3].trim() : '#f1f5f9',
             role: rows[i][4] ? rows[i][4].trim() : '協作會員',
-            password: rows[i][5] ? rows[i][5].trim() : '', // 👈 讀取 F 欄位識別密碼
+            password: rows[i][5] ? rows[i][5].trim() : '',
             lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
           });
         }
@@ -447,7 +573,6 @@
   function checkDuplicateName() {
     const nameInput = document.getElementById('txtRegName').value.trim().toLowerCase();
     const isDuplicate = state.membersList.some(m => m.name.toLowerCase() === nameInput);
-    
     document.getElementById('msgDuplicateName').style.display = isDuplicate ? 'block' : 'none';
     document.getElementById('btnRegisterSubmit').classList.toggle('btn-disabled', isDuplicate);
   }
@@ -455,7 +580,6 @@
   function initColorDropdown() {
     const usedColors = state.membersList.map(m => m.color.toLowerCase());
     const selColor = document.getElementById('selRegColor');
-    
     const available = PRESET_COLORS.filter(c => !usedColors.includes(c.hex.toLowerCase()));
     
     if(available.length === 0) {
@@ -463,9 +587,7 @@
       return;
     }
 
-    selColor.innerHTML = available.map(c => `
-      <option value="${c.hex}">${c.name}</option>
-    `).join('');
+    selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
   async function fetchDataCenterFromSheet() {
@@ -563,7 +685,6 @@
     document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
   }
 
-  // 2. 嚴格比對識別密碼 + 乾淨歡迎語
   function performLogin() {
     const selectedName = document.getElementById('selLoginUser').value;
     const inputPwd = document.getElementById('txtLoginPwd').value.trim();
@@ -575,7 +696,7 @@
     }
 
     if (user.password && inputPwd !== user.password) {
-      showCustomAlert(state.currentLang === 'ZH' ? "登入失敗" : "Login Failed", state.currentLang === 'ZH' ? "識別密碼錯誤，請重新輸入！" : "Incorrect password. Please try again.");
+      showCustomAlert(state.currentLang === 'ZH' ? "登入失敗" : "Login Failed", state.currentLang === 'ZH' ? "識別密碼錯誤，請重新輸入！" : "Incorrect password.");
       return;
     }
 
@@ -591,9 +712,7 @@
     applyLanguage();
     refreshDashboard();
     
-    const welcomeTitle = state.currentLang === 'ZH' ? "登入成功" : "Welcome";
-    const welcomeMsg = state.currentLang === 'ZH' ? `歡迎回來，${user.name}！` : `Welcome back, ${user.name}!`;
-    showCustomAlert(welcomeTitle, welcomeMsg);
+    showCustomAlert(state.currentLang === 'ZH' ? "登入成功" : "Welcome", state.currentLang === 'ZH' ? `歡迎回來，${user.name}！` : `Welcome back, ${user.name}!`);
   }
 
   function guestLogin() {
@@ -603,7 +722,27 @@
     document.getElementById('userBadge').innerText = state.currentLang==='ZH'?"訪客":"Guest";
     applyLanguage();
     refreshDashboard();
-    showCustomAlert(state.currentLang==='ZH'?"訪客模式":"Guest Mode", state.currentLang==='ZH'?"已以訪客身份登入，登錄按鈕功能將受限。":"Logged in as Guest. Form submissions are restricted.");
+    showCustomAlert(state.currentLang==='ZH'?"訪客模式":"Guest Mode", "已以訪客身份登入，登錄功能受限。");
+  }
+
+  function performLogout() {
+    closeFabMenu();
+    showCustomConfirm(
+      state.currentLang === 'ZH' ? "確認登出" : "Logout",
+      state.currentLang === 'ZH' ? "確定要登出當前帳號嗎？" : "Are you sure you want to log out?",
+      state.currentLang === 'ZH' ? "取消" : "Cancel",
+      state.currentLang === 'ZH' ? "登出" : "Logout",
+      (confirmed) => {
+        if (confirmed) {
+          state.currentUser = null;
+          state.isGuest = false;
+          document.getElementById('txtLoginPwd').value = "";
+          document.getElementById('userBadge').innerText = state.currentLang === 'ZH' ? "未登入" : "Not Logged In";
+          document.getElementById('authPage').style.display = 'flex';
+          refreshDashboard();
+        }
+      }
+    );
   }
 
   async function performRegister() {
@@ -667,22 +806,13 @@
     document.getElementById('menuSchedule').innerText = isZH ? "排程中心" : "Schedule Center";
     document.getElementById('menuRecord').innerText = isZH ? "紀錄中心" : "Record Center";
     document.getElementById('menuProfile').innerText = isZH ? "更改個人資訊" : "Edit Profile";
+    document.getElementById('menuLogout').innerText = isZH ? "登出系統" : "Logout";
     document.getElementById('menuClose').innerText = isZH ? "關閉" : "Close";
     document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
   }
 
-  function onTestDateChange() {
-    state.simulatedDate = document.getElementById('testDateInput').value;
-    refreshDashboard();
-  }
-
-  function toggleTestPanel(show) {
-    document.getElementById('testPanel').style.display = show ? 'flex' : 'none';
-  }
-
   function updateDashboardButtons() {
     const todayHasExp = state.dataCenter.some(d => d.date === state.simulatedDate);
-    
     const d = new Date(state.simulatedDate);
     d.setDate(d.getDate() + 1);
     const tomorrowStr = d.toISOString().split('T')[0];
@@ -740,7 +870,9 @@
     pages: [],
     currentPageIdx: 0,
     data: {},
-    isMakeup: false
+    isMakeup: false,
+    selectedAction: null,
+    selectedStatusTag: null
   };
 
   function handleTodayExperiment() {
@@ -761,7 +893,6 @@
 
   function handleTomorrowPrep() {
     if(state.isGuest) return;
-    showCustomAlert("明日準備", "已載入明日預約資料進行檢查表填寫。");
     openForm("FORM_002_1");
   }
 
@@ -770,18 +901,16 @@
     currentFormCtx.currentPageIdx = 0;
     currentFormCtx.isMakeup = isMakeup;
     currentFormCtx.data = state.formDataCache[formId] || {};
+    currentFormCtx.selectedAction = null;
+    currentFormCtx.selectedStatusTag = null;
 
     currentFormCtx.pages = getFormStructure(formId);
-    setupFormTheme(formId);
+    document.getElementById('formTitle').innerText = formId;
 
     renderFormSidebar();
     renderFormCurrentPage();
 
     document.getElementById('formPageContainer').style.display = 'flex';
-  }
-
-  function setupFormTheme(formId) {
-    document.getElementById('formTitle').innerText = formId;
   }
 
   function renderFormSidebar() {
@@ -793,6 +922,7 @@
     `).join('');
   }
 
+  // 表單渲染器：精準渲染試算表定義的所有題型
   function renderFormCurrentPage() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
@@ -802,19 +932,37 @@
     page.fields.forEach(field => {
       const val = currentFormCtx.data[field.id] || field.default || "";
 
-      if(field.type === "info") {
-        html += `<div style="font-weight:600; font-size:12px; background:#f0f9ff; color:#0369a1; padding:10px; border-radius:var(--radius-sm); margin-bottom:12px; border:1px solid #bae6fd;">${field.label}</div>`;
+      if (field.type === "section") {
+        html += `<div class="section-header">${field.label}</div>`;
       }
-      else if(field.type === "text" || field.type === "number") {
+      else if (field.type === "user_select") {
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <input type="${field.type}" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value)">
+            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value)">
+              ${state.membersList.map(m => `<option value="${m.name}" ${val === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      }
+      else if (field.type === "text" || field.type === "number") {
+        html += `
+          <div class="form-group">
+            <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+            <input type="${field.type}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value)">
             ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
           </div>
         `;
       }
-      else if(field.type === "checkbox") {
+      else if (field.type === "formula") {
+        html += `
+          <div class="form-group" style="background:var(--primary-light); padding:10px; border-radius:var(--radius-sm);">
+            <label style="color:var(--primary);">${field.label}</label>
+            <div style="font-size:14px; font-weight:700; color:var(--text-primary);" id="calc_${field.id}">${val || '根據公式自動計算...'} ${field.unit}</div>
+          </div>
+        `;
+      }
+      else if (field.type === "checkbox") {
         const checked = currentFormCtx.data[field.id] ? 'checked' : '';
         html += `
           <div class="checkbox-item">
@@ -822,29 +970,52 @@
             <div>
               <label for="${field.id}">${field.label}</label>
               ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
+              ${field.warning ? `<div class="warning-box">${field.warning}</div>` : ''}
             </div>
           </div>
         `;
       }
-      else if(field.type === "radio") {
+      else if (field.type === "radio") {
         html += `<div class="form-group"><label>${field.label}</label>`;
-        field.options.forEach(opt => {
-          const checked = val === opt ? 'checked' : '';
+        field.options.forEach((opt, idx) => {
+          const optName = typeof opt === 'string' ? opt : opt.name;
+          const checked = val === optName ? 'checked' : '';
+          const optId = `${field.id}_opt_${idx}`;
+          
           html += `
-            <div style="margin-bottom:6px; font-size:13px;">
-              <input type="radio" name="${field.id}" value="${opt}" ${checked} onchange="saveFormFieldData('${field.id}', this.value)"> ${opt}
+            <div style="margin-bottom:8px; font-size:13px;">
+              <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${checked} onchange="handleRadioSelect('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}')">
+              <label for="${optId}">${optName}</label>
+              ${opt.hasInput ? `<input type="text" class="form-control" style="margin-top:4px;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
             </div>
           `;
         });
         html += `</div>`;
       }
-      else if(field.type === "fetch_detail") {
+      else if (field.type === "checkbox_group") {
+        html += `<div class="form-group"><label>${field.label}</label>`;
+        field.options.forEach((opt, idx) => {
+          const optName = typeof opt === 'string' ? opt : opt.name;
+          const isChecked = currentFormCtx.data[field.id] && currentFormCtx.data[field.id].includes(optName);
+          
+          html += `
+            <div class="checkbox-item">
+              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onchange="handleCheckboxGroupSelect('${field.id}', '${optName}', this.checked)">
+              <div>
+                <label for="${field.id}_${idx}">${optName}</label>
+                ${opt.hasInput ? `<input type="text" class="form-control" style="margin-top:4px;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+      }
+      else if (field.type === "fetch_detail") {
         const detailText = calculateFetchDetail(field.detailKey);
         html += `
           <div class="form-group" style="background:#fffbeb; padding:12px; border-radius:var(--radius-sm); border:1px solid #fde68a;">
             <label style="color:#b45309;">${field.label}</label>
-            <button class="modal-btn" style="font-size:11px; padding:4px 8px; margin-bottom:8px; background:#fff;" onclick="showCustomAlert('詳細計算結果', \`${detailText}\`)">顯示詳情</button>
-            <pre style="font-size:12px; background:#fff; padding:8px; border-radius:4px; color:var(--text-primary);">${detailText}</pre>
+            <pre style="font-size:12px; background:#fff; padding:8px; border-radius:4px; color:var(--text-primary); margin-top:6px;">${detailText}</pre>
           </div>
         `;
       }
@@ -854,7 +1025,27 @@
 
     document.getElementById('btnFormPrev').style.display = currentFormCtx.currentPageIdx === 0 ? 'none' : 'inline-block';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-    document.getElementById('btnFormNext').innerText = isLastPage ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+    document.getElementById('btnFormNext').innerText = (isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit')) ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+  }
+
+  function handleRadioSelect(fieldId, val, action, statusTag) {
+    saveFormFieldData(fieldId, val);
+    currentFormCtx.selectedAction = action;
+    if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
+    
+    // 更新「下一頁 / 提交」按鈕文字
+    const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
+    document.getElementById('btnFormNext').innerText = (isLastPage || (action && action.type === 'submit')) ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+  }
+
+  function handleCheckboxGroupSelect(fieldId, val, isChecked) {
+    if (!currentFormCtx.data[fieldId]) currentFormCtx.data[fieldId] = [];
+    if (isChecked) {
+      if (!currentFormCtx.data[fieldId].includes(val)) currentFormCtx.data[fieldId].push(val);
+    } else {
+      currentFormCtx.data[fieldId] = currentFormCtx.data[fieldId].filter(v => v !== val);
+    }
+    state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
   }
 
   function saveFormFieldData(fieldId, val) {
@@ -871,29 +1062,26 @@
   }
 
   function nextFormPage() {
-    if(currentFormCtx.formId.startsWith("FORM_002")) {
-      const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-      const uncompleted = page.fields.filter(f => f.type === "checkbox" && !currentFormCtx.data[f.id]);
-      
-      if(uncompleted.length > 0) {
-        const listText = uncompleted.map(u => `• ${u.label}`).join('\n');
-        showCustomConfirm("未完成核對提示", `尚有以下項目未勾選：\n${listText}`, "返回繼續檢查", "仍要提交", (confirmed) => {
-          if(!confirmed) proceedNextPage();
-        });
+    // 判斷單選題帶出的條件跳頁或提交動作
+    if (currentFormCtx.selectedAction) {
+      if (currentFormCtx.selectedAction.type === 'submit') {
+        submitFormFinal();
         return;
       }
+      else if (currentFormCtx.selectedAction.type === 'goto') {
+        const targetPageTitle = currentFormCtx.selectedAction.target; // 例如 "Page 2"
+        const targetIdx = currentFormCtx.pages.findIndex(p => p.title.toLowerCase().includes(targetPageTitle.toLowerCase()));
+        if (targetIdx !== -1) {
+          currentFormCtx.currentPageIdx = targetIdx;
+          renderFormSidebar();
+          renderFormCurrentPage();
+          return;
+        }
+      }
     }
-    proceedNextPage();
-  }
 
-  function proceedNextPage() {
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-
-    if(currentFormCtx.currentPageIdx === 0) {
-      triggerStatusUpdateOnPage1(currentFormCtx.formId);
-    }
-
-    if(isLastPage) {
+    if (isLastPage) {
       submitFormFinal();
     } else {
       currentFormCtx.currentPageIdx++;
@@ -912,45 +1100,9 @@
     document.getElementById('formPageContainer').style.display = 'none';
   }
 
-  async function triggerStatusUpdateOnPage1(formId) {
-    const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
-    if(!todayExp) return;
-
-    let newStatus = todayExp.status;
-    if(formId === "FORM_001_1") newStatus = "實驗開始";
-    else if(formId.startsWith("FORM_002")) newStatus = "準備完成";
-    else if(formId === "FORM_003") newStatus = "手術中";
-    else if(formId === "FORM_004") newStatus = "正在蒐集訊號";
-    else if(formId === "FORM_005") newStatus = "犧牲中";
-
-    todayExp.status = newStatus;
-    
-    await syncToGoogleSheet("updateStatus", {
-      date: todayExp.date,
-      user: todayExp.user,
-      status: newStatus
-    });
-
-    refreshDashboard();
-  }
-
   async function submitFormFinal() {
     const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
-    let targetStatus = "已完成";
-    const formId = currentFormCtx.formId;
-
-    if(formId === "FORM_001_1") targetStatus = "實驗開始";
-    else if(formId === "FORM_001_2") targetStatus = "已預約";
-    else if(formId.startsWith("FORM_002")) targetStatus = "準備完成";
-    else if(formId === "FORM_003") {
-      const result = currentFormCtx.data['status_rat_result'];
-      targetStatus = (result === "登錄狀態-已死亡") ? "已死亡" : "休息中";
-    }
-    else if(formId === "FORM_004") targetStatus = "訊號搜集完成";
-    else if(formId === "FORM_005") targetStatus = "開始善後";
-    else if(formId === "FORM_006") targetStatus = "實驗結束";
-
-    if(currentFormCtx.isMakeup) targetStatus = "實驗結束";
+    let targetStatus = currentFormCtx.selectedStatusTag || "已完成";
 
     await syncToGoogleSheet("submitForm", {
       date: state.simulatedDate,
@@ -969,101 +1121,13 @@
 
   function calculateFetchDetail(key) {
     const exp = state.dataCenter.find(d => d.date === state.simulatedDate) || state.dataCenter[0] || {};
-    
     if(key === "O2_and_Isoflurane_usage") {
-      const o2_init = exp.O2_init || 160;
-      const iso_init = exp.Iso_init || 500.23;
-      return `O2：${o2_init}→120\nIsoflurane：${iso_init}→485.54`;
+      return `O2：${exp.O2_init || 160}→120\nIsoflurane：${exp.Iso_init || 500.23}→485.54`;
     } 
     else if(key === "NaCl_and_Isoflurane_usage") {
-      const link = "https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit#gid=1540621860";
-      return `實驗室登錄連結 : ${link}\nNaCl：${exp.user || 'Daniel'}, July 25, 9g\nIsoflurane：${exp.user || 'Daniel'}, July 25, 14.69g`;
+      return `NaCl：${exp.user || 'Daniel'}, July 25, 9g\nIsoflurane：${exp.user || 'Daniel'}, July 25, 14.69g`;
     }
     return "尚無資料";
-  }
-
-  function getFormStructure(formId) {
-    if(formId === "FORM_001_1" || formId === "FORM_001_2") {
-      return [
-        {
-          title: "Page 1 實驗基本資訊",
-          fields: [
-            { id: "exp_date", label: "日期", type: "text", default: state.simulatedDate },
-            { id: "exp_outline", label: "實驗大綱", type: "text", default: "Vortex gut–brain stimulation" },
-            { id: "exp_purpose", label: "本次目的", type: "radio", options: ["VUS刺激 / VUS stimulation", "FUS刺激", "健康控制組", "PTZ控制組", "其他"] },
-            { id: "exp_user", label: "負責人", type: "text", default: state.currentUser ? state.currentUser.name : "Daniel" }
-          ]
-        },
-        {
-          title: "Page 2 超音波訊號參數",
-          fields: [
-            { id: "freq", label: "頻率 (MHz)", type: "text", default: "3.5" },
-            { id: "cycles", label: "週期數", type: "text", default: "2000" },
-            { id: "voltage", label: "電壓 (mV)", type: "text", default: "239" }
-          ]
-        }
-      ];
-    }
-    else if(formId.startsWith("FORM_002")) {
-      return [
-        {
-          title: "Page 1 手術相關",
-          fields: [
-            { id: "m1", label: "底層墊（光滑朝下）", type: "checkbox" },
-            { id: "m2", label: "垃圾桶 / 檯燈 / 奇異筆", type: "checkbox" },
-            { id: "m3", label: "手術台 (含塑膠盒、墊板、過濾瓶)", type: "checkbox" },
-            { id: "m4", label: "麻醉盒 & 氧氣麻醉台", type: "checkbox" }
-          ]
-        },
-        {
-          title: "Page 2 訊號與支架",
-          fields: [
-            { id: "m5", label: "訊號放大器與產生器", type: "checkbox" },
-            { id: "m6", label: "電極檢查與 Saline", type: "checkbox" }
-          ]
-        }
-      ];
-    }
-    else if(formId === "FORM_003") {
-      return [
-        {
-          title: "Page 1 劑量計算",
-          fields: [
-            { id: "weight", label: "大鼠體重 (g)", type: "number", default: "250" },
-            { id: "ptz_dose", label: "PTZ 使用劑量 (uL/g)", type: "number", default: "1" },
-            { id: "ptz_calc", label: "PTZ 需要量 : 250 uL | Saline 補足 : 450 uL", type: "info" }
-          ]
-        },
-        {
-          title: "Page 5 電極與狀態",
-          fields: [
-            { id: "status_rat_result", label: "實驗後大鼠狀態", type: "radio", options: ["登錄狀態-休息中", "登錄狀態-已死亡"] }
-          ]
-        }
-      ];
-    }
-    else if(formId === "FORM_005") {
-      return [
-        {
-          title: "Page 1 善後檢查",
-          fields: [
-            { id: "c1", label: "手術器械皆清洗乾淨並放入紫外線烘乾機", type: "checkbox", desc: "清洗步驟：先用 soap 清洗 > 血漬用菜瓜布清除 > 清水洗淨。" },
-            { id: "c2", label: "氧氣瓶關閉", type: "checkbox", desc: "步驟：先轉鬆出氣旋鈕 > 確認出氣量表歸零 > 將氣瓶閥門關閉。" }
-          ]
-        },
-        {
-          title: "Page 3 耗材登記",
-          fields: [
-            { id: "f1", label: "實驗室門上表單 - 氧氣與 Isoflurane 用量", type: "fetch_detail", detailKey: "O2_and_Isoflurane_usage" },
-            { id: "f2", label: "填寫實驗室線上化學品用量", type: "fetch_detail", detailKey: "NaCl_and_Isoflurane_usage" }
-          ]
-        }
-      ];
-    }
-
-    return [
-      { title: "Page 1 預設頁面", fields: [{ id: "g1", label: "確認完成", type: "checkbox" }] }
-    ];
   }
 
   function showCustomAlert(title, message) {
@@ -1104,8 +1168,8 @@
     document.getElementById('fabMenuOverlay').style.display = 'none';
   }
 
-  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心 / Schedule", "開啟排程中心面板 (殼)。"); }
-  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心 / Record", "開啟實驗紀錄中心面板 (殼)。"); }
+  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心 / Schedule", "開啟排程中心面板。"); }
+  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心 / Record", "開啟實驗紀錄中心面板。"); }
   function openEditProfile() {
     closeFabMenu();
     if(state.currentUser) {
