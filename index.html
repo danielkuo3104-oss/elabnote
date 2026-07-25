@@ -10,7 +10,7 @@
       --card-bg: #ffffff;
       --text-primary: #0f172a;
       --text-secondary: #334155;
-      --text-muted: #64748b;
+      --text-muted: #94a3b8;
       
       --primary: #0284c7;
       --primary-hover: #0369a1;
@@ -33,30 +33,37 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     
-    body { background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+    /* 1. 鎖死 Body 防止整體網頁滑動晃動 */
+    html, body { 
+      width: 100%; height: 100%; overflow: hidden; position: fixed; 
+      background-color: var(--bg-main); color: var(--text-primary);
+    }
 
     .app-container {
-      width: 100%; max-width: 480px; background: var(--bg-main); height: 100vh;
-      display: flex; flex-direction: column; position: relative; overflow: hidden;
+      width: 100%; max-width: 480px; margin: 0 auto; height: 100%;
+      background: var(--bg-main); display: flex; flex-direction: column; 
+      position: relative; overflow: hidden;
     }
 
-    /* Header */
+    /* 頂部 Header */
     .header {
-      background: var(--card-bg); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid var(--border-color); z-index: 10; padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+      background: var(--card-bg); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border-color); z-index: 10; padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+      flex-shrink: 0;
     }
-    .header-title h1 { font-size: 17px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+    .header-title h1 { font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
     .header-title h1::before { content: ""; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
-    .header-title h2 { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-left: 10px; }
+    .header-title h2 { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-left: 8px; }
     
-    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-    .user-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
-    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
-    .update-time { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, monospace; display: flex; align-items: center; gap: 4px; }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .user-badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
+    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .update-time { font-size: 10px; color: var(--text-muted); font-family: ui-monospace, monospace; display: flex; align-items: center; gap: 4px; }
     .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s; }
     .refresh-icon:active { transform: rotate(180deg); }
 
-    .main-content { padding: 16px; flex: 1; overflow-y: auto; padding-bottom: 80px; }
+    /* 僅允許內部滾動 */
+    .main-content { padding: 16px; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
     .dashboard-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
     .status-badge { background: #fef3c7; color: var(--warning); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; border: 1px solid #fde68a; }
@@ -76,31 +83,36 @@
     .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
     .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
-    .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; }
+    .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; margin-bottom: 20px; }
     .timeline-line { position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: var(--border-color); }
     .timeline-item { position: relative; margin-bottom: 14px; cursor: pointer; }
     .timeline-node { position: absolute; left: -19px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 2px var(--primary); }
     .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
 
-    /* 修正後的 FAB 浮動按鈕與選單 */
+    /* 版權與版本宣告樣式 */
+    .copyright-notice {
+      text-align: center; font-size: 11px; color: var(--text-muted); padding: 12px 0; font-weight: 500;
+    }
+
+    /* FAB 懸浮按鈕：預設隱藏，僅主頁時顯示 */
     .fab {
-      position: fixed; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 50px; height: 50px;
-      background: var(--text-primary); color: #fff; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 26px; cursor: pointer; border: none; box-shadow: var(--shadow-md); z-index: 300;
-      transition: transform 0.25s ease, background-color 0.2s;
+      position: absolute; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); width: 48px; height: 48px;
+      background: var(--text-primary); color: #fff; border-radius: 50%; display: none; align-items: center;
+      justify-content: center; font-size: 24px; cursor: pointer; border: none; box-shadow: var(--shadow-md); z-index: 50;
+      transition: transform 0.25s ease;
     }
     .fab.active { transform: rotate(135deg); background: var(--danger); }
 
     .fab-menu-overlay {
-      position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.4);
+      position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(4px); display: none; flex-direction: column; justify-content: flex-end; align-items: flex-end;
-      padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 85px) 20px; z-index: 250;
+      padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 80px) 20px; z-index: 45;
     }
     .fab-menu-item {
       background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 20px;
       margin-top: 10px; font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: var(--shadow-md); color: var(--text-primary);
-      width: 160px; text-align: center; border: 1px solid var(--border-color);
+      width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
     /* Modal 提示框 */
@@ -119,17 +131,25 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    /* 表單頁面修復：固定 Header 與 Footer，僅中間可滾動 */
+    /* 表單頁面獨立彈窗 */
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: var(--card-bg); z-index: 100; flex-direction: column; height: 100vh;
+      background: var(--card-bg); z-index: 100; flex-direction: column; height: 100%;
     }
     .form-header {
       padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;
       background: var(--bg-main); padding-top: calc(env(safe-area-inset-top, 0px) + 14px); flex-shrink: 0;
     }
+    /* 醒目的紅色關閉按鈕 */
+    .btn-close-red {
+      background: #fee2e2; color: var(--danger); border: 1px solid #fca5a5; width: 32px; height: 32px;
+      border-radius: 50%; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-close-red:active { background: var(--danger); color: #fff; }
+
     .form-body { flex: 1; display: flex; overflow: hidden; position: relative; }
-    .form-sidebar { width: 100px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; flex-shrink: 0; }
+    .form-sidebar { width: 95px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; flex-shrink: 0; }
     .sidebar-bookmark { padding: 14px 8px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); font-weight: 500; line-height: 1.3; }
     .sidebar-bookmark.active { background: var(--card-bg); font-weight: 700; color: var(--primary); border-left: 3px solid var(--primary); }
     
@@ -144,13 +164,12 @@
     .btn-footer-prev { background: var(--bg-main); color: var(--text-secondary); }
     .btn-footer-next { background: var(--primary); color: #fff; border: none; }
 
-    /* 重構：選項卡片（Option Cards）解決排版太擠問題 */
+    /* 選項卡片（卡片化單選與多選） */
     .form-group { margin-bottom: 18px; }
     .form-group > label { display: block; font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--text-primary); }
     .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-main); color: var(--text-primary); outline: none; }
     .form-control:focus { border-color: var(--border-focus); background: #fff; }
     
-    /* 可點擊選項卡片 */
     .option-card {
       display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg-main);
       border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
@@ -162,13 +181,14 @@
     .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
     .section-header { font-size: 12px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 6px 10px; border-radius: 4px; margin: 16px 0 10px 0; }
 
+    /* 登入畫面 */
     .auth-container {
       position: absolute; top:0; left:0; right:0; bottom:0; background: var(--card-bg); z-index: 200;
-      padding: 24px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto;
+      padding: 24px; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto;
     }
-    .auth-header-bar { display: flex; justify-content: flex-end; margin-bottom: 24px; padding-top: env(safe-area-inset-top, 10px); }
-    .auth-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 24px; color: var(--text-primary); letter-spacing: -0.5px; }
-    .auth-tabs { display: flex; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); }
+    .auth-header-bar { display: flex; justify-content: flex-end; padding-top: env(safe-area-inset-top, 10px); }
+    .auth-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 20px; color: var(--text-primary); letter-spacing: -0.5px; }
+    .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); }
     .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-muted); }
     .auth-tab.active { border-bottom: 2px solid var(--primary); color: var(--primary); }
 
@@ -184,67 +204,71 @@
 
 <div class="app-container">
 
-  <!-- 1. 登入 / 註冊 頁面 -->
+  <!-- 1. 登入 / 註冊 頁面 (含底部版權) -->
   <div id="authPage" class="auth-container">
-    <div class="auth-header-bar">
-      <button id="authLangBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
+    <div>
+      <div class="auth-header-bar">
+        <button id="authLangBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
+      </div>
+
+      <div class="auth-title" id="txtAuthTitle" style="margin-top: 20px;">智慧實驗日誌 E-labnote</div>
+      <div class="auth-tabs">
+        <div id="tabLogin" class="auth-tab active" onclick="switchAuthTab('login')">登入</div>
+        <div id="tabRegister" class="auth-tab" onclick="switchAuthTab('register')">註冊</div>
+      </div>
+
+      <div id="loginForm">
+        <div class="form-group">
+          <label id="lblUserSelect">選擇會員帳號</label>
+          <select id="selLoginUser" class="form-control">
+            <option value="">同步會員中心資料中...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label id="lblPassword">識別密碼</label>
+          <input type="password" id="txtLoginPwd" class="form-control" placeholder="請輸入密碼">
+        </div>
+        <button id="btnLoginSubmit" class="btn-action btn-tomorrow" style="width:100%; margin-top: 10px;" onclick="performLogin()">登入</button>
+        <button id="btnGuestSubmit" class="btn-action btn-reserve" style="width:100%; margin-top:10px;" onclick="guestLogin()">訪客登入 (僅查看)</button>
+      </div>
+
+      <div id="registerForm" style="display:none;">
+        <div class="form-group">
+          <label id="lblRegName">會員名稱 (不可重複)</label>
+          <input type="text" id="txtRegName" class="form-control" placeholder="例如：Daniel" oninput="checkDuplicateName()">
+          <div id="msgDuplicateName" class="error-msg">⚠️ 此名稱已被使用，請更換其他名稱</div>
+        </div>
+        <div class="form-group">
+          <label id="lblRegEmail">電子信箱</label>
+          <input type="email" id="txtRegEmail" class="form-control" placeholder="user@gmail.com">
+        </div>
+        <div class="form-group">
+          <label id="lblRegRole">身份別</label>
+          <select id="selRegRole" class="form-control">
+            <option value="協作會員">協作會員 (Collaborator)</option>
+            <option value="一般會員">一般會員 (General Member)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label id="lblRegPwd">設定識別密碼</label>
+          <input type="password" id="txtRegPwd" class="form-control">
+        </div>
+        <div class="form-group">
+          <label id="lblRegColor">個人代表色 (不可重複)</label>
+          <select id="selRegColor" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label id="lblRegLang">預設介面語言</label>
+          <select id="selRegLang" class="form-control">
+            <option value="ZH">中文 (Traditional Chinese)</option>
+            <option value="EN">English</option>
+          </select>
+        </div>
+        <button id="btnRegisterSubmit" class="btn-action btn-tomorrow" style="width:100%;" onclick="performRegister()">註冊新帳號</button>
+      </div>
     </div>
 
-    <div class="auth-title" id="txtAuthTitle">智慧實驗日誌 E-labnote</div>
-    <div class="auth-tabs">
-      <div id="tabLogin" class="auth-tab active" onclick="switchAuthTab('login')">登入</div>
-      <div id="tabRegister" class="auth-tab" onclick="switchAuthTab('register')">註冊</div>
-    </div>
-
-    <div id="loginForm">
-      <div class="form-group">
-        <label id="lblUserSelect">選擇會員帳號</label>
-        <select id="selLoginUser" class="form-control">
-          <option value="">同步會員中心資料中...</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label id="lblPassword">識別密碼</label>
-        <input type="password" id="txtLoginPwd" class="form-control" placeholder="請輸入密碼">
-      </div>
-      <button id="btnLoginSubmit" class="btn-action btn-tomorrow" style="width:100%; margin-top: 10px;" onclick="performLogin()">登入</button>
-      <button id="btnGuestSubmit" class="btn-action btn-reserve" style="width:100%; margin-top:10px;" onclick="guestLogin()">訪客登入 (僅查看)</button>
-    </div>
-
-    <div id="registerForm" style="display:none;">
-      <div class="form-group">
-        <label id="lblRegName">會員名稱 (不可重複)</label>
-        <input type="text" id="txtRegName" class="form-control" placeholder="例如：Daniel" oninput="checkDuplicateName()">
-        <div id="msgDuplicateName" class="error-msg">⚠️ 此名稱已被使用，請更換其他名稱</div>
-      </div>
-      <div class="form-group">
-        <label id="lblRegEmail">電子信箱</label>
-        <input type="email" id="txtRegEmail" class="form-control" placeholder="user@gmail.com">
-      </div>
-      <div class="form-group">
-        <label id="lblRegRole">身份別</label>
-        <select id="selRegRole" class="form-control">
-          <option value="協作會員">協作會員 (Collaborator)</option>
-          <option value="一般會員">一般會員 (General Member)</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label id="lblRegPwd">設定識別密碼</label>
-        <input type="password" id="txtRegPwd" class="form-control">
-      </div>
-      <div class="form-group">
-        <label id="lblRegColor">個人代表色 (不可重複)</label>
-        <select id="selRegColor" class="form-control"></select>
-      </div>
-      <div class="form-group">
-        <label id="lblRegLang">預設介面語言</label>
-        <select id="selRegLang" class="form-control">
-          <option value="ZH">中文 (Traditional Chinese)</option>
-          <option value="EN">English</option>
-        </select>
-      </div>
-      <button id="btnRegisterSubmit" class="btn-action btn-tomorrow" style="width:100%;" onclick="performRegister()">註冊新帳號</button>
-    </div>
+    <div class="copyright-notice">© DanielGuo 版權所有 v2.0</div>
   </div>
 
   <!-- 2. 主頁面 Header -->
@@ -291,9 +315,11 @@
     <div id="timelineContainer" class="timeline-container" onclick="openRecordCenter()">
       <div class="timeline-line"></div>
     </div>
+
+    <div class="copyright-notice">© DanielGuo 版權所有 v2.0</div>
   </div>
 
-  <!-- FAB 與遮罩選單 -->
+  <!-- FAB 懸浮選單 -->
   <div id="fabMenuOverlay" class="fab-menu-overlay" onclick="closeFabMenu()">
     <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
     <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄中心</div>
@@ -302,11 +328,12 @@
   </div>
   <div id="fabBtn" class="fab" onclick="toggleFabMenu()">+</div>
 
-  <!-- 固定 Footer 的表單頁面 -->
+  <!-- 表單頁面 -->
   <div id="formPageContainer" class="form-page-container">
     <div class="form-header">
       <h3 id="formTitle" style="font-size: 15px; font-weight: 700;">表單名稱</h3>
-      <button style="border:none; background:transparent; font-size:20px; cursor:pointer;" onclick="closeFormPage()">✕</button>
+      <!-- 恢復紅圓圈關閉按鈕 -->
+      <button class="btn-close-red" onclick="closeFormPage()">✕</button>
     </div>
     
     <div class="form-body">
@@ -376,7 +403,7 @@
     updateDashboardButtons();
   }
 
-  // 試算表表單解析器
+  // 表單動態解析 Engine
   async function fetchAndParseFormsFromSheet() {
     try {
       const res = await fetch(URL_FORMS);
@@ -665,6 +692,9 @@
     state.currentLang = user.lang || "ZH";
     document.getElementById('authPage').style.display = 'none';
     
+    // 登入後顯示 FAB (+) 按鈕
+    document.getElementById('fabBtn').style.display = 'flex';
+
     const badge = document.getElementById('userBadge');
     badge.innerText = user.name;
     badge.style.background = user.color || '#f1f5f9';
@@ -679,9 +709,13 @@
     state.isGuest = true;
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('userBadge').innerText = "訪客";
+    
+    // 訪客也顯示 FAB (+) 按鈕
+    document.getElementById('fabBtn').style.display = 'flex';
+
     applyLanguage();
     refreshDashboard();
-    showCustomAlert("訪客模式", "已以訪客身份登入，登錄按鈕已全數受限。");
+    showCustomAlert("訪客模式", "已以訪客身份登入，登錄功能受限。");
   }
 
   function performLogout() {
@@ -693,6 +727,9 @@
         document.getElementById('txtLoginPwd').value = "";
         document.getElementById('userBadge').innerText = "未登入";
         document.getElementById('authPage').style.display = 'flex';
+        
+        // 登出時隱藏 FAB 按鈕
+        document.getElementById('fabBtn').style.display = 'none';
         refreshDashboard();
       }
     });
@@ -707,7 +744,6 @@
     const lang = document.getElementById('selRegLang').value;
 
     if(!name || !email) { showCustomAlert("錯誤", "請完整填寫姓名與 Email"); return; }
-    
     if(state.membersList.some(m => m.name.toLowerCase() === name.toLowerCase())) {
       showCustomAlert("註冊失敗", "會員名稱已存在！"); return;
     }
@@ -753,7 +789,7 @@
     document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
   }
 
-  // 1. 訪客按鈕權限修復：訪客登入時，全部 4 個按鈕一律停用！
+  // 訪客禁用所有按鈕
   function updateDashboardButtons() {
     const todayHasExp = state.dataCenter.some(d => d.date === state.simulatedDate);
     const d = new Date(state.simulatedDate);
@@ -765,7 +801,7 @@
       document.getElementById('btnTodayExp').classList.add('btn-disabled');
       document.getElementById('btnTomorrowPrep').classList.add('btn-disabled');
       document.getElementById('btnReserveExp').classList.add('btn-disabled');
-      document.getElementById('btnMakeupExp').classList.add('btn-disabled'); // 👈 訪客補登按鈕同步禁用！
+      document.getElementById('btnMakeupExp').classList.add('btn-disabled');
       return;
     }
 
@@ -846,6 +882,8 @@
     renderFormSidebar();
     renderFormCurrentPage();
 
+    // 開啟表單時，隱藏 FAB 懸浮按鈕
+    document.getElementById('fabBtn').style.display = 'none';
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
@@ -858,7 +896,7 @@
     `).join('');
   }
 
-  // 3. 重構渲染器：使用獨立 option-card 徹底解決排版太擠、分不清上下問題
+  // 重構單選題，解決複選/混淆問題
   function renderFormCurrentPage() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
@@ -891,31 +929,28 @@
         `;
       }
       else if (field.type === "checkbox") {
-        const checked = currentFormCtx.data[field.id] ? 'checked' : '';
         const isSelected = !!currentFormCtx.data[field.id];
         html += `
           <div class="option-card ${isSelected ? 'selected' : ''}" onclick="toggleOptionCheckbox('${field.id}')">
-            <input type="checkbox" id="${field.id}" ${checked} onclick="event.stopPropagation()" onchange="saveFormFieldData('${field.id}', this.checked); renderFormCurrentPage();">
-            <div>
-              <label for="${field.id}">${field.label}</label>
-              ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
-            </div>
+            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}');">
+            <label for="${field.id}">${field.label}</label>
           </div>
+          ${field.desc ? `<div class="field-desc" style="margin:-4px 0 10px 4px;">${field.desc}</div>` : ''}
         `;
       }
       else if (field.type === "radio") {
         html += `<div class="form-group"><label>${field.label}</label>`;
         field.options.forEach((opt, idx) => {
           const optName = typeof opt === 'string' ? opt : opt.name;
-          const isSelected = val === optName;
+          const isSelected = (val === optName);
           const optId = `${field.id}_opt_${idx}`;
           
           html += `
             <div class="option-card ${isSelected ? 'selected' : ''}" onclick="selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}')">
-              <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation()">
+              <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}');">
               <label for="${optId}">${optName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
+            ${(opt.hasInput && isSelected) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" value="${currentFormCtx.data[field.id+'_input'] || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
           `;
         });
         html += `</div>`;
@@ -928,10 +963,10 @@
           
           html += `
             <div class="option-card ${isChecked ? 'selected' : ''}" onclick="toggleCheckboxGroupOption('${field.id}', '${optName}')">
-              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation()">
+              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
               <label for="${field.id}_${idx}">${optName}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
+            ${(opt.hasInput && isChecked) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" value="${currentFormCtx.data[field.id+'_input'] || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
           `;
         });
         html += `</div>`;
@@ -940,7 +975,7 @@
 
     container.innerHTML = html;
 
-    // 4. 固定 Footer 按鈕文字邏輯修復
+    // 底部按鈕顯示控制
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
     const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
@@ -1021,6 +1056,10 @@
 
   function closeFormPage() {
     document.getElementById('formPageContainer').style.display = 'none';
+    // 關閉表單後，重新顯示 FAB 懸浮按鈕
+    if(state.currentUser) {
+      document.getElementById('fabBtn').style.display = 'flex';
+    }
   }
 
   async function submitFormFinal() {
@@ -1067,7 +1106,6 @@
 
   function closeCustomModal() { document.getElementById('customModalBackdrop').style.display = 'none'; }
 
-  // 2. 懸浮按鈕 (+) 遮擋與動畫修復
   function toggleFabMenu() {
     const overlay = document.getElementById('fabMenuOverlay');
     const btn = document.getElementById('fabBtn');
