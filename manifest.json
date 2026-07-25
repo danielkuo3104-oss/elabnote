@@ -1,7 +1,7 @@
 {
   "name": "智慧實驗日誌 E-labnote",
   "short_name": "e-Lab",
-  "description": "E-labnote",
+  "description": "智慧實驗日誌與數據追蹤系統",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#bce0fd",
@@ -10,12 +10,14 @@
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
