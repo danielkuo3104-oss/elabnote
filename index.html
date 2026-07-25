@@ -406,30 +406,31 @@
     updateDashboardButtons();
   }
 
-  async function fetchMembersFromSheet() {
-    try {
-      const res = await fetch(URL_MEMBERS);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
-      
-      const members = [];
-      for(let i = 1; i < rows.length; i++) {
-        if(rows[i][0]) {
-          members.push({
-            name: rows[i][0].trim(),
-            email: rows[i][1] ? rows[i][1].trim() : '',
-            color: rows[i][3] ? rows[i][3].trim() : '#e2e8f0',
-            role: rows[i][4] ? rows[i][4].trim() : '協作會員',
-            lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
-          });
-        }
+  // 1. 修復 CSV 讀取，將 F 欄（識別密碼）讀入 user 物件
+async function fetchMembersFromSheet() {
+  try {
+    const res = await fetch(URL_MEMBERS);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
+    
+    const members = [];
+    for(let i = 1; i < rows.length; i++) {
+      if(rows[i][0]) {
+        members.push({
+          name: rows[i][0].trim(),
+          email: rows[i][1] ? rows[i][1].trim() : '',
+          color: rows[i][3] ? rows[i][3].trim() : '#e2e8f0',
+          role: rows[i][4] ? rows[i][4].trim() : '協作會員',
+          password: rows[i][5] ? rows[i][5].trim() : '', // 👈 補上 F 欄位密碼
+          lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
+        });
       }
-      state.membersList = members;
-      initAuthDropdown();
-      initColorDropdown();
-    } catch(err) {
-      console.error("同步會員中心失敗:", err);
     }
+    state.membersList = members;
+    initAuthDropdown();
+    initColorDropdown();
+  } catch(err) {
+    console.error("同步會員中心失敗:", err);
   }
 
   function checkDuplicateName() {
@@ -551,24 +552,39 @@
     document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
   }
 
-  function performLogin() {
-    const selectedName = document.getElementById('selLoginUser').value;
-    const user = state.membersList.find(m => m.name === selectedName);
-    if(user) {
-      state.currentUser = user;
-      state.isGuest = false;
-      state.currentLang = user.lang || "ZH";
-      document.getElementById('authPage').style.display = 'none';
-      
-      const badge = document.getElementById('userBadge');
-      badge.innerText = user.name;
-      badge.style.background = user.color || '#f1f5f9';
+  // 2. 修復登入邏輯，加入真密碼核對
+function performLogin() {
+  const selectedName = document.getElementById('selLoginUser').value;
+  const inputPwd = document.getElementById('txtLoginPwd').value.trim();
+  const user = state.membersList.find(m => m.name === selectedName);
 
-      applyLanguage();
-      refreshDashboard();
-      showCustomAlert(state.currentLang==='ZH'?"登入成功":"Login Success", `歡迎回來 / Welcome, ${user.name}！`);
-    }
+  if (!user) {
+    showCustomAlert(state.currentLang === 'ZH' ? "錯誤" : "Error", "請選擇會員帳號");
+    return;
   }
+
+  // 👈 真正比對識別密碼
+  if (user.password && inputPwd !== user.password) {
+    showCustomAlert(state.currentLang === 'ZH' ? "登入失敗" : "Login Failed", "識別密碼不正確，請重新輸入！");
+    return;
+  }
+
+  state.currentUser = user;
+  state.isGuest = false;
+  state.currentLang = user.lang || "ZH";
+  document.getElementById('authPage').style.display = 'none';
+  
+  const badge = document.getElementById('userBadge');
+  badge.innerText = user.name;
+  badge.style.background = user.color || '#f1f5f9';
+
+  applyLanguage();
+  refreshDashboard();
+  
+  // 👈 依據語言顯示乾淨的歡迎語
+  const welcomeMsg = state.currentLang === 'ZH' ? `歡迎回來，${user.name}！` : `Welcome back, ${user.name}!`;
+  showCustomAlert(state.currentLang === 'ZH' ? "登入成功" : "Success", welcomeMsg);
+}
 
   function guestLogin() {
     state.currentUser = { name: "訪客", role: "Guest", color: "#f1f5f9" };
