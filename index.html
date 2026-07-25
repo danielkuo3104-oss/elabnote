@@ -160,9 +160,9 @@
     <!-- 登入 Form -->
     <div id="loginForm">
       <div class="form-group">
-        <label id="lblUserSelect">選擇會員帳號</label>
+        <label id="lblUserSelect">選擇會員帳號 (同步來自 Google 會員中心)</label>
         <select id="selLoginUser" class="form-control">
-          <!-- 動態載入會員 -->
+          <option value="">載入中...</option>
         </select>
       </div>
       <div class="form-group">
@@ -206,11 +206,11 @@
     </div>
     <div class="header-right">
       <div style="display:flex; gap:5px; align-items:center;">
-        <div id="userBadge" class="user-badge">Daniel</div>
+        <div id="userBadge" class="user-badge">未登入</div>
         <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
       </div>
       <div class="update-time">
-        <span id="txtUpdateTime">更新時間 : 2026/7/25 20:41</span>
+        <span id="txtUpdateTime">更新時間 : 載入中...</span>
         <span class="refresh-icon" title="一鍵刷新" onclick="refreshDashboard()">🔄</span>
       </div>
     </div>
@@ -221,20 +221,15 @@
 
     <!-- 最新動態與排程 -->
     <div class="dashboard-card">
-      <div id="statusBadge" class="status-badge">手術中</div>
-      <div id="txtCurrentExpUser" style="font-size:12px; font-weight:bold; color:#3498db; margin-bottom:4px;">7/25 Daniel</div>
-      <div id="txtCurrentExpTitle" style="font-size:14px; font-weight:bold;">Vortex gut–brain stimulation<br>-VUS刺激 / VUS stimulation</div>
+      <div id="statusBadge" class="status-badge" style="display:none;">--</div>
+      <div id="txtCurrentExpUser" style="font-size:12px; font-weight:bold; color:#3498db; margin-bottom:4px;">載入中...</div>
+      <div id="txtCurrentExpTitle" style="font-size:14px; font-weight:bold;">同步試算表資料中...</div>
       <hr style="margin:10px 0; border:0; border-top:1px solid #eee;">
       
       <div id="scheduleSection" onclick="openScheduleCenter()">
-        <!-- 排程最靠近兩筆 -->
-        <div class="schedule-item">
-          <span class="schedule-tag" style="background:#fce4ec; color:#c2185b;">7/27 Yuki</span>
-          <span>Vortex gut–brain stimulation -VUS刺激</span>
-        </div>
-        <div class="schedule-item">
-          <span class="schedule-tag" style="background:#e3f2fd; color:#1976d2;">7/28 Daniel</span>
-          <span>Vortex gut–brain stimulation -健康控制組</span>
+        <div style="font-size:12px; font-weight:bold; color:#888; margin-bottom:4px;">未來排程 (最靠近兩筆)</div>
+        <div id="scheduleList">
+          <div class="schedule-item"><span class="schedule-tag">--</span><span>載入中...</span></div>
         </div>
       </div>
     </div>
@@ -250,7 +245,6 @@
     <!-- 歷史時間軸 -->
     <div id="timelineContainer" class="timeline-container" onclick="openRecordCenter()">
       <div class="timeline-line"></div>
-      <!-- 動態時間軸內容 -->
     </div>
 
   </div>
@@ -304,49 +298,169 @@
 
 <script>
   /* ==========================================================================
-     一、 後端 CSV 資料庫連結與全域 State 變數
+     一、 後端 API & CSV 試算表連結全同步設定
      ========================================================================== */
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw0xNdgsPy-uxYAgwxMs8Z583seaGU94Y3mbs8fNqSefekpgjNwD29iLnCisKgzDYvkzQ/exec";
+  
   const URL_MEMBERS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=280963157&single=true&output=csv";
   const URL_FORMS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=0&single=true&output=csv";
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
-  // 全域系統狀態
+  // 全域 State（零預設假資料，全從 Google 試算表同步）
   let state = {
-    currentUser: null,       // 當前登入會員 { name, email, lang, role }
-    isGuest: false,          // 是否訪客
-    currentLang: "ZH",       // ZH 或 EN
-    simulatedDate: "2026-07-25", // 測試面板日期
-    showTestPanel: true,     // 是否顯示測試面板 (寫死在程式中)
-    membersList: [
-      { name: "Daniel", email: "danielkuo@gmail.com", lang: "ZH", role: "管理員" },
-      { name: "Yuki", email: "yuki@gmail.com", lang: "EN", role: "研究員" }
-    ],
-    dataCenter: [
-      { id: "EXP001", date: "2026-07-25", user: "Daniel", status: "手術中", info: "Vortex gut–brain stimulation -VUS刺激", prep: "", surgery: "", signal: "", sacrifice: "", post: "", O2_init: "160", Iso_init: "500.23" },
-      { id: "EXP002", date: "2026-07-21", user: "Daniel", status: "實驗結束", info: "Vortex gut–brain stimulation -VUS刺激", prep: "", surgery: "", signal: "", sacrifice: "", post: "", O2_init: "150", Iso_init: "490.00" },
-      { id: "EXP003", date: "2026-07-21", user: "Yuki", status: "實驗結束", info: "Vortex gut–brain stimulation -VUS刺激", prep: "", surgery: "", signal: "", sacrifice: "", post: "", O2_init: "150", Iso_init: "480.00" },
-      { id: "EXP004", date: "2026-07-27", user: "Yuki", status: "已預約", info: "Vortex gut–brain stimulation -VUS刺激", prep: "", surgery: "", signal: "", sacrifice: "", post: "", O2_init: "", Iso_init: "" },
-      { id: "EXP005", date: "2026-07-28", user: "Daniel", status: "已預約", info: "Vortex gut–brain stimulation -健康控制組", prep: "", surgery: "", signal: "", sacrifice: "", post: "", O2_init: "", Iso_init: "" }
-    ],
-    // 自動記憶填答之結構 (Form Auto-save)
+    currentUser: null,
+    isGuest: false,
+    currentLang: "ZH",
+    simulatedDate: "2026-07-25",
+    showTestPanel: true,
+    membersList: [],
+    dataCenter: [],
     formDataCache: {}
   };
 
   /* ==========================================================================
-     二、 系統初始化與語系切換
+     二、 系統初始化與與 Google 試算表同步讀取 (Read Sync)
      ========================================================================== */
-  window.addEventListener('DOMContentLoaded', () => {
-    initAuthDropdown();
+  window.addEventListener('DOMContentLoaded', async () => {
+    toggleTestPanel(state.showTestPanel);
+    await refreshDashboard();
+  });
+
+  // 全面同步三張試算表
+  async function refreshDashboard() {
+    const now = new Date();
+    document.getElementById('txtUpdateTime').innerText = `更新時間 : ${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+    // 1. 同步會員中心
+    await fetchMembersFromSheet();
+    // 2. 同步資料中心
+    await fetchDataCenterFromSheet();
+
+    // 3. 渲染主 UI
+    renderMainDashboardUI();
     renderTimeline();
     updateDashboardButtons();
-    toggleTestPanel(state.showTestPanel);
-  });
+  }
+
+  // 從 Google 試算表讀取「會員中心」
+  async function fetchMembersFromSheet() {
+    try {
+      const res = await fetch(URL_MEMBERS);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      
+      const members = [];
+      for(let i = 1; i < rows.length; i++) {
+        if(rows[i][0]) {
+          members.push({
+            name: rows[i][0].trim(),
+            email: rows[i][1] ? rows[i][1].trim() : '',
+            role: rows[i][4] ? rows[i][4].trim() : '研究員',
+            lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
+          });
+        }
+      }
+      state.membersList = members;
+      initAuthDropdown();
+    } catch(err) {
+      console.error("同步會員中心失敗:", err);
+    }
+  }
+
+  // 從 Google 試算表讀取「資料中心」
+  async function fetchDataCenterFromSheet() {
+    try {
+      const res = await fetch(URL_DATA);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      
+      const records = [];
+      for(let i = 1; i < rows.length; i++) {
+        if(rows[i][0]) { // A欄: 實驗日期
+          records.push({
+            date: rows[i][0].trim(),
+            user: rows[i][1] ? rows[i][1].trim() : '',
+            status: rows[i][2] ? rows[i][2].trim() : '',
+            info: rows[i][3] ? rows[i][3].trim() : '',
+            O2_init: rows[i][5] ? rows[i][5].trim() : '160',
+            Iso_init: rows[i][5] ? rows[i][5].trim() : '500.23'
+          });
+        }
+      }
+      state.dataCenter = records;
+    } catch(err) {
+      console.error("同步資料中心失敗:", err);
+    }
+  }
+
+  // 工具：簡易 CSV 解析器
+  function parseCSV(text) {
+    return text.split('\n').map(r => r.split(','));
+  }
 
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
+    if(state.membersList.length === 0) {
+      sel.innerHTML = `<option value="">無會員資料</option>`;
+      return;
+    }
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
+  function renderMainDashboardUI() {
+    // 渲染最新一筆動態
+    const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate);
+    if(todayExps.length > 0) {
+      const active = todayExps[0];
+      document.getElementById('statusBadge').style.display = 'block';
+      document.getElementById('statusBadge').innerText = active.status;
+      document.getElementById('txtCurrentExpUser').innerText = `${active.date} ${active.user}`;
+      document.getElementById('txtCurrentExpTitle').innerText = active.info;
+    } else {
+      document.getElementById('statusBadge').style.display = 'none';
+      document.getElementById('txtCurrentExpUser').innerText = state.simulatedDate;
+      document.getElementById('txtCurrentExpTitle').innerText = "本日無進行中實驗";
+    }
+
+    // 渲染未來排程最靠近兩筆
+    const futureExps = state.dataCenter
+      .filter(d => new Date(d.date) > new Date(state.simulatedDate))
+      .sort((a,b) => new Date(a.date) - new Date(b.date))
+      .slice(0, 2);
+
+    const scheduleContainer = document.getElementById('scheduleList');
+    if(futureExps.length > 0) {
+      scheduleContainer.innerHTML = futureExps.map(f => `
+        <div class="schedule-item">
+          <span class="schedule-tag" style="background:#e3f2fd; color:#1976d2;">${f.date.slice(5)} ${f.user}</span>
+          <span>${f.info}</span>
+        </div>
+      `).join('');
+    } else {
+      scheduleContainer.innerHTML = `<div class="schedule-item" style="color:#aaa;">無未來預約排程</div>`;
+    }
+  }
+
+  /* ==========================================================================
+     三、 寫入同步機制 (Write Sync to GAS API)
+     ========================================================================== */
+  async function syncToGoogleSheet(actionType, payload) {
+    try {
+      await fetch(GAS_API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionType, ...payload })
+      });
+      console.log(`[GAS API] 同步成功: ${actionType}`);
+    } catch(err) {
+      console.error(`[GAS API] 同步失敗:`, err);
+    }
+  }
+
+  /* ==========================================================================
+     四、 登入 / 註冊 & 語系切換
+     ========================================================================== */
   function switchAuthTab(tab) {
     document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
     document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
@@ -379,7 +493,7 @@
     showCustomAlert("訪客模式", "已以訪客身份登入，登錄按鈕功能將受限。");
   }
 
-  function performRegister() {
+  async function performRegister() {
     const name = document.getElementById('txtRegName').value.trim();
     const email = document.getElementById('txtRegEmail').value.trim();
     const lang = document.getElementById('selRegLang').value;
@@ -387,9 +501,13 @@
     
     const newUser = { name, email, lang, role: "研究員" };
     state.membersList.push(newUser);
+
+    // 同步新會員至 Google 試算表
+    await syncToGoogleSheet("registerUser", newUser);
+
     initAuthDropdown();
     switchAuthTab('login');
-    showCustomAlert("註冊成功", "註冊完成！請由帳號選單選擇並登入。");
+    showCustomAlert("註冊成功", "註冊完成！資料已同步回會員中心，請選擇帳號登入。");
   }
 
   function toggleLanguage() {
@@ -408,7 +526,7 @@
   }
 
   /* ==========================================================================
-     三、 時間與 Dashboard 控制邏輯
+     五、 時間與 UI 按鈕狀態控制
      ========================================================================== */
   function onTestDateChange() {
     state.simulatedDate = document.getElementById('testDateInput').value;
@@ -419,40 +537,14 @@
     document.getElementById('testPanel').style.display = show ? 'flex' : 'none';
   }
 
-  function refreshDashboard() {
-    // 1. 更新時間顯示
-    const now = new Date();
-    document.getElementById('txtUpdateTime').innerText = `更新時間 : ${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
-    
-    // 2. 刷新最新動態卡片
-    const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate);
-    if(todayExps.length > 0) {
-      const active = todayExps[0];
-      document.getElementById('statusBadge').style.display = 'block';
-      document.getElementById('statusBadge').innerText = active.status;
-      document.getElementById('txtCurrentExpUser').innerText = `${active.date} ${active.user}`;
-      document.getElementById('txtCurrentExpTitle').innerText = active.info;
-    } else {
-      document.getElementById('statusBadge').style.display = 'none';
-      document.getElementById('txtCurrentExpUser').innerText = state.simulatedDate;
-      document.getElementById('txtCurrentExpTitle').innerText = "本日無進行中實驗";
-    }
-
-    // 3. 刷新按鈕狀態與歷史時間軸
-    updateDashboardButtons();
-    renderTimeline();
-  }
-
   function updateDashboardButtons() {
     const todayHasExp = state.dataCenter.some(d => d.date === state.simulatedDate);
     
-    // 計算明日日期
     const d = new Date(state.simulatedDate);
     d.setDate(d.getDate() + 1);
     const tomorrowStr = d.toISOString().split('T')[0];
     const tomorrowHasExp = state.dataCenter.some(d => d.date === tomorrowStr);
 
-    // 訪客禁用中間三個按鈕
     if(state.isGuest) {
       document.getElementById('btnTodayExp').classList.add('btn-disabled');
       document.getElementById('btnTomorrowPrep').classList.add('btn-disabled');
@@ -471,9 +563,13 @@
     const container = document.getElementById('timelineContainer');
     let html = `<div class="timeline-line"></div>`;
 
-    // 排序數據
     const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
     
+    if(sorted.length === 0) {
+      container.innerHTML = html + `<div style="padding:10px; color:#888;">今日無實驗紀錄</div>`;
+      return;
+    }
+
     sorted.forEach(item => {
       const isToday = item.date === state.simulatedDate;
       html += `
@@ -494,7 +590,7 @@
   }
 
   /* ==========================================================================
-     四、 表單引擎 (Form Engine) & 多階段流轉邏輯
+     六、 表單引擎 (Form Engine) & 狀態更新
      ========================================================================== */
   let currentFormCtx = {
     formId: '',
@@ -504,44 +600,25 @@
     isMakeup: false
   };
 
-  // 按鈕點擊判斷呼叫對應表單
   function handleTodayExperiment() {
     if(state.isGuest) return;
     const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
     if(!todayExp) return;
 
-    // 依據現有狀態決定開啟哪份表單
     switch(todayExp.status) {
-      case "已預約":
-        openForm("FORM_001_1");
-        break;
-      case "實驗開始":
-        if(todayExp.info.includes("控制組")) {
-          openForm("FORM_002_2");
-        } else {
-          openForm("FORM_002_1");
-        }
-        break;
-      case "準備完成":
-        openForm("FORM_003");
-        break;
-      case "休息中":
-        openForm("FORM_004");
-        break;
-      case "訊號搜集完成":
-        openForm("FORM_005");
-        break;
-      case "開始善後":
-        openForm("FORM_006");
-        break;
-      default:
-        showCustomAlert("提示", `當前實驗狀態為 [${todayExp.status}]，無後續需填寫表單。`);
+      case "已預約": openForm("FORM_001_1"); break;
+      case "實驗開始": openForm(todayExp.info.includes("控制組") ? "FORM_002_2" : "FORM_002_1"); break;
+      case "準備完成": openForm("FORM_003"); break;
+      case "休息中": openForm("FORM_004"); break;
+      case "訊號搜集完成": openForm("FORM_005"); break;
+      case "開始善後": openForm("FORM_006"); break;
+      default: showCustomAlert("提示", `當前實驗狀態為 [${todayExp.status}]，無後續表單。`);
     }
   }
 
   function handleTomorrowPrep() {
     if(state.isGuest) return;
-    showCustomAlert("明日準備", "已預先載入明日預約內容，進行實驗準備表單填寫。");
+    showCustomAlert("明日準備", "已載入明日預約資料進行檢查表填寫。");
     openForm("FORM_002_1");
   }
 
@@ -551,13 +628,9 @@
     currentFormCtx.isMakeup = isMakeup;
     currentFormCtx.data = state.formDataCache[formId] || {};
 
-    // 載入預設表單結構
     currentFormCtx.pages = getFormStructure(formId);
-
-    // 設定表單色彩與標題
     setupFormTheme(formId);
 
-    // 渲染側邊欄與頁面內容
     renderFormSidebar();
     renderFormCurrentPage();
 
@@ -631,7 +704,6 @@
         html += `</div>`;
       }
       else if(field.type === "fetch_detail") {
-        // 特殊計算詳情提取
         const detailText = calculateFetchDetail(field.detailKey);
         html += `
           <div class="form-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffe0b2;">
@@ -645,7 +717,6 @@
 
     container.innerHTML = html;
 
-    // 按鈕切換
     document.getElementById('btnFormPrev').style.display = currentFormCtx.currentPageIdx === 0 ? 'none' : 'inline-block';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
     document.getElementById('btnFormNext').innerText = isLastPage ? '提交' : '下一頁';
@@ -653,7 +724,7 @@
 
   function saveFormFieldData(fieldId, val) {
     currentFormCtx.data[fieldId] = val;
-    state.formDataCache[currentFormCtx.formId] = currentFormCtx.data; // 自動記憶
+    state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
   }
 
   function prevFormPage() {
@@ -665,27 +736,24 @@
   }
 
   function nextFormPage() {
-    // 檢查未完成項目 (以 Form2 為例)
     if(currentFormCtx.formId.startsWith("FORM_002")) {
       const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
       const uncompleted = page.fields.filter(f => f.type === "checkbox" && !currentFormCtx.data[f.id]);
       
       if(uncompleted.length > 0) {
         const listText = uncompleted.map(u => `• ${u.label}`).join('\n');
-        showCustomConfirm("檢查未完成提示", `尚有以下項目未勾選核對：\n${listText}`, "返回繼續檢查", "仍要提交", (confirmed) => {
+        showCustomConfirm("未完成核對提示", `尚有以下項目未勾選：\n${listText}`, "返回繼續檢查", "仍要提交", (confirmed) => {
           if(!confirmed) proceedNextPage();
         });
         return;
       }
     }
-
     proceedNextPage();
   }
 
   function proceedNextPage() {
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
 
-    // 第一頁觸發即時狀態異動
     if(currentFormCtx.currentPageIdx === 0) {
       triggerStatusUpdateOnPage1(currentFormCtx.formId);
     }
@@ -710,24 +778,33 @@
   }
 
   /* ==========================================================================
-     五、 狀態異動與提交邏輯
+     七、 狀態異動與提交至 Google Apps Script (GAS)
      ========================================================================== */
-  function triggerStatusUpdateOnPage1(formId) {
+  async function triggerStatusUpdateOnPage1(formId) {
     const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
     if(!todayExp) return;
 
-    if(formId === "FORM_001_1") todayExp.status = "實驗開始";
-    else if(formId.startsWith("FORM_002")) todayExp.status = "準備完成";
-    else if(formId === "FORM_003") todayExp.status = "手術中";
-    else if(formId === "FORM_004") todayExp.status = "正在蒐集訊號";
-    else if(formId === "FORM_005") todayExp.status = "犧牲中";
+    let newStatus = todayExp.status;
+    if(formId === "FORM_001_1") newStatus = "實驗開始";
+    else if(formId.startsWith("FORM_002")) newStatus = "準備完成";
+    else if(formId === "FORM_003") newStatus = "手術中";
+    else if(formId === "FORM_004") newStatus = "正在蒐集訊號";
+    else if(formId === "FORM_005") newStatus = "犧牲中";
+
+    todayExp.status = newStatus;
+    
+    // 即時同步至 GAS API
+    await syncToGoogleSheet("updateStatus", {
+      date: todayExp.date,
+      user: todayExp.user,
+      status: newStatus
+    });
 
     refreshDashboard();
   }
 
-  function submitFormFinal() {
+  async function submitFormFinal() {
     const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
-    
     let targetStatus = "已完成";
     const formId = currentFormCtx.formId;
 
@@ -744,18 +821,27 @@
 
     if(currentFormCtx.isMakeup) targetStatus = "實驗結束";
 
+    // 寫入 GAS Web App
+    await syncToGoogleSheet("submitForm", {
+      date: state.simulatedDate,
+      user: state.currentUser ? state.currentUser.name : "Daniel",
+      status: targetStatus,
+      info: "Vortex gut–brain stimulation -VUS刺激",
+      formData: currentFormCtx.data
+    });
+
     if(todayExp) todayExp.status = targetStatus;
 
     closeFormPage();
-    refreshDashboard();
-    showCustomAlert("提交成功", `資料已順利登錄至「資料中心」，狀態更變為：[${targetStatus}]`);
+    await refreshDashboard();
+    showCustomAlert("提交成功", `表單已成功寫入 Google 試算表！\n實驗狀態更變為：[${targetStatus}]`);
   }
 
   /* ==========================================================================
-     六、 特殊計算與數據提取
+     八、 跨表單動態計算與試算表資料提取
      ========================================================================== */
   function calculateFetchDetail(key) {
-    const exp = state.dataCenter.find(d => d.date === state.simulatedDate) || state.dataCenter[0];
+    const exp = state.dataCenter.find(d => d.date === state.simulatedDate) || state.dataCenter[0] || {};
     
     if(key === "O2_and_Isoflurane_usage") {
       const o2_init = exp.O2_init || 160;
@@ -764,13 +850,13 @@
     } 
     else if(key === "NaCl_and_Isoflurane_usage") {
       const link = "https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit#gid=1540621860";
-      return `實驗室登錄連結 : ${link}\nNaCl：${exp.user}, July 25, 9g\nIsoflurane：${exp.user}, July 25, 14.69g`;
+      return `實驗室登錄連結 : ${link}\nNaCl：${exp.user || 'Daniel'}, July 25, 9g\nIsoflurane：${exp.user || 'Daniel'}, July 25, 14.69g`;
     }
-    return "尚無數據";
+    return "尚無資料";
   }
 
   /* ==========================================================================
-     七、 模擬表單結構產出器 (Mock Form Structures)
+     九、 表單結構定義 (Form Contexts)
      ========================================================================== */
   function getFormStructure(formId) {
     if(formId === "FORM_001_1" || formId === "FORM_001_2") {
@@ -857,7 +943,7 @@
   }
 
   /* ==========================================================================
-     八、 值日生風格 Modal 與選單控制器
+     十、 值日生風格 Modal 控制
      ========================================================================== */
   function showCustomAlert(title, message) {
     document.getElementById('modalTitle').innerText = title;
@@ -902,7 +988,7 @@
   function openEditProfile() {
     closeFabMenu();
     if(state.currentUser) {
-      showCustomAlert("更改個人資訊", `當前使用者 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}`);
+      showCustomAlert("更改個人資訊", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}`);
     }
   }
 </script>
