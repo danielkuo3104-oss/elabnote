@@ -1,6 +1,7 @@
 {
+  "id": "/v2",
   "name": "智慧實驗日誌 E-labnote",
-  "short_name": "e-Lab",
+  "short_name": "e-Lab v2",
   "start_url": "index.html?v=2.0",
   "display": "standalone",
   "background_color": "#bce0fd",
