@@ -133,12 +133,10 @@
   </style>
 
 
-  <!-- 1. 瀏覽器分頁與桌面圖示 (全部指向藍色 DNA 圖檔) -->
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-2.0.png">
-  <link rel="apple-touch-icon" href="icon-2.0.png">
-  
-  <!-- 2. PWA Manifest -->
-  <link rel="manifest" href="manifest.json">
+  <!-- 加上 ?v=2.0 強制瀏覽器重新向伺服器拉取最新圖片 -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-2.0.png?v=2.0">
+  <link rel="apple-touch-icon" href="icon-2.0.png?v=2.0">
+  <link rel="manifest" href="manifest.json?v=2.0">
   
   <!-- 3. 新版跨平台 Web App Meta 標籤 (解決 Deprecated 警告) -->
   <meta name="mobile-web-app-capable" content="yes">
