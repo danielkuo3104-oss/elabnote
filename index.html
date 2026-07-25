@@ -19,6 +19,7 @@
       --success: #059669;
       --warning: #d97706;
       --danger: #dc2626;
+      --gray-badge: #64748b;
       
       --border-color: #e2e8f0;
       --border-focus: #38bdf8;
@@ -33,7 +34,6 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     
-    /* 1. 鎖死 Body 防止整體網頁滑動晃動 */
     html, body { 
       width: 100%; height: 100%; overflow: hidden; position: fixed; 
       background-color: var(--bg-main); color: var(--text-primary);
@@ -45,7 +45,7 @@
       position: relative; overflow: hidden;
     }
 
-    /* 頂部 Header */
+    /* 頂部 Header 與加大版刷新按鈕 */
     .header {
       background: var(--card-bg); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border-color); z-index: 10; padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
@@ -55,18 +55,30 @@
     .header-title h1::before { content: ""; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
     .header-title h2 { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-left: 8px; }
     
-    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-    .user-badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
-    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 2px 6px; font-size: 11px; font-weight: 600; cursor: pointer; }
-    .update-time { font-size: 10px; color: var(--text-muted); font-family: ui-monospace, monospace; display: flex; align-items: center; gap: 4px; }
-    .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s; }
-    .refresh-icon:active { transform: rotate(180deg); }
+    .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .header-btn-group { display: flex; gap: 6px; align-items: center; }
+    .user-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
+    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    
+    /* 加大便於手機點擊的一鍵更新按鈕 */
+    .btn-refresh-touch {
+      display: flex; align-items: center; gap: 4px; background: var(--primary-light); color: var(--primary);
+      border: 1px solid #bae6fd; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .btn-refresh-touch:active { background: #e0f2fe; }
 
-    /* 僅允許內部滾動 */
+    .update-time { font-size: 10px; color: var(--text-muted); font-family: ui-monospace, monospace; margin-top: 2px; }
+
     .main-content { padding: 16px; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
     .dashboard-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
-    .status-badge { background: #fef3c7; color: var(--warning); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; border: 1px solid #fde68a; }
+    
+    /* 狀態 Badge 樣式 */
+    .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; border: 1px solid transparent; }
+    .status-badge.reserved { background: #f1f5f9; color: var(--gray-badge); border-color: #cbd5e1; }
+    .status-badge.active { background: #fef3c7; color: var(--warning); border-color: #fde68a; }
+    .status-badge.completed { background: #ecfdf5; color: var(--success); border-color: #a7f3d0; }
+
     .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
     .schedule-tag { border-radius: 4px; padding: 2px 8px; font-size: 11px; margin-right: 8px; font-weight: 600; font-family: ui-monospace, monospace; }
 
@@ -90,12 +102,15 @@
     .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
 
-    /* 版權與版本宣告樣式 */
+    .upload-status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-left: 6px; }
+    .upload-status-tag.uploaded { background: #dcfce7; color: #15803d; }
+    .upload-status-tag.pending { background: #fee2e2; color: #b91c1c; }
+
+    /* 英文版權宣告 */
     .copyright-notice {
-      text-align: center; font-size: 11px; color: var(--text-muted); padding: 12px 0; font-weight: 500;
+      text-align: center; font-size: 11px; color: var(--text-muted); padding: 16px 0; font-weight: 500; font-family: ui-monospace, monospace;
     }
 
-    /* FAB 懸浮按鈕：預設隱藏，僅主頁時顯示 */
     .fab {
       position: absolute; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); width: 48px; height: 48px;
       background: var(--text-primary); color: #fff; border-radius: 50%; display: none; align-items: center;
@@ -115,7 +130,6 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
-    /* Modal 提示框 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
@@ -131,7 +145,7 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    /* 表單頁面獨立彈窗 */
+    /* 表單彈窗 */
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       background: var(--card-bg); z-index: 100; flex-direction: column; height: 100%;
@@ -140,7 +154,6 @@
       padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;
       background: var(--bg-main); padding-top: calc(env(safe-area-inset-top, 0px) + 14px); flex-shrink: 0;
     }
-    /* 醒目的紅色關閉按鈕 */
     .btn-close-red {
       background: #fee2e2; color: var(--danger); border: 1px solid #fca5a5; width: 32px; height: 32px;
       border-radius: 50%; font-size: 16px; font-weight: bold; display: flex; align-items: center; justify-content: center;
@@ -163,8 +176,8 @@
     .btn-footer { flex: 1; padding: 12px; border-radius: var(--radius-sm); font-weight: 700; font-size: 14px; cursor: pointer; border: 1px solid var(--border-color); text-align: center; }
     .btn-footer-prev { background: var(--bg-main); color: var(--text-secondary); }
     .btn-footer-next { background: var(--primary); color: #fff; border: none; }
+    .btn-footer-next:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* 選項卡片（卡片化單選與多選） */
     .form-group { margin-bottom: 18px; }
     .form-group > label { display: block; font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--text-primary); }
     .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-main); color: var(--text-primary); outline: none; }
@@ -181,7 +194,6 @@
     .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
     .section-header { font-size: 12px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 6px 10px; border-radius: 4px; margin: 16px 0 10px 0; }
 
-    /* 登入畫面 */
     .auth-container {
       position: absolute; top:0; left:0; right:0; bottom:0; background: var(--card-bg); z-index: 200;
       padding: 24px; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto;
@@ -204,7 +216,7 @@
 
 <div class="app-container">
 
-  <!-- 1. 登入 / 註冊 頁面 (含底部版權) -->
+  <!-- 1. 登入 / 註冊 頁面 (含英文版權宣告) -->
   <div id="authPage" class="auth-container">
     <div>
       <div class="auth-header-bar">
@@ -268,24 +280,24 @@
       </div>
     </div>
 
-    <div class="copyright-notice">© DanielGuo 版權所有 v2.0</div>
+    <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.0</div>
   </div>
 
-  <!-- 2. 主頁面 Header -->
+  <!-- 2. 主頁面 Header (加大刷新點擊區) -->
   <div class="header">
     <div class="header-title">
       <h1 id="appTitle">智慧實驗日誌</h1>
       <h2>E-labnote</h2>
     </div>
     <div class="header-right">
-      <div style="display:flex; gap:6px; align-items:center;">
+      <div class="header-btn-group">
         <div id="userBadge" class="user-badge" onclick="performLogout()" title="點擊登出">未登入</div>
         <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
+        <button class="btn-refresh-touch" onclick="refreshDashboard()" title="一鍵更新">
+          <span class="refresh-icon">🔄</span> 更新
+        </button>
       </div>
-      <div class="update-time">
-        <span id="txtUpdateTime">更新 : 載入中...</span>
-        <span class="refresh-icon" title="一鍵刷新" onclick="refreshDashboard()">🔄</span>
-      </div>
+      <div class="update-time" id="txtUpdateTime">Syncing...</div>
     </div>
   </div>
 
@@ -316,7 +328,7 @@
       <div class="timeline-line"></div>
     </div>
 
-    <div class="copyright-notice">© DanielGuo 版權所有 v2.0</div>
+    <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.0</div>
   </div>
 
   <!-- FAB 懸浮選單 -->
@@ -328,11 +340,10 @@
   </div>
   <div id="fabBtn" class="fab" onclick="toggleFabMenu()">+</div>
 
-  <!-- 表單頁面 -->
+  <!-- 表單彈窗 -->
   <div id="formPageContainer" class="form-page-container">
     <div class="form-header">
       <h3 id="formTitle" style="font-size: 15px; font-weight: 700;">表單名稱</h3>
-      <!-- 恢復紅圓圈關閉按鈕 -->
       <button class="btn-close-red" onclick="closeFormPage()">✕</button>
     </div>
     
@@ -378,11 +389,12 @@
     currentUser: null,
     isGuest: false,
     currentLang: "ZH",
-    simulatedDate: "2026-07-25",
+    simulatedDate: "2026-07-26", // 精準校正今日日期
     membersList: [],
     dataCenter: [],
     formDataCache: {},
-    dynamicForms: {}
+    dynamicForms: {},
+    isSubmitting: false // 防連點開關
   };
 
   window.addEventListener('DOMContentLoaded', async () => {
@@ -393,7 +405,7 @@
 
   async function refreshDashboard() {
     const now = new Date();
-    document.getElementById('txtUpdateTime').innerText = `${state.currentLang==='ZH'?'更新':'Updated'}: ${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('txtUpdateTime').innerText = `${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
     await fetchMembersFromSheet();
     await fetchDataCenterFromSheet();
@@ -403,7 +415,7 @@
     updateDashboardButtons();
   }
 
-  // 表單動態解析 Engine
+  // 試算表表單動態解析 Engine (包含 Native Calendar 日曆)
   async function fetchAndParseFormsFromSheet() {
     try {
       const res = await fetch(URL_FORMS);
@@ -511,12 +523,23 @@
             });
             lastParentField = null;
           }
-          else if (rawType.includes("[number]") || rawType.includes("[text]") || rawType.includes("[datetime]")) {
+          // [datetime] 自動轉為 HTML5 原生月曆 (<input type="date">)
+          else if (rawType.includes("[datetime]")) {
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "date",
+              default: state.simulatedDate,
+              desc: rawDesc
+            });
+            lastParentField = null;
+          }
+          else if (rawType.includes("[number]") || rawType.includes("[text]")) {
             currentPage.fields.push({
               id: `field_${r}_${col}`,
               label: rawLabel,
               type: rawType.includes("[number]") ? "number" : "text",
-              default: rawType.match(/\[default:\s*([^\]]+)\]/)?.[1] || (rawLabel.includes("日期") ? state.simulatedDate : ""),
+              default: rawType.match(/\[default:\s*([^\]]+)\]/)?.[1] || "",
               unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || "",
               placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "",
               desc: rawDesc
@@ -530,7 +553,7 @@
 
       state.dynamicForms = parsedForms;
     } catch (err) {
-      console.error("動態解析表單中心失敗:", err);
+      console.error("動態解析表單失敗:", err);
     }
   }
 
@@ -587,6 +610,7 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
+  // 讀取資料中心（包含 V 欄 / Index 21 數據上傳檢註）
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -596,11 +620,13 @@
       const records = [];
       for(let i = 1; i < rows.length; i++) {
         if(rows[i][0]) {
+          const colV = rows[i][21] ? rows[i][21].trim() : '';
           records.push({
             date: rows[i][0].trim(),
             user: rows[i][1] ? rows[i][1].trim() : '',
             status: rows[i][2] ? rows[i][2].trim() : '',
-            info: rows[i][3] ? rows[i][3].trim() : ''
+            info: rows[i][3] ? rows[i][3].trim() : '',
+            hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
           });
         }
       }
@@ -622,13 +648,19 @@
   }
 
   function renderMainDashboardUI() {
-    const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate);
+    const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成');
+    
     if(todayExps.length > 0) {
       const active = todayExps[0];
-      document.getElementById('statusBadge').style.display = 'block';
-      document.getElementById('statusBadge').innerText = active.status;
+      const badge = document.getElementById('statusBadge');
+      badge.style.display = 'block';
+      badge.innerText = active.status;
+      
+      // 動態 Badge 樣式
+      badge.className = 'status-badge ' + (active.status === '已預約' ? 'reserved' : 'active');
+      
       document.getElementById('txtCurrentExpUser').innerText = `${active.date} ${active.user}`;
-      document.getElementById('txtCurrentExpTitle').innerText = active.info;
+      document.getElementById('txtCurrentExpTitle').innerText = active.info || "實驗進行中";
     } else {
       document.getElementById('statusBadge').style.display = 'none';
       document.getElementById('txtCurrentExpUser').innerText = state.simulatedDate;
@@ -648,7 +680,7 @@
         return `
           <div class="schedule-item">
             <span class="schedule-tag" style="background:${userColor}; color:var(--text-primary);">${f.date.slice(5)} ${f.user}</span>
-            <span>${f.info}</span>
+            <span>${f.info || '預約排程'}</span>
           </div>
         `;
       }).join('');
@@ -692,7 +724,6 @@
     state.currentLang = user.lang || "ZH";
     document.getElementById('authPage').style.display = 'none';
     
-    // 登入後顯示 FAB (+) 按鈕
     document.getElementById('fabBtn').style.display = 'flex';
 
     const badge = document.getElementById('userBadge');
@@ -710,12 +741,11 @@
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('userBadge').innerText = "訪客";
     
-    // 訪客也顯示 FAB (+) 按鈕
     document.getElementById('fabBtn').style.display = 'flex';
 
     applyLanguage();
     refreshDashboard();
-    showCustomAlert("訪客模式", "已以訪客身份登入，登錄功能受限。");
+    showCustomAlert("訪客模式", "已以訪客身份登入，登錄功能已全數受限。");
   }
 
   function performLogout() {
@@ -728,7 +758,6 @@
         document.getElementById('userBadge').innerText = "未登入";
         document.getElementById('authPage').style.display = 'flex';
         
-        // 登出時隱藏 FAB 按鈕
         document.getElementById('fabBtn').style.display = 'none';
         refreshDashboard();
       }
@@ -789,7 +818,6 @@
     document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
   }
 
-  // 訪客禁用所有按鈕
   function updateDashboardButtons() {
     const todayHasExp = state.dataCenter.some(d => d.date === state.simulatedDate);
     const d = new Date(state.simulatedDate);
@@ -811,6 +839,7 @@
     document.getElementById('btnMakeupExp').classList.remove('btn-disabled');
   }
 
+  // 時間軸渲染：上半部（未完成/預約/進行中）、下半部（已完成紀錄 + V欄判定）
   function renderTimeline() {
     const container = document.getElementById('timelineContainer');
     let html = `<div class="timeline-line"></div>`;
@@ -825,16 +854,28 @@
       const isToday = item.date === state.simulatedDate;
       const userObj = state.membersList.find(m => m.name === item.user);
       const userColor = userObj ? userObj.color : '#f1f5f9';
+      
+      const isCompleted = item.status === '已完成' || item.status === '實驗結束';
+      const statusColor = isCompleted ? 'var(--success)' : (item.status === '已預約' ? 'var(--gray-badge)' : 'var(--warning)');
+      
+      const uploadTagHtml = isCompleted 
+        ? (item.hasDataUpload 
+            ? `<span class="upload-status-tag uploaded">已上傳資料</span>` 
+            : `<span class="upload-status-tag pending">待上傳資料</span>`) 
+        : '';
 
       html += `
         <div class="timeline-item">
-          <div class="timeline-node"></div>
+          <div class="timeline-node" style="background:${statusColor}"></div>
           <div class="timeline-card ${isToday ? 'today' : ''}">
             <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:12px;">
               <span>${item.date} <span style="background:${userColor}; border-radius:4px; padding:2px 6px; margin-left:4px;">${item.user}</span></span>
-              <span style="color:var(--warning);">${item.status}</span>
+              <div>
+                <span style="color:${statusColor}">${item.status}</span>
+                ${uploadTagHtml}
+              </div>
             </div>
-            <div style="font-size:13px; margin-top:6px; color:var(--text-primary);">${item.info}</div>
+            <div style="font-size:13px; margin-top:6px; color:var(--text-primary); font-weight:500;">${item.info || '實驗大綱項'}</div>
           </div>
         </div>
       `;
@@ -882,7 +923,6 @@
     renderFormSidebar();
     renderFormCurrentPage();
 
-    // 開啟表單時，隱藏 FAB 懸浮按鈕
     document.getElementById('fabBtn').style.display = 'none';
     document.getElementById('formPageContainer').style.display = 'flex';
   }
@@ -896,7 +936,6 @@
     `).join('');
   }
 
-  // 重構單選題，解決複選/混淆問題
   function renderFormCurrentPage() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
@@ -916,6 +955,16 @@
             <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value)">
               ${state.membersList.map(m => `<option value="${m.name}" ${val === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
             </select>
+          </div>
+        `;
+      }
+      // [datetime] / [date] 使用月曆選取器
+      else if (field.type === "date") {
+        html += `
+          <div class="form-group">
+            <label>${field.label}</label>
+            <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value)">
+            ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
           </div>
         `;
       }
@@ -975,11 +1024,13 @@
 
     container.innerHTML = html;
 
-    // 底部按鈕顯示控制
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
     const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
-    document.getElementById('btnFormNext').innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+    
+    const btnNext = document.getElementById('btnFormNext');
+    btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+    btnNext.disabled = state.isSubmitting;
   }
 
   function selectOptionRadio(fieldId, optName, action, statusTag) {
@@ -1021,6 +1072,8 @@
   }
 
   function nextFormPage() {
+    if (state.isSubmitting) return;
+
     if (currentFormCtx.selectedAction) {
       if (currentFormCtx.selectedAction.type === 'submit') {
         submitFormFinal();
@@ -1056,29 +1109,51 @@
 
   function closeFormPage() {
     document.getElementById('formPageContainer').style.display = 'none';
-    // 關閉表單後，重新顯示 FAB 懸浮按鈕
     if(state.currentUser) {
       document.getElementById('fabBtn').style.display = 'flex';
     }
   }
 
+  // 核心：動態提取真正的表單填寫數據，防連點提交
   async function submitFormFinal() {
-    const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
-    let targetStatus = currentFormCtx.selectedStatusTag || "已完成";
+    if (state.isSubmitting) return;
+
+    // 1. 防連點：上鎖按鈕
+    state.isSubmitting = true;
+    const btnNext = document.getElementById('btnFormNext');
+    btnNext.disabled = true;
+    btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
+
+    // 2. 決定狀態：如果是 FORM_001_2 (實驗預約)，強制標示為「已預約」
+    let targetStatus = "已預約";
+    if (currentFormCtx.formId !== "FORM_001_2") {
+      targetStatus = currentFormCtx.selectedStatusTag || "已完成";
+    }
+
+    // 3. 動態提取真實填寫的實驗資訊 (例如：目的 / 大綱)
+    let dynamicInfo = "";
+    Object.keys(currentFormCtx.data).forEach(key => {
+      const val = currentFormCtx.data[key];
+      if (typeof val === 'string' && val.trim() !== '' && !key.includes('input') && !key.includes('date')) {
+        if (!dynamicInfo) dynamicInfo = val;
+      }
+    });
+
+    const submitDate = currentFormCtx.data['field_3_4'] || state.simulatedDate;
 
     await syncToGoogleSheet("submitForm", {
-      date: state.simulatedDate,
+      date: submitDate,
       user: state.currentUser ? state.currentUser.name : "Daniel",
       status: targetStatus,
-      info: "Vortex gut–brain stimulation -VUS刺激",
+      info: dynamicInfo || "實驗登記項目",
       formData: currentFormCtx.data
     });
 
-    if(todayExp) todayExp.status = targetStatus;
-
+    // 4. 解鎖並關閉
+    state.isSubmitting = false;
     closeFormPage();
     await refreshDashboard();
-    showCustomAlert("提交成功", `表單已成功寫入！\n實驗狀態更變為：[${targetStatus}]`);
+    showCustomAlert("提交成功", `表單已寫入試算表！\n狀態：[${targetStatus}]`);
   }
 
   function showCustomAlert(title, message) {
