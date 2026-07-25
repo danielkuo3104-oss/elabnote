@@ -2,31 +2,37 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>智慧實驗日誌 E-labnote</title>
   <style>
     :root {
+      /* 專業臨床實驗室配色 */
       --bg-main: #f8fafc;
       --card-bg: #ffffff;
       --text-primary: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
       
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --primary-light: #eff6ff;
+      --primary: #0284c7;        /* Lab Blue */
+      --primary-dark: #0369a1;
+      --primary-light: #f0f9ff;
       
-      --accent-green: #10b981;
-      --accent-orange: #f59e0b;
+      --success: #059669;        /* Clinical Green */
+      --warning: #d97706;        /* Alert Amber */
+      --danger: #dc2626;
+      
       --border-color: #e2e8f0;
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+      --border-focus: #38bdf8;
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     
     body { 
       background-color: var(--bg-main); 
@@ -45,10 +51,10 @@
       display: flex; 
       flex-direction: column;
       position: relative;
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
     }
 
-    /* Header 改為乾淨的白底加軟陰影 */
+    /* 專業頂部導覽列 */
     .header {
       background: var(--card-bg); 
       padding: 16px 20px; 
@@ -60,18 +66,21 @@
       top: 0;
       z-index: 10;
     }
-    .header-title h1 { font-size: 18px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.3px; }
-    .header-title h2 { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+    .header-title h1 { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.3px; display: flex; align-items: center; gap: 6px; }
+    .header-title h1::before { content: ""; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
+    .header-title h2 { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-left: 10px; }
+    
     .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-    .user-badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--text-primary); border: 1px solid var(--border-color); }
-    .lang-btn { background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
-    .update-time { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-    .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s; }
+    .user-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); }
+    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .lang-btn:active { background: var(--primary-light); }
+    .update-time { font-size: 11px; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; display: flex; align-items: center; gap: 4px; }
+    .refresh-icon { cursor: pointer; display: inline-block; transition: transform 0.3s ease; }
     .refresh-icon:active { transform: rotate(180deg); }
 
     .main-content { padding: 16px; flex: 1; overflow-y: auto; }
 
-    /* Dashboard 簡約高質感卡片 */
+    /* 實驗狀態儀表板卡片 */
     .dashboard-card { 
       background: var(--card-bg); 
       border: 1px solid var(--border-color); 
@@ -80,71 +89,72 @@
       margin-bottom: 16px; 
       box-shadow: var(--shadow-sm);
     }
-    .status-badge { background: #fef3c7; color: #d97706; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; }
+    .status-badge { background: #fef3c7; color: var(--warning); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; float: right; border: 1px solid #fde68a; }
     .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
-    .schedule-tag { border-radius: 6px; padding: 2px 8px; font-size: 11px; margin-right: 8px; font-weight: 600; border: 1px solid var(--border-color); }
+    .schedule-tag { border-radius: 4px; padding: 2px 8px; font-size: 11px; margin-right: 8px; font-weight: 600; font-family: ui-monospace, monospace; }
 
-    /* 按鈕重新設計：高對比度、專業質感 */
-    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    /* 行動按鈕區（高質感醫用風格） */
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
     .btn-action {
-      padding: 14px; 
+      padding: 14px 12px; 
       border-radius: var(--radius-md); 
       border: 1px solid var(--border-color); 
       font-weight: 600; 
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer; 
       text-align: center; 
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       background: var(--card-bg);
       color: var(--text-primary);
       box-shadow: var(--shadow-sm);
     }
-    .btn-action:active { transform: scale(0.97); }
+    .btn-action:active { transform: translateY(1px); }
     .btn-disabled { opacity: 0.4; cursor: not-allowed !important; pointer-events: none; background: #f1f5f9; color: var(--text-muted); }
     
     .btn-today { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-    .btn-tomorrow { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-    .btn-reserve { background: #f8fafc; color: var(--text-primary); border-color: #cbd5e1; }
+    .btn-tomorrow { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+    .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
     .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
-    /* 時間軸設計優化 */
-    .timeline-container { position: relative; padding-left: 24px; margin-top: 16px; }
-    .timeline-line { position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--border-color); }
-    .timeline-item { position: relative; margin-bottom: 16px; cursor: pointer; }
-    .timeline-node { position: absolute; left: -21px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 2px var(--primary); }
-    .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
+    /* 實驗時間軸 */
+    .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; }
+    .timeline-line { position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: var(--border-color); }
+    .timeline-item { position: relative; margin-bottom: 14px; cursor: pointer; }
+    .timeline-node { position: absolute; left: -19px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 2px var(--primary); }
+    .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
 
-    /* 懸浮按鈕 */
+    /* 功能浮動按鈕 */
     .fab {
-      position: fixed; right: calc(50% - 220px); bottom: 24px; width: 52px; height: 52px;
+      position: fixed; right: calc(50% - 220px); bottom: 24px; width: 48px; height: 48px;
       background: var(--text-primary); color: #fff; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 24px; cursor: pointer; border: none; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-      z-index: 10;
+      justify-content: center; font-size: 22px; cursor: pointer; border: none; box-shadow: var(--shadow-md);
+      z-index: 10; transition: transform 0.2s;
     }
+    .fab:active { transform: scale(0.95); }
     @media (max-width: 480px) { .fab { right: 20px; } }
 
     .fab-menu-overlay {
-      position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.4);
+      position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(15, 23, 42, 0.3);
       backdrop-filter: blur(4px); display: none; flex-direction: column; justify-content: flex-end;
       align-items: flex-end; padding: 80px 20px; z-index: 9;
     }
     .fab-menu-item {
       background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 20px;
-      margin-bottom: 10px; font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: var(--shadow-md); color: var(--text-primary);
+      margin-bottom: 10px; font-weight: 600; font-size: 13px; cursor: pointer; box-shadow: var(--shadow-md); color: var(--text-primary);
     }
 
-    /* Modal 提示框 */
+    /* 專業 Modal 提示框 */
     .custom-modal-backdrop {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5);
-      backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
     }
     .custom-modal {
       background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 320px;
-      padding: 24px 20px; box-shadow: var(--shadow-md); text-align: center;
+      padding: 20px; box-shadow: var(--shadow-md); text-align: center; border: 1px solid var(--border-color);
     }
-    .custom-modal h3 { margin-bottom: 8px; font-size: 16px; font-weight: 700; color: var(--text-primary); }
-    .custom-modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; white-space: pre-line; text-align: center; line-height: 1.5; }
+    .custom-modal h3 { margin-bottom: 8px; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .custom-modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; white-space: pre-line; text-align: center; line-height: 1.5; }
     .custom-modal-btns { display: flex; gap: 8px; justify-content: center; }
     .modal-btn { flex: 1; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-weight: 600; font-size: 13px; cursor: pointer; }
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
@@ -155,18 +165,18 @@
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
       background: var(--card-bg); z-index: 100; flex-direction: column;
     }
-    .form-header { padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); }
+    .form-header { padding: 14px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--bg-main); }
     .form-body { flex: 1; display: flex; overflow: hidden; position: relative; }
     .form-sidebar { width: 90px; background: var(--bg-main); border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; }
-    .sidebar-bookmark { padding: 12px 8px; font-size: 12px; text-align: center; border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); font-weight: 500; }
+    .sidebar-bookmark { padding: 12px 8px; font-size: 11px; text-align: center; border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); font-weight: 500; }
     .sidebar-bookmark.active { background: var(--card-bg); font-weight: 700; color: var(--primary); border-left: 3px solid var(--primary); }
     .form-content { flex: 1; padding: 16px; overflow-y: auto; }
     .form-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; background: var(--card-bg); }
 
     .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; color: var(--text-primary); }
-    .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 14px; background: var(--bg-main); color: var(--text-primary); outline: none; }
-    .form-control:focus { border-color: var(--primary); background: #fff; }
+    .form-group label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 6px; color: var(--text-primary); }
+    .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-main); color: var(--text-primary); outline: none; transition: border-color 0.2s; }
+    .form-control:focus { border-color: var(--border-focus); background: #fff; }
     .checkbox-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; font-size: 13px; color: var(--text-primary); }
     .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
 
@@ -176,7 +186,7 @@
     }
     .test-panel input { padding: 2px 6px; border-radius: 4px; border: none; font-size: 11px; }
 
-    /* 解決登入頁在中手機上跑版與狀態列重疊問題 */
+    /* 登入頁面（徹底解決瀏海/狀態列重疊） */
     .auth-container {
       position: absolute; top:0; left:0; right:0; bottom:0; background: var(--card-bg); z-index: 200;
       padding: 24px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto;
@@ -184,14 +194,15 @@
     .auth-header-bar {
       display: flex;
       justify-content: flex-end;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
+      padding-top: env(safe-area-inset-top, 10px);
     }
-    .auth-title { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 24px; color: var(--text-primary); letter-spacing: -0.5px; }
+    .auth-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 24px; color: var(--text-primary); letter-spacing: -0.5px; }
     .auth-tabs { display: flex; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); }
-    .auth-tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; font-weight: 600; font-size: 15px; color: var(--text-muted); }
+    .auth-tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-muted); }
     .auth-tab.active { border-bottom: 2px solid var(--primary); color: var(--primary); }
 
-    .error-msg { color: #ef4444; font-size: 12px; font-weight: 500; margin-top: 6px; display: none; }
+    .error-msg { color: var(--danger); font-size: 11px; font-weight: 600; margin-top: 6px; display: none; }
   </style>
 
   <link rel="icon" type="image/png" href="icon-2.0.png?v=2.0">
@@ -208,7 +219,7 @@
 
 <div class="app-container">
 
-  <!-- 1. 登入 / 註冊 頁面 (完美修復頂部狀態列重疊問題) -->
+  <!-- 1. 登入 / 註冊 頁面 -->
   <div id="authPage" class="auth-container">
     <div class="auth-header-bar">
       <button id="authLangBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
@@ -296,12 +307,12 @@
   <div class="main-content">
     <div class="dashboard-card">
       <div id="statusBadge" class="status-badge" style="display:none;">--</div>
-      <div id="txtCurrentExpUser" style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px;">載入中...</div>
-      <div id="txtCurrentExpTitle" style="font-size:15px; font-weight:700; color:var(--text-primary);">同步試算表資料中...</div>
+      <div id="txtCurrentExpUser" style="font-size:12px; font-weight:700; color:var(--primary); margin-bottom:4px; font-family:ui-monospace, monospace;">載入中...</div>
+      <div id="txtCurrentExpTitle" style="font-size:14px; font-weight:700; color:var(--text-primary);">同步試算表資料中...</div>
       <hr style="margin:12px 0; border:0; border-top:1px solid var(--border-color);">
       
       <div id="scheduleSection" onclick="openScheduleCenter()">
-        <div id="txtScheduleHeader" style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px;">未來排程 (最靠近兩筆)</div>
+        <div id="txtScheduleHeader" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">未來排程 (最靠近兩筆)</div>
         <div id="scheduleList">
           <div class="schedule-item"><span class="schedule-tag">--</span><span>載入中...</span></div>
         </div>
@@ -324,7 +335,7 @@
     <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
     <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄中心</div>
     <div class="fab-menu-item" id="menuProfile" onclick="openEditProfile()">更改個人資訊</div>
-    <div class="fab-menu-item" id="menuClose" style="color:#ef4444;" onclick="closeFabMenu()">關閉</div>
+    <div class="fab-menu-item" id="menuClose" style="color:var(--danger);" onclick="closeFabMenu()">關閉</div>
   </div>
   <div class="fab" onclick="toggleFabMenu()">+</div>
 
@@ -336,7 +347,7 @@
 
   <div id="formPageContainer" class="form-page-container">
     <div class="form-header" id="formHeader">
-      <h3 id="formTitle" style="font-size: 16px; font-weight: 700;">表單名稱</h3>
+      <h3 id="formTitle" style="font-size: 15px; font-weight: 700;">表單名稱</h3>
       <button style="border:none; background:transparent; font-size:18px; cursor:pointer;" onclick="closeFormPage()">❌</button>
     </div>
     <div class="form-body">
@@ -369,12 +380,11 @@
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
   const PRESET_COLORS = [
-    { name: "天藍色 (Sky Blue)", hex: "#81d4fa" },
-    { name: "薄荷綠 (Mint Green)", hex: "#a5d6a7" },
-    { name: "珊瑚粉 (Coral Pink)", hex: "#ffab91" },
-    { name: "紫羅蘭 (Violet)", hex: "#ce93d8" },
-    { name: "檸檬黃 (Lemon Yellow)", hex: "#fff59d" },
-    { name: "淡橙色 (Light Orange)", hex: "#ffe082" }
+    { name: "天藍色 (Sky Blue)", hex: "#e0f2fe" },
+    { name: "薄荷綠 (Mint Green)", hex: "#dcfce7" },
+    { name: "珊瑚粉 (Coral Pink)", hex: "#ffedd5" },
+    { name: "紫羅蘭 (Violet)", hex: "#f3e8ff" },
+    { name: "檸檬黃 (Lemon Yellow)", hex: "#fef9c3" }
   ];
 
   let state = {
@@ -406,31 +416,32 @@
     updateDashboardButtons();
   }
 
-  // 1. 修復 CSV 讀取，將 F 欄（識別密碼）讀入 user 物件
-async function fetchMembersFromSheet() {
-  try {
-    const res = await fetch(URL_MEMBERS);
-    const csvText = await res.text();
-    const rows = parseCSV(csvText);
-    
-    const members = [];
-    for(let i = 1; i < rows.length; i++) {
-      if(rows[i][0]) {
-        members.push({
-          name: rows[i][0].trim(),
-          email: rows[i][1] ? rows[i][1].trim() : '',
-          color: rows[i][3] ? rows[i][3].trim() : '#e2e8f0',
-          role: rows[i][4] ? rows[i][4].trim() : '協作會員',
-          password: rows[i][5] ? rows[i][5].trim() : '', // 👈 補上 F 欄位密碼
-          lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
-        });
+  // 1. 完整解析 CSV 並讀取 F 欄位識別密碼
+  async function fetchMembersFromSheet() {
+    try {
+      const res = await fetch(URL_MEMBERS);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      
+      const members = [];
+      for(let i = 1; i < rows.length; i++) {
+        if(rows[i][0]) {
+          members.push({
+            name: rows[i][0].trim(),
+            email: rows[i][1] ? rows[i][1].trim() : '',
+            color: rows[i][3] ? rows[i][3].trim() : '#f1f5f9',
+            role: rows[i][4] ? rows[i][4].trim() : '協作會員',
+            password: rows[i][5] ? rows[i][5].trim() : '', // 👈 讀取 F 欄位識別密碼
+            lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
+          });
+        }
       }
+      state.membersList = members;
+      initAuthDropdown();
+      initColorDropdown();
+    } catch(err) {
+      console.error("同步會員中心失敗:", err);
     }
-    state.membersList = members;
-    initAuthDropdown();
-    initColorDropdown();
-  } catch(err) {
-    console.error("同步會員中心失敗:", err);
   }
 
   function checkDuplicateName() {
@@ -552,39 +563,38 @@ async function fetchMembersFromSheet() {
     document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
   }
 
-  // 2. 修復登入邏輯，加入真密碼核對
-function performLogin() {
-  const selectedName = document.getElementById('selLoginUser').value;
-  const inputPwd = document.getElementById('txtLoginPwd').value.trim();
-  const user = state.membersList.find(m => m.name === selectedName);
+  // 2. 嚴格比對識別密碼 + 乾淨歡迎語
+  function performLogin() {
+    const selectedName = document.getElementById('selLoginUser').value;
+    const inputPwd = document.getElementById('txtLoginPwd').value.trim();
+    const user = state.membersList.find(m => m.name === selectedName);
 
-  if (!user) {
-    showCustomAlert(state.currentLang === 'ZH' ? "錯誤" : "Error", "請選擇會員帳號");
-    return;
+    if (!user) {
+      showCustomAlert(state.currentLang === 'ZH' ? "提示" : "Alert", state.currentLang === 'ZH' ? "請選擇會員帳號" : "Select an account");
+      return;
+    }
+
+    if (user.password && inputPwd !== user.password) {
+      showCustomAlert(state.currentLang === 'ZH' ? "登入失敗" : "Login Failed", state.currentLang === 'ZH' ? "識別密碼錯誤，請重新輸入！" : "Incorrect password. Please try again.");
+      return;
+    }
+
+    state.currentUser = user;
+    state.isGuest = false;
+    state.currentLang = user.lang || "ZH";
+    document.getElementById('authPage').style.display = 'none';
+    
+    const badge = document.getElementById('userBadge');
+    badge.innerText = user.name;
+    badge.style.background = user.color || '#f1f5f9';
+
+    applyLanguage();
+    refreshDashboard();
+    
+    const welcomeTitle = state.currentLang === 'ZH' ? "登入成功" : "Welcome";
+    const welcomeMsg = state.currentLang === 'ZH' ? `歡迎回來，${user.name}！` : `Welcome back, ${user.name}!`;
+    showCustomAlert(welcomeTitle, welcomeMsg);
   }
-
-  // 👈 真正比對識別密碼
-  if (user.password && inputPwd !== user.password) {
-    showCustomAlert(state.currentLang === 'ZH' ? "登入失敗" : "Login Failed", "識別密碼不正確，請重新輸入！");
-    return;
-  }
-
-  state.currentUser = user;
-  state.isGuest = false;
-  state.currentLang = user.lang || "ZH";
-  document.getElementById('authPage').style.display = 'none';
-  
-  const badge = document.getElementById('userBadge');
-  badge.innerText = user.name;
-  badge.style.background = user.color || '#f1f5f9';
-
-  applyLanguage();
-  refreshDashboard();
-  
-  // 👈 依據語言顯示乾淨的歡迎語
-  const welcomeMsg = state.currentLang === 'ZH' ? `歡迎回來，${user.name}！` : `Welcome back, ${user.name}!`;
-  showCustomAlert(state.currentLang === 'ZH' ? "登入成功" : "Success", welcomeMsg);
-}
 
   function guestLogin() {
     state.currentUser = { name: "訪客", role: "Guest", color: "#f1f5f9" };
@@ -593,7 +603,7 @@ function performLogin() {
     document.getElementById('userBadge').innerText = state.currentLang==='ZH'?"訪客":"Guest";
     applyLanguage();
     refreshDashboard();
-    showCustomAlert(state.currentLang==='ZH'?"訪客模式":"Guest Mode", "已以訪客身份登入，登錄按鈕功能將受限。");
+    showCustomAlert(state.currentLang==='ZH'?"訪客模式":"Guest Mode", state.currentLang==='ZH'?"已以訪客身份登入，登錄按鈕功能將受限。":"Logged in as Guest. Form submissions are restricted.");
   }
 
   async function performRegister() {
@@ -699,7 +709,7 @@ function performLogin() {
     const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
     
     if(sorted.length === 0) {
-      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:13px;">${state.currentLang==='ZH'?'今日無實驗紀錄':'No experiment records today'}</div>`;
+      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">${state.currentLang==='ZH'?'今日無實驗紀錄':'No experiment records today'}</div>`;
       return;
     }
 
@@ -714,7 +724,7 @@ function performLogin() {
           <div class="timeline-card ${isToday ? 'today' : ''}">
             <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:12px;">
               <span>${item.date} <span style="background:${userColor}; border-radius:4px; padding:2px 6px; margin-left:4px;">${item.user}</span></span>
-              <span style="color:#d97706;">${item.status}</span>
+              <span style="color:var(--warning);">${item.status}</span>
             </div>
             <div style="font-size:13px; margin-top:6px; color:var(--text-primary);">${item.info}</div>
           </div>
@@ -787,13 +797,13 @@ function performLogin() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
 
-    let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
+    let html = `<h4 style="margin-bottom:16px; font-size:13px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
 
     page.fields.forEach(field => {
       const val = currentFormCtx.data[field.id] || field.default || "";
 
       if(field.type === "info") {
-        html += `<div style="font-weight:600; font-size:13px; background:#eff6ff; color:#1d4ed8; padding:10px; border-radius:var(--radius-sm); margin-bottom:12px;">${field.label}</div>`;
+        html += `<div style="font-weight:600; font-size:12px; background:#f0f9ff; color:#0369a1; padding:10px; border-radius:var(--radius-sm); margin-bottom:12px; border:1px solid #bae6fd;">${field.label}</div>`;
       }
       else if(field.type === "text" || field.type === "number") {
         html += `
