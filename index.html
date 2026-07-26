@@ -507,7 +507,7 @@
     dataCenter: [],
     formDataCache: {},
     dynamicForms: {},
-    fieldLabelMap: {}, // 🚀 全域欄位 Key -> 問題名稱對照字典
+    fieldLabelMap: {},
     isSubmitting: false,
     activeSelectedExpId: null
   };
@@ -633,12 +633,14 @@
     }
   }
   
+  // 🚀 完整即時響應計算引擎（支援 Page 0 劑量與 Page 1 座標）
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
 
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
 
+    // 🚀 第一頁：劑量計算 (PageIndex = 0)
     if (currentFormCtx.currentPageIdx === 0) {
       let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
       let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
@@ -648,9 +650,9 @@
         if (f.type === "formula") {
           let calculatedVal = 0;
           if (formulaIndex === 1) {
-            calculatedVal = 700 - (weight * dose);
+            calculatedVal = 700 - (weight * dose); // Saline 需要量
           } else {
-            calculatedVal = weight * dose;
+            calculatedVal = weight * dose;        // PTZ 需要量
           }
 
           currentFormCtx.data[f.id] = calculatedVal;
@@ -664,6 +666,7 @@
       return;
     }
 
+    // 🚀 第二頁：座標計算 (PageIndex = 1)
     if (currentFormCtx.currentPageIdx === 1) {
       const valArr = Array.from(allInputs).map(inp => parseFloat(inp.value) || 0);
       
@@ -728,7 +731,8 @@
 
   async function fetchAndParseFormsFromSheet() {
     try {
-      const res = await fetch(URL_FORMS);
+      // 🚀 加破快取隨機數
+      const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
       const csvText = await res.text();
       const rows = parseCSV(csvText);
 
@@ -745,7 +749,7 @@
       }
 
       const parsedForms = {};
-      state.fieldLabelMap = {}; // 初始化問題對照表
+      state.fieldLabelMap = {};
 
       formBlocks.forEach(block => {
         const formId = block.formId;
@@ -807,7 +811,7 @@
           const cleanLbl = cleanDisplayLabel(rawLabel);
 
           if (cleanLbl) {
-            state.fieldLabelMap[fieldId] = cleanLbl; // 🚀 綁定 Key 與問題標題
+            state.fieldLabelMap[fieldId] = cleanLbl;
           }
 
           if (formulaExpr) {
@@ -922,7 +926,7 @@
 
   async function fetchMembersFromSheet() {
     try {
-      const res = await fetch(URL_MEMBERS);
+      const res = await fetch(`${URL_MEMBERS}&_t=${Date.now()}`);
       const csvText = await res.text();
       const rows = parseCSV(csvText);
       
@@ -966,9 +970,10 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
+  // 🚀 關鍵同步修復：加上破快取隨機數，確保手機手動/自動更新時能秒獲取雲端最新狀態！
   async function fetchDataCenterFromSheet() {
     try {
-      const res = await fetch(URL_DATA);
+      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
       const csvText = await res.text();
       const rows = parseCSV(csvText);
 
@@ -1016,7 +1021,6 @@
             }
           });
 
-          // 專一讀取 FORM_001 作為標題
           let form001Data = {};
           if (row[4]) {
             let rawForm1Str = row[4].trim();
@@ -1040,6 +1044,7 @@
             dynamicInfo = "實驗專案";
           }
 
+          // 防狀態倒退，但若雲端更先進則強制同步雲端！
           const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
           let finalStatus = statusFromSheet;
 
@@ -1049,6 +1054,8 @@
 
             if (currentRank > sheetRank) {
               finalStatus = existingLocalRecord.status;
+            } else {
+              finalStatus = statusFromSheet; // 雲端有新進展，強制覆寫 Local
             }
           }
 
@@ -1137,7 +1144,7 @@
     }
   }
 
-  // 🚀 徹底重構詳細資訊彈窗：精準隔離數字與備註，以「問題: 回答」格式呈現
+  // 🚀 關鍵修復一：FORM_002_1, FORM_002_2, FORM_006 精簡呈現在明細，顯示「已完成檢查」或「已完成檢查*」
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1148,10 +1155,8 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 1. 精準隔離真正備註
     const notesStr = formData['notes'] ? formData['notes'] : (isZH ? '無' : 'None');
 
-    // 2. 歷程時間軸
     let timeLogsHtml = '';
     if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
       timeLogsHtml = Object.entries(formData['_time_logs']).map(([st, time]) => `
@@ -1164,29 +1169,37 @@
       timeLogsHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</span>`;
     }
 
-    // 3. 🚀 數據解析：將 field_xx_xx 轉換成「問題名稱: 填寫數值」格式
-    const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes', 'notes_label', '_time_logs'];
-    let filledDataList = [];
+    let filledDataHtml = '';
 
-    Object.keys(formData).forEach(k => {
-      if (!systemKeys.includes(k) && !k.endsWith('_input') && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
-        const valStr = String(formData[k]).trim();
-        // 透過對照表取得問題名稱
-        const questionLabel = state.fieldLabelMap[k] || k;
-        
-        // 過濾掉與標題/目的重複的字串
-        if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name']) {
-          filledDataList.push(`
-            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; border-bottom:1px solid #f1f5f9; padding-bottom:2px;">
-              <span style="color:var(--text-muted); font-weight:600; max-width:60%; font-size:10px;">${questionLabel}:</span>
-              <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${valStr}</span>
-            </div>
-          `);
+    // 🚀 判斷是否為檢查表類型（FORM_002_1, FORM_002_2, FORM_006）
+    const isChecklistForm = formData['_is_checklist'] || formData['field_8_0'] || formData['field_13_0'] || exp.status === '準備完成' || exp.status === '實驗完成';
+    
+    if (isChecklistForm) {
+      const isForce = formData['_is_force_submitted'] || false;
+      const statusText = isForce ? '已完成檢查*' : '已完成檢查';
+      filledDataHtml = `<span style="font-weight:700; color:var(--success); font-size:12px;">${statusText}</span>`;
+    } else {
+      const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes', 'notes_label', '_time_logs', '_is_checklist', '_is_force_submitted'];
+      let filledDataList = [];
+
+      Object.keys(formData).forEach(k => {
+        if (!systemKeys.includes(k) && !k.endsWith('_input') && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
+          const valStr = String(formData[k]).trim();
+          const questionLabel = state.fieldLabelMap[k] || k;
+          
+          if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name'] && valStr !== 'true' && valStr !== 'false') {
+            filledDataList.push(`
+              <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; border-bottom:1px solid #f1f5f9; padding-bottom:2px;">
+                <span style="color:var(--text-muted); font-weight:600; max-width:60%; font-size:10px;">${questionLabel}:</span>
+                <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${valStr}</span>
+              </div>
+            `);
+          }
         }
-      }
-    });
+      });
 
-    const filledDataHtml = filledDataList.length > 0 ? filledDataList.join('') : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
+      filledDataHtml = filledDataList.length > 0 ? filledDataList.join('') : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
+    }
 
     const htmlContent = `
       <div class="detail-list">
@@ -1627,6 +1640,7 @@
     }).join('');
   }
 
+  // 🚀 救回完整即時響應計算與 DOM 渲染！
   function renderFormCurrentPage() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
@@ -1639,30 +1653,11 @@
         if (selectedOutline !== field.dependsOn) return;
       }
 
-      if (field.type === "formula" && currentFormCtx.currentPageIdx === 1) {
-        let calculatedVal = 0;
-        const allInputs = container.querySelectorAll('input.form-control, input[type="number"]');
-        
-        const valArr = Array.from(allInputs).map(inp => parseFloat(inp.value) || 0);
-        
-        const lamdaML = valArr[2] || 0;
-        const lamdaAP = valArr[3] || 0;
-        const rawML = valArr[4] || 0;
-        const rawAP = valArr[5] || 0;
-        const rawDH = valArr[6] || 0;
-
+      // 🚀 公式欄位動態渲染 (自動計算與代入)
+      if (field.type === "formula") {
         const renderedFormulaCount = container.querySelectorAll('.formula-field').length;
+        let calculatedVal = currentFormCtx.data[field.id] || 0;
 
-        if (renderedFormulaCount === 0) {
-          calculatedVal = rawML - lamdaML;
-        } else if (renderedFormulaCount === 1) {
-          calculatedVal = rawAP - lamdaAP;
-        } else {
-          calculatedVal = rawDH;
-        }
-
-        currentFormCtx.data[field.id] = calculatedVal;
-        
         html += `
           <div class="form-group">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
@@ -1815,6 +1810,7 @@
 
     container.innerHTML = html;
 
+    // 🚀 全面即時事件監聽器（打字瞬間秒運算公式）
     const allFormInputs = container.querySelectorAll('input, textarea');
     allFormInputs.forEach(input => {
       if (!input.dataset.bound) {
@@ -1827,6 +1823,9 @@
         });
       }
     });
+
+    // 🚀 渲染完畢立刻主動運算一次公式
+    triggerRealtimeFormulaCalculation();
 
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
@@ -1880,7 +1879,6 @@
     renderFormCurrentPage();
   }
 
-  // 🚀 智慧資料保存：嚴格區分純備註與一般欄位
   function saveFormFieldData(fieldId, val, fieldLabel = '') {
     currentFormCtx.data[fieldId] = val;
 
@@ -1997,6 +1995,7 @@
     renderTimeline();
   }
 
+  // 🚀 必填與強制提交記錄標記
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
     const targetForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
@@ -2005,6 +2004,9 @@
       submitFormFinal();
       return;
     }
+
+    // 標記該表單屬於檢查表
+    currentFormCtx.data['_is_checklist'] = true;
 
     const uncompletedFields = [];
 
@@ -2046,9 +2048,13 @@
       `;
 
       showCustomConfirm("填寫未完成警告", msgHtml, "返回填寫", "仍要提交", (confirmed) => {
-        if (confirmed) submitFormFinal();
+        if (confirmed) {
+          currentFormCtx.data['_is_force_submitted'] = true; // 🚀 標記為強制提交 (會顯示 已完成檢查*)
+          submitFormFinal();
+        }
       });
     } else {
+      currentFormCtx.data['_is_force_submitted'] = false; // 完整勾選 (顯示 已完成檢查)
       submitFormFinal();
     }
   }
@@ -2234,7 +2240,6 @@
     }
   }
 
-  // 🚀 手機與桌面雙重背景靜默同步機制
   if (window.bgRefreshTimer) clearInterval(window.bgRefreshTimer);
   window.bgRefreshTimer = setInterval(async () => {
     checkAndSilentRefresh();
