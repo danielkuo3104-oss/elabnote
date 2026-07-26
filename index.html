@@ -197,14 +197,12 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    /* 緊湊對齊詳細資訊 */
     .detail-list { text-align: left; overflow-y: auto; max-height: 55vh; font-size: 12px; padding: 2px; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 30%; flex-shrink: 0; line-height: 1.3; }
     .detail-value { font-weight: 600; color: var(--text-primary); width: 70%; text-align: right; line-height: 1.3; word-break: break-word; }
 
-    /* 說明欄區塊 (支援 [info] 與 [warning]) */
     .desc-alert {
       padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; line-height: 1.45;
       margin: 6px 0 10px 0; border: 1px solid transparent; word-break: break-word;
@@ -460,21 +458,21 @@
   const URL_FORMS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=0&single=true&output=csv";
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
-  // 全域狀態淡色背景與邊框樣式 Mapping (除了已死亡與完成為深色外，其餘全為淡色背景)
+  // 全域狀態淡色背景與邊框樣式 Mapping
   const STATUS_STYLES = {
-    "已預約": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },       // 淡灰
-    "準備中": { bg: "#f0f9ff", text: "#0284c7", border: "#bae6fd" },       // 淡藍
-    "準備完成": { bg: "#ecfdf5", text: "#059669", border: "#a7f3d0" },     // 淡綠
-    "手術中": { bg: "#fef2f2", text: "#dc2626", border: "#fca5a5" },       // 淡紅
-    "休息中": { bg: "#f0fdf4", text: "#10b981", border: "#86efac" },       // 淡翡綠
-    "已死亡": { bg: "#0f172a", text: "#ffffff", border: "#0f172a" },       // 純黑 (深色)
-    "訊號蒐集中": { bg: "#fffbeb", text: "#d97706", border: "#fde68a" },   // 淡橘
-    "訊號搜集完成": { bg: "#fefce8", text: "#ca8a04", border: "#fef08a" }, // 淡黃
-    "犧牲中": { bg: "#f3e8ff", text: "#7c3aed", border: "#d8b4fe" },       // 淡紫
-    "實驗善後": { bg: "#faf5ff", text: "#a855f7", border: "#e9d5ff" },     // 淡淺紫
-    "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },     // 深灰 (深色)
-    "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },       // 深灰 (深色)
-    "實驗結束": { bg: "#334155", text: "#ffffff", border: "#334155" },     // 深灰 (深色)
+    "已預約": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },       
+    "準備中": { bg: "#f0f9ff", text: "#0284c7", border: "#bae6fd" },       
+    "準備完成": { bg: "#ecfdf5", text: "#059669", border: "#a7f3d0" },     
+    "手術中": { bg: "#fef2f2", text: "#dc2626", border: "#fca5a5" },       
+    "休息中": { bg: "#f0fdf4", text: "#10b981", border: "#86efac" },       
+    "已死亡": { bg: "#0f172a", text: "#ffffff", border: "#0f172a" },       
+    "訊號蒐集中": { bg: "#fffbeb", text: "#d97706", border: "#fde68a" },   
+    "訊號搜集完成": { bg: "#fefce8", text: "#ca8a04", border: "#fef08a" }, 
+    "犧牲中": { bg: "#f3e8ff", text: "#7c3aed", border: "#d8b4fe" },       
+    "實驗善後": { bg: "#faf5ff", text: "#a855f7", border: "#e9d5ff" },     
+    "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },     
+    "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },       
+    "實驗結束": { bg: "#334155", text: "#ffffff", border: "#334155" },     
     "其他": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" }
   };
 
@@ -590,6 +588,7 @@
     return result;
   }
 
+  // 渲染描述欄位（支援 [info], [warning] 及 [formula] 動態公式計算引擎）
   function renderFieldDescription(descText) {
     if (!descText) return '';
     
@@ -610,6 +609,38 @@
       return `<div class="desc-alert ${alertType}">${formattedHtml}</div>`;
     } else {
       return `<div class="field-desc">${formattedHtml}</div>`;
+    }
+  }
+
+  // 數學公式動態計算引擎 (支援 {欄位名稱} 替換與計算)
+  function evaluateFormula(formulaTemplate) {
+    if (!formulaTemplate) return '';
+    let evalStr = formulaTemplate;
+    
+    // 找出所有 {欄位名稱} 
+    const matches = formulaTemplate.match(/\{([^}]+)\}/g);
+    if (matches) {
+      matches.forEach(match => {
+        const fieldLabel = match.slice(1, -1).trim();
+        // 在當前表單資料中尋找對應 Label 的數值
+        let val = 0;
+        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+        if (page && page.fields) {
+          const targetField = page.fields.find(f => f.label && f.label.includes(fieldLabel));
+          if (targetField && currentFormCtx.data[targetField.id]) {
+            val = parseFloat(currentFormCtx.data[targetField.id]) || 0;
+          }
+        }
+        evalStr = evalStr.replace(match, val);
+      });
+    }
+
+    try {
+      // 安全計算數學表達式
+      const result = Function('"use strict";return (' + evalStr + ')')();
+      return isNaN(result) ? '' : Math.round(result * 100) / 100;
+    } catch (e) {
+      return '';
     }
   }
 
@@ -702,7 +733,28 @@
             if (match) dependsOn = match[1].trim();
           }
 
-          if (rawType.includes("[v]") && rawLabel.includes("實驗大綱")) {
+          // 支援 [formula] 動態計算欄位解析
+          let formulaExpr = null;
+          let formulaUnit = '';
+          if (rawType.includes("[formula]")) {
+            const fMatch = rawType.match(/\[formula:\s*([^\]]+)\]/i);
+            if (fMatch) formulaExpr = fMatch[1].trim();
+            const uMatch = rawType.match(/\[unit:\s*([^\]]+)\]/i);
+            if (uMatch) formulaUnit = uMatch[1].trim();
+          }
+
+          if (formulaExpr) {
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: rawLabel,
+              type: "formula",
+              formula: formulaExpr,
+              unit: formulaUnit,
+              desc: rawDesc
+            });
+            lastParentField = null;
+          }
+          else if (rawType.includes("[v]") && rawLabel.includes("實驗大綱")) {
             lastParentField = { id: `field_${r}_${col}`, label: rawLabel, type: "outline_select", options: [] };
             currentPage.fields.push(lastParentField);
           }
@@ -919,7 +971,6 @@
 
   function renderMainDashboardUI() {
     const isZH = state.currentLang === 'ZH';
-    // 過濾今日且非最終結束之實驗
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed');
     const todayListContainer = document.getElementById('todayActiveExpList');
     
@@ -976,7 +1027,6 @@
     }
   }
 
-  // 點擊今日卡片跳出精緻 Modal
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1188,7 +1238,7 @@
   }
 
   function applyLanguage() {
-    const isZH = state.currentLang === "ZH";
+    const isZH = state.currentLang === 'ZH';
     document.getElementById('langToggleBtn').innerText = isZH ? "ZN" : "EN";
     document.getElementById('authLangBtn').innerText = isZH ? "ZN" : "EN";
     
@@ -1239,12 +1289,11 @@
     formId: '', pages: [], currentPageIdx: 0, data: {}, isMakeup: false, selectedAction: null, selectedStatusTag: null
   };
 
-  // 1. 點擊今日登錄：跳出選擇今日實驗視窗，記憶選擇的編號
+  // 1. 點擊今日實驗登錄：彈窗選擇實驗編號
   function handleTodayExperiment() {
     if(state.isGuest) return;
     
     const isZH = state.currentLang === 'ZH';
-    // 找出所有符合今日且尚未完全結束/死亡的實驗
     const todayActiveExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed');
 
     if (todayActiveExps.length === 0) {
@@ -1252,7 +1301,6 @@
       return;
     }
 
-    // 若有多筆項目，引導選擇並記憶編號
     if (todayActiveExps.length === 1) {
       state.activeSelectedExpId = todayActiveExps[0].expId;
       startExpFormByStatus(todayActiveExps[0]);
@@ -1280,42 +1328,31 @@
     }
   }
 
-  // 2. 根據當前狀態啟動接力路線
+  // 2. 嚴格依照狀態與控制組判斷對應表單
   function startExpFormByStatus(targetExp) {
     const status = targetExp.status || '已預約';
 
-    // 如果狀態為「已死亡」，提示並不予開啟表單
     if (status === '已死亡') {
       showCustomAlert("提示", state.currentLang === 'ZH' ? "該實驗已被標記為 [已死亡]，無法繼續登錄後續流程。" : "This experiment is marked as deceased.");
       return;
     }
 
-    // 表單路線接力判斷
-    switch(status) {
-      case "已預約": 
-        openForm("FORM_001_1"); 
-        break;
-      case "準備中":
-      case "實驗準備": 
-        const isControlGroup = targetExp.info.includes("控制組") || (targetExp.formData && targetExp.formData['selected_purpose_name'] && targetExp.formData['selected_purpose_name'].includes("控制組"));
-        openForm(isControlGroup ? "FORM_002_2" : "FORM_002_1"); 
-        break;
-      case "準備完成": 
-        openForm("FORM_003"); 
-        break;
-      case "休息中": 
-        openForm("FORM_004"); 
-        break;
-      case "訊號蒐集中":
-      case "訊號搜集完成": 
-        openForm("FORM_005"); 
-        break;
-      case "犧牲中":
-      case "實驗善後": 
-        openForm("FORM_006"); 
-        break;
-      default: 
-        openForm("FORM_001_1");
+    if (status === '已預約') {
+      openForm("FORM_001_1");
+    } else if (status === '準備中' || status === '實驗準備') {
+      // 檢查目的或大綱是否包含 "控制組"
+      const isControlGroup = targetExp.info.includes("控制組") || (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
+      openForm(isControlGroup ? "FORM_002_2" : "FORM_002_1");
+    } else if (status === '準備完成') {
+      openForm("FORM_003");
+    } else if (status === '休息中') {
+      openForm("FORM_004");
+    } else if (status === '訊號蒐集中' || status === '訊號搜集完成') {
+      openForm("FORM_005");
+    } else if (status === '犧牲中' || status === '實驗善後') {
+      openForm("FORM_006");
+    } else {
+      openForm("FORM_001_1");
     }
 
     setTimeout(() => {
@@ -1359,13 +1396,11 @@
         }
 
         const savedData = existingRecord.formData || {};
-        
         Object.keys(savedData).forEach(key => {
           currentFormCtx.data[key] = savedData[key];
         });
 
         const targetNotesVal = savedData['notes'] || savedData['field_14_4'] || '';
-
         currentFormCtx.pages.forEach(page => {
           page.fields.forEach(field => {
             const isNoteField = field.label && (field.label.includes('備註') || field.label.toLowerCase().includes('note'));
@@ -1413,9 +1448,9 @@
     renderFormCurrentPage();
   }
 
-  // 渲染側欄（FORM_003 / FORM_004 / FORM_005 鎖定側面左欄不可點擊跳轉）
   function renderFormSidebar() {
     const sb = document.getElementById('formSidebar');
+    // FORM_003, FORM_004, FORM_005 鎖定側面左欄不可點擊跳轉
     const isLockedForm = ["FORM_003", "FORM_004", "FORM_005"].includes(currentFormCtx.formId);
 
     sb.innerHTML = currentFormCtx.pages.map((p, idx) => {
@@ -1440,6 +1475,20 @@
       if (field.dependsOn) {
         const selectedOutline = currentFormCtx.data['outline_select_val'];
         if (selectedOutline !== field.dependsOn) return;
+      }
+
+      // 如果是公式動態計算欄位
+      if (field.type === "formula") {
+        const calculatedVal = evaluateFormula(field.formula);
+        currentFormCtx.data[field.id] = calculatedVal; // 同步寫入記憶體
+        html += `
+          <div class="form-group">
+            <label>${field.label} (${field.unit || ''})</label>
+            <input type="text" class="form-control" readonly style="background:#e2e8f0; font-weight:700;" value="${calculatedVal}">
+            ${renderFieldDescription(field.desc)}
+          </div>
+        `;
+        return;
       }
 
       const val = currentFormCtx.data[field.id] || field.default || "";
@@ -1514,7 +1563,7 @@
         html += `
           <div class="form-group">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-            <input type="${field.type}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}')">
+            <input type="${field.type}" id="${field.id}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}')">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -1638,11 +1687,19 @@
     }
   }
 
-  // 3. 下一頁與第一頁即時狀態發送邏輯
+  // 3. 下一頁與第一頁即時狀態發送邏輯 (FORM_003 ➔ 手術中, FORM_004 ➔ 訊號蒐集中, FORM_005 ➔ 犧牲中)
   async function nextFormPage() {
     if (state.isSubmitting) return;
 
-    // 檢查第一頁完成按「下一頁」時，背景回傳狀態更新
+    // 同步把當前頁面 DOM 上的 Input 值抓回記憶體，防止漏掉未觸發 oninput 的欄位
+    const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+    page.fields.forEach(f => {
+      const el = document.getElementById(f.id);
+      if (el && el.value !== undefined) {
+        currentFormCtx.data[f.id] = el.value;
+      }
+    });
+
     if (currentFormCtx.currentPageIdx === 0) {
       let interimStatus = "";
       if (currentFormCtx.formId === "FORM_003") interimStatus = "手術中";
@@ -1681,7 +1738,6 @@
     }
   }
 
-  // 背景發送中間狀態 (如：手術中、訊號蒐集中、犧牲中)
   async function syncInterimStatus(statusStr) {
     const selectedExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
     if (!selectedExpId) return;
@@ -1702,15 +1758,21 @@
     refreshDashboard(false);
   }
 
-  // 4. 提交前檢查（若有漏填跳出警告與雙選擇）
+  // 4. 提交前檢查（雙重比對記憶體與 DOM 畫面值，防止誤報未填）
   function checkFormAndSubmit() {
     const uncompletedFields = [];
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
 
     page.fields.forEach(f => {
       if (f.type === 'text' || f.type === 'number') {
-        if (!currentFormCtx.data[f.id] || String(currentFormCtx.data[f.id]).trim() === '') {
+        const domEl = document.getElementById(f.id);
+        const domVal = domEl ? domEl.value : '';
+        const memVal = currentFormCtx.data[f.id];
+        
+        if ((!memVal || String(memVal).trim() === '') && (!domVal || String(domVal).trim() === '')) {
           uncompletedFields.push(f.label);
+        } else if (domVal) {
+          currentFormCtx.data[f.id] = domVal; // 同步最新 DOM 值
         }
       } else if (f.type === 'radio' || f.type === 'outline_select') {
         if (!currentFormCtx.data[f.id] && !currentFormCtx.data['outline_select_val']) {
@@ -1764,7 +1826,7 @@
     return `${outlineCode}${purposeCode}${yyMMdd}${checksum}`;
   }
 
-  // 5. 最終提交表單邏輯（精準狀態指派）
+  // 5. 最終提交表單邏輯（確實清除記憶體，防止下次誤導）
   async function submitFormFinal() {
     if (state.isSubmitting) return;
 
@@ -1775,7 +1837,6 @@
 
     let targetStatus = "準備中";
 
-    // 依據表單代碼精準設定提交後狀態
     if (currentFormCtx.formId === "FORM_001_1" || currentFormCtx.formId === "FORM_001_2") {
       targetStatus = "準備中";
     } else if (currentFormCtx.formId === "FORM_002_1" || currentFormCtx.formId === "FORM_002_2") {
@@ -1783,11 +1844,11 @@
     } else if (currentFormCtx.formId === "FORM_003") {
       targetStatus = currentFormCtx.selectedStatusTag || "休息中";
     } else if (currentFormCtx.formId === "FORM_004") {
-      targetStatus = "訊號蒐集完成";
+      targetStatus = "訊號搜集完成";
     } else if (currentFormCtx.formId === "FORM_005") {
       targetStatus = "實驗善後";
     } else if (currentFormCtx.formId === "FORM_006") {
-      targetStatus = "實驗完成"; // FORM_006 結束歸入歷史
+      targetStatus = "實驗完成"; 
     }
 
     let submitDate = state.simulatedDate;
@@ -1825,6 +1886,10 @@
       isUpdate: isUpdateMode,
       formData: currentFormCtx.data
     });
+
+    // 提交成功後，清除快取與選擇記憶，避免下次被誤導
+    state.activeSelectedExpId = null;
+    delete state.formDataCache[currentFormCtx.formId];
 
     state.isSubmitting = false;
     closeFormPage();
