@@ -59,11 +59,15 @@
     .user-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
     .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
     
+    /* 點擊時熄滅反應按鈕 */
     .btn-refresh-touch {
       display: flex; align-items: center; gap: 4px; background: var(--primary-light); color: var(--primary);
-      border: 1px solid #bae6fd; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+      border: 1px solid #bae6fd; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s ease;
     }
-    .btn-refresh-touch:active { background: #e0f2fe; }
+    .btn-refresh-touch.refreshing {
+      background: #e2e8f0 !important; color: #94a3b8 !important; border-color: #cbd5e1 !important; opacity: 0.6;
+    }
 
     .update-time { font-size: 10px; color: var(--text-muted); font-family: ui-monospace, monospace; margin-top: 2px; }
 
@@ -71,10 +75,7 @@
 
     .dashboard-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
     
-    /* 今日多項實驗清單 */
-    .active-exp-list-item {
-      padding: 10px 0; border-bottom: 1px dashed var(--border-color);
-    }
+    .active-exp-list-item { padding: 10px 0; border-bottom: 1px dashed var(--border-color); }
     .active-exp-list-item:last-child { border-bottom: none; }
 
     .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; float: right; border: 1px solid transparent; }
@@ -98,7 +99,6 @@
     .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
     .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
-    /* 時間軸與歷史紀錄優化 */
     .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; margin-bottom: 20px; }
     .timeline-line { position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: var(--border-color); }
     .timeline-item { position: relative; margin-bottom: 16px; cursor: pointer; }
@@ -119,6 +119,18 @@
     .copyright-notice {
       text-align: center; font-size: 11px; color: var(--text-muted); padding: 16px 0; font-weight: 500; font-family: ui-monospace, monospace;
     }
+
+    /* 霧面毛玻璃載入遮罩 */
+    .blur-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      z-index: 900; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+    }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border-color); border-top-color: var(--primary);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .fab {
       position: absolute; right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); width: 48px; height: 48px;
@@ -215,14 +227,20 @@
     .error-msg { color: var(--danger); font-size: 11px; font-weight: 600; margin-top: 6px; display: none; }
   </style>
 
-  <link rel="icon" type="image/png" href="icon-2.0.png?v=2.0">
-  <link rel="apple-touch-icon" href="icon-2.0.png?v=2.0">
-  <link rel="manifest" href="manifest.json?v=2.0">
+  <link rel="icon" type="image/png" href="icon-2.0.png?v=2.1">
+  <link rel="apple-touch-icon" href="icon-2.0.png?v=2.1">
+  <link rel="manifest" href="manifest.json?v=2.1">
   <meta name="theme-color" content="#ffffff">
 </head>
 <body>
 
 <div class="app-container">
+
+  <!-- 全螢幕霧面毛玻璃載入遮罩 -->
+  <div id="blurOverlay" class="blur-overlay">
+    <div class="spinner"></div>
+    <div style="font-size:12px; font-weight:700; color:var(--text-secondary);" id="txtOverlayMsg">資料同步中...</div>
+  </div>
 
   <!-- 1. 登入 / 註冊 頁面 -->
   <div id="authPage" class="auth-container">
@@ -288,7 +306,7 @@
       </div>
     </div>
 
-    <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.0</div>
+    <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.1</div>
   </div>
 
   <!-- 2. 主頁面 Header -->
@@ -301,7 +319,7 @@
       <div class="header-btn-group">
         <div id="userBadge" class="user-badge" onclick="performLogout()" title="點擊登出">未登入</div>
         <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
-        <button class="btn-refresh-touch" onclick="refreshDashboard()" title="一鍵更新">
+        <button id="btnRefresh" class="btn-refresh-touch" onclick="refreshDashboard(true)" title="一鍵更新">
           <span class="refresh-icon">🔄</span> 更新
         </button>
       </div>
@@ -311,7 +329,6 @@
 
   <!-- 3. 主頁面內容 -->
   <div class="main-content">
-    <!-- 今日進行中實驗區域（支援多項） -->
     <div class="dashboard-card" id="dashboardCard">
       <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:8px;" id="txtTodayHeader">
         今日進行中項目 / Today Active Experiments
@@ -336,14 +353,13 @@
       <button id="btnMakeupExp" class="btn-action btn-makeup" onclick="openForm('FORM_001_1', true)">實驗補登</button>
     </div>
 
-    <!-- 區隔標題：歷史紀錄 -->
     <div class="section-divider">實驗歷史紀錄 / History Log</div>
 
     <div id="timelineContainer" class="timeline-container" onclick="openRecordCenter()">
       <div class="timeline-line"></div>
     </div>
 
-    <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.0</div>
+    <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.1</div>
   </div>
 
   <!-- FAB 懸浮選單 -->
@@ -415,10 +431,20 @@
   window.addEventListener('DOMContentLoaded', async () => {
     applyLanguage();
     await fetchAndParseFormsFromSheet();
-    await refreshDashboard();
+    await refreshDashboard(false);
   });
 
-  async function refreshDashboard() {
+  // 刷新面板（含按鈕熄滅與全螢幕霧面遮罩）
+  async function refreshDashboard(showBlur = true) {
+    const btnRef = document.getElementById('btnRefresh');
+    const blurOverlay = document.getElementById('blurOverlay');
+    
+    if (showBlur) {
+      btnRef.classList.add('refreshing');
+      document.getElementById('txtOverlayMsg').innerText = state.currentLang === 'ZH' ? "同步試算表資料中..." : "Syncing Spreadsheet...";
+      blurOverlay.style.display = 'flex';
+    }
+
     const now = new Date();
     document.getElementById('txtUpdateTime').innerText = `${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
@@ -428,9 +454,16 @@
     renderMainDashboardUI();
     renderTimeline();
     updateDashboardButtons();
+
+    if (showBlur) {
+      setTimeout(() => {
+        btnRef.classList.remove('refreshing');
+        blurOverlay.style.display = 'none';
+      }, 300);
+    }
   }
 
-  // 試算表表單動態解析 Engine
+  // 表單動態解析 Engine
   async function fetchAndParseFormsFromSheet() {
     try {
       const res = await fetch(URL_FORMS);
@@ -635,6 +668,7 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
+  // 讀取資料中心（已平移 6 欄位：A:編號, B:日期, C:負責人, D:狀態, E:資訊, F:時間）
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -646,11 +680,11 @@
         if(rows[i][0] || rows[i][1]) {
           const colV = rows[i][21] ? rows[i][21].trim() : '';
           records.push({
-            expId: rows[i][0] ? rows[i][0].trim() : '未編號',
-            date: rows[i][1] ? rows[i][1].trim() : '',
-            user: rows[i][2] ? rows[i][2].trim() : '',
-            status: rows[i][3] ? rows[i][3].trim() : '',
-            info: rows[i][4] ? rows[i][4].trim() : '',
+            expId: rows[i][0] ? rows[i][0].trim() : '未編號', // A欄: 實驗編號
+            date: rows[i][1] ? rows[i][1].trim() : '',       // B欄: 實驗日期
+            user: rows[i][2] ? rows[i][2].trim() : '',       // C欄: 負責人
+            status: rows[i][3] ? rows[i][3].trim() : '',     // D欄: 狀態
+            info: rows[i][4] ? rows[i][4].trim() : '',       // E欄: 實驗資訊
             hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
           });
         }
@@ -672,7 +706,6 @@
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
-  // 渲染今日多項進行中實驗 UI
   function renderMainDashboardUI() {
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束');
     const todayListContainer = document.getElementById('todayActiveExpList');
@@ -756,7 +789,7 @@
     badge.style.background = user.color || '#f1f5f9';
 
     applyLanguage();
-    refreshDashboard();
+    refreshDashboard(true);
     showCustomAlert("登入成功", `歡迎回來，${user.name}！`);
   }
 
@@ -769,7 +802,7 @@
     document.getElementById('fabBtn').style.display = 'flex';
 
     applyLanguage();
-    refreshDashboard();
+    refreshDashboard(true);
     showCustomAlert("訪客模式", "已以訪客身份登入，登錄功能已全數受限。");
   }
 
@@ -784,7 +817,7 @@
         document.getElementById('authPage').style.display = 'flex';
         
         document.getElementById('fabBtn').style.display = 'none';
-        refreshDashboard();
+        refreshDashboard(false);
       }
     });
   }
@@ -865,7 +898,6 @@
     document.getElementById('btnMakeupExp').classList.remove('btn-disabled');
   }
 
-  // 渲染歷史紀錄 (寬鬆大方)
   function renderTimeline() {
     const container = document.getElementById('timelineContainer');
     let html = `<div class="timeline-line"></div>`;
@@ -979,14 +1011,11 @@
       if (field.type === "section") {
         html += `<div class="section-header">${field.label}</div>`;
       }
-      // 核心修正：今日登錄選單（FORM_001_1）只載入當天日期的實驗
       else if (field.type === "exp_select") {
         const isZH = state.currentLang === 'ZH';
         const newProjText = isZH ? "➕ 新增實驗專案" : "➕ New Experiment Project";
-        
         const isTodayLogin = currentFormCtx.formId === "FORM_001_1";
         
-        // 如果是今日登錄，只過濾出「日期 == 今日」且「非結束」的專案；預約表單則顯示全部非結束專案
         const activeProjects = state.dataCenter.filter(d => {
           const notFinished = d.status !== '實驗結束' && d.status !== 'Completed';
           return isTodayLogin ? (d.date === state.simulatedDate && notFinished) : notFinished;
@@ -1218,7 +1247,7 @@
     return `${outlineCode}${purposeCode}${yyMMdd}${checksum}`;
   }
 
-  // 核心：編號判斷原則（Update vs Insert）
+  // 核心：對齊平移後的欄位上傳（A:編號, B:日期, C:負責人, D:狀態, E:資訊）
   async function submitFormFinal() {
     if (state.isSubmitting) return;
 
@@ -1232,9 +1261,14 @@
       targetStatus = currentFormCtx.selectedStatusTag || "已完成";
     }
 
-    const submitDate = currentFormCtx.data['field_3_4'] || state.simulatedDate;
+    // 正確抓取日期（優先抓取表單內的日曆值，沒有才拿系統日期）
+    let submitDate = state.simulatedDate;
+    Object.keys(currentFormCtx.data).forEach(k => {
+      if (k.includes('field_') && typeof currentFormCtx.data[k] === 'string' && currentFormCtx.data[k].match(/^\d{4}-\d{2}-\d{2}$/)) {
+        submitDate = currentFormCtx.data[k];
+      }
+    });
 
-    // 判斷選取的是「既有編號」還是「新增專案」
     let selectedExpSelectVal = "";
     Object.keys(currentFormCtx.data).forEach(k => {
       if (currentFormCtx.data[k] && typeof currentFormCtx.data[k] === 'string' && currentFormCtx.data[k].length > 8 && currentFormCtx.data[k] !== 'NEW_PROJECT') {
@@ -1246,11 +1280,9 @@
     let isUpdateMode = false;
 
     if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT') {
-      // 1. 選擇已有編號：觸發【更新 Row 模式】
       finalExpId = selectedExpSelectVal;
       isUpdateMode = true;
     } else {
-      // 2. 選擇新增專案：自動生成全新編號，觸發【新增 Row 模式】
       finalExpId = generateExperimentId(submitDate);
       isUpdateMode = false;
     }
@@ -1259,19 +1291,20 @@
     const purposeVal = currentFormCtx.data['selected_purpose_name'] || '';
     const dynamicInfo = (outlineVal || purposeVal) ? `${outlineVal} - ${purposeVal}`.trim() : "實驗專案";
 
+    // 正確平移寫入 Google 試算表（A欄: expId, B欄: date, C欄: user, D欄: status, E欄: info）
     await syncToGoogleSheet("submitForm", {
       expId: finalExpId,
       date: submitDate,
       user: state.currentUser ? state.currentUser.name : "Daniel",
       status: targetStatus,
       info: dynamicInfo,
-      isUpdate: isUpdateMode, // 👈 告訴後端 GAS：這是【更新既有 Row】還是【新增 Row】
+      isUpdate: isUpdateMode,
       formData: currentFormCtx.data
     });
 
     state.isSubmitting = false;
     closeFormPage();
-    await refreshDashboard();
+    await refreshDashboard(true);
     
     const msg = isUpdateMode 
       ? `實驗編號 [${finalExpId}] 紀錄已更新！\n狀態：[${targetStatus}]` 
