@@ -180,7 +180,7 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
-    /* Modal */
+    /* Modal - 緊湊排版 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
@@ -199,8 +199,8 @@
     .detail-list { text-align: left; overflow-y: auto; max-height: 55vh; font-size: 12px; padding: 2px; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
-    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 30%; flex-shrink: 0; line-height: 1.3; }
-    .detail-value { font-weight: 600; color: var(--text-primary); width: 70%; text-align: right; line-height: 1.3; word-break: break-word; }
+    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 32%; flex-shrink: 0; line-height: 1.3; }
+    .detail-value { font-weight: 600; color: var(--text-primary); width: 68%; text-align: right; line-height: 1.3; word-break: break-word; }
 
     .desc-alert {
       padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; line-height: 1.45;
@@ -532,7 +532,7 @@
     return lang === 'EN' ? enText : zhText;
   }
 
-  // 淨化標籤：自動移除 [submit], [fetch_detail: ...], [status: ...] 等控制指令，避免顯示在畫面
+  // 強效標籤過濾器：過濾 [submit]、[fetch_detail: ...]、[status: ...] 等語法
   function cleanDisplayLabel(text) {
     if (!text) return '';
     return text
@@ -543,6 +543,8 @@
       .replace(/\[warning\]/gi, '')
       .replace(/\[formula:[^\]]+\]/gi, '')
       .replace(/\[unit:[^\]]+\]/gi, '')
+      .replace(/\[placeholder:[^\]]+\]/gi, '')
+      .replace(/\[default:[^\]]+\]/gi, '')
       .trim();
   }
 
@@ -603,26 +605,17 @@
 
   function renderFieldDescription(descText) {
     if (!descText) return '';
-    
     let text = cleanDisplayLabel(descText).replace(/\\n/g, '\n');
     let alertType = '';
 
-    if (descText.includes('[warning]')) {
-      alertType = 'warning';
-    } else if (descText.includes('[info]')) {
-      alertType = 'info';
-    }
+    if (descText.includes('[warning]')) alertType = 'warning';
+    else if (descText.includes('[info]')) alertType = 'info';
 
     const formattedHtml = text.replace(/\n/g, '<br>');
-
-    if (alertType) {
-      return `<div class="desc-alert ${alertType}">${formattedHtml}</div>`;
-    } else {
-      return `<div class="field-desc">${formattedHtml}</div>`;
-    }
+    return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 毫秒級全頁面變數即時數學公式計算引擎
+  // 全頁面動態公式即時計算引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     let evalStr = formulaTemplate;
@@ -659,19 +652,20 @@
     }
   }
 
-  // 即時響應：打字時瞬間重新計算整頁所有 [formula] 欄位並更新 DOM
   function triggerRealtimeFormulaCalculation() {
-    const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-    if (!page || !page.fields) return;
-
-    page.fields.forEach(f => {
-      if (f.type === "formula") {
-        const calculatedVal = evaluateFormula(f.formula);
-        currentFormCtx.data[f.id] = calculatedVal;
-        const domEl = document.getElementById(f.id);
-        if (domEl) {
-          domEl.value = calculatedVal;
-        }
+    if (!currentFormCtx.pages) return;
+    currentFormCtx.pages.forEach(p => {
+      if (p.fields) {
+        p.fields.forEach(f => {
+          if (f.type === "formula") {
+            const calculatedVal = evaluateFormula(f.formula);
+            currentFormCtx.data[f.id] = calculatedVal;
+            const domEl = document.getElementById(f.id);
+            if (domEl) {
+              domEl.value = calculatedVal;
+            }
+          }
+        });
       }
     });
   }
@@ -741,7 +735,7 @@
           if (!rawLabel && !rawType) continue;
 
           if (rawLabel.includes("【") && rawLabel.includes("】")) {
-            const pageTitle = rawLabel.replace(/【|】/g, "").trim();
+            const pageTitle = cleanDisplayLabel(rawLabel.replace(/【|】/g, ""));
             currentPage = { title: pageTitle, fields: [] };
             pages.push(currentPage);
             lastParentField = null;
@@ -1058,6 +1052,7 @@
     }
   }
 
+  // 精簡彈窗：只輸出簡明卡片，徹底隱藏冗長檢查表
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1753,7 +1748,7 @@
     refreshDashboard(false);
   }
 
-  // 嚴格規定：僅 FORM_002_1, FORM_002_2, FORM_006 執行必填檢查（備註與其餘表單完全跳過）
+  // 精準必填檢查：僅 FORM_002_1, FORM_002_2, FORM_006 執行檢查，備註完全豁免
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
     const needsValidation = ["FORM_002_1", "FORM_002_2", "FORM_006"].includes(formId);
