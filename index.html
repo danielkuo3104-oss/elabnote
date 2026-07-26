@@ -1457,29 +1457,35 @@
 
     let targetFormId = "FORM_001_1";
 
-    // 🚀 精準狀態對應表單邏輯
+    // 🚀 精準狀態對應表單分流邏輯
     if (status === '已預約') {
+      // 已預約狀態點擊，進入 FORM_001_1 (今日登錄)
       targetFormId = "FORM_001_1";
     } else if (status === '準備中' || status === '實驗準備') {
+      // 判斷是否為控制組，決定開啟 FORM_002_1 或 FORM_002_2
       const isControlGroup = targetExp.info.includes("控制組") || 
         (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
       targetFormId = isControlGroup ? "FORM_002_2" : "FORM_002_1";
     } else if (status === '準備完成' || status === '手術中') {
+      // 進入 FORM_003 手術/劑量計算
       targetFormId = "FORM_003";
     } else if (status === '休息中' || status === '訊號蒐集中') {
+      // 進入 FORM_004 訊號紀錄
       targetFormId = "FORM_004";
     } else if (status === '已死亡' || status === '訊號蒐集完成' || status === '犧牲中') {
-      // 🚀 關鍵修復：大鼠已死亡不熔斷，直接進入 FORM_005 進行犧牲與組織保存記錄
+      // 大鼠已死亡或訊號搜集完成，直接進入 FORM_005 進行犧牲與組織保存記錄
       targetFormId = "FORM_005";
     } else if (status === '實驗善後') {
+      // 進入 FORM_006 實驗善後與完結
       targetFormId = "FORM_006";
     } else {
       targetFormId = "FORM_001_1";
     }
 
-    // 將該筆實驗既有的 formData 帶入 openForm，自動接續填寫與預設值
+    // 🚀 關鍵：將該筆實驗既有的 formData 帶入 openForm，自動還原勾選狀態與資料
     openForm(targetFormId, false, targetExp.formData || null);
 
+    // 觸發下拉選單與 Radio 狀態同步
     setTimeout(() => {
       handleExpSelectChange(targetExp.expId);
     }, 100);
@@ -2129,10 +2135,12 @@
       btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
     }
 
-    let targetStatus = "已預約";
+    let targetStatus = "準備中";
 
-    // 🚀 狀態邏輯修正：預約維持「已預約」
-    if (currentFormCtx.formId === "FORM_001_1" || currentFormCtx.formId === "FORM_001_2") {
+    // 🚀 關鍵拆分：FORM_001_1 走「準備中」，FORM_001_2 走「已預約」
+    if (currentFormCtx.formId === "FORM_001_1") {
+      targetStatus = "準備中";
+    } else if (currentFormCtx.formId === "FORM_001_2") {
       targetStatus = "已預約";
     } else if (currentFormCtx.formId === "FORM_002_1" || currentFormCtx.formId === "FORM_002_2") {
       targetStatus = "準備完成";
