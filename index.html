@@ -1423,11 +1423,6 @@
     if (!targetExp) return;
     const status = targetExp.status || '已預約';
 
-    if (status === '已死亡') {
-      showCustomAlert("提示", state.currentLang === 'ZH' ? "該實驗已被標記為 [已死亡]，無法繼續登錄後續流程。" : "This experiment is marked as deceased.");
-      return;
-    }
-
     let targetFormId = "FORM_001_1";
 
     // 🚀 精準狀態對應表單邏輯
@@ -1438,11 +1433,11 @@
         (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
       targetFormId = isControlGroup ? "FORM_002_2" : "FORM_002_1";
     } else if (status === '準備完成' || status === '手術中') {
-      // 關鍵修復：狀態為「準備完成」或「手術中」時，都應該調用 FORM_003
       targetFormId = "FORM_003";
     } else if (status === '休息中' || status === '訊號蒐集中') {
       targetFormId = "FORM_004";
-    } else if (status === '訊號搜集完成' || status === '犧牲中') {
+    } else if (status === '已死亡' || status === '訊號搜集完成' || status === '犧牲中') {
+      // 🚀 關鍵修復：大鼠已死亡不熔斷，直接進入 FORM_005 進行犧牲與組織保存記錄
       targetFormId = "FORM_005";
     } else if (status === '實驗善後') {
       targetFormId = "FORM_006";
@@ -1457,6 +1452,7 @@
       handleExpSelectChange(targetExp.expId);
     }, 100);
   }
+  
   function handleTomorrowPrep() {
     if(state.isGuest) return;
     openForm("FORM_002_1");
@@ -1794,16 +1790,19 @@
   }
 
   function selectOptionRadio(fieldId, optName, action, statusTag, purposeIdx) {
-    saveFormFieldData(fieldId, optName, '實驗目的');
+    // 🚀 存入前先用 cleanDisplayLabel 過濾掉 [status: ...] 等語法標籤
+    const cleanedOptName = cleanDisplayLabel(optName);
+    
+    saveFormFieldData(fieldId, cleanedOptName, '實驗目的');
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
     
     currentFormCtx.data['purpose_code'] = String(purposeIdx).padStart(2, '0');
-    currentFormCtx.data['selected_purpose_name'] = optName;
+    currentFormCtx.data['selected_purpose_name'] = cleanedOptName;
     
     renderFormCurrentPage();
   }
-
+  
   function toggleOptionCheckbox(fieldId, label) {
     const currentVal = !currentFormCtx.data[fieldId];
     saveFormFieldData(fieldId, currentVal, label);
@@ -2163,6 +2162,18 @@
       showCustomAlert("個人資訊", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}\n身份 : ${state.currentUser.role}`);
     }
   }
+
+  // 🚀 獨立全域定時器：每 60 秒背景靜默同步一次
+  if (window.bgRefreshTimer) clearInterval(window.bgRefreshTimer);
+  window.bgRefreshTimer = setInterval(async () => {
+    // 當使用者正在填寫表單時，不干擾輸入，僅更新背景資料
+    const isFormOpen = document.getElementById('formPageContainer').style.display === 'flex';
+    if (!isFormOpen) {
+      console.log("⏱️ [每分鐘背景刷新] 向雲端同步資料中...");
+      await refreshDashboard(false); // false 代表不安裝毛玻璃遮罩、不轉圈
+    }
+  }, 60000);
+  
 </script>
 </body>
 </html>
