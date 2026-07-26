@@ -18,6 +18,7 @@
       
       --success: #059669;
       --warning: #d97706;
+      --warning-bg: #fffbeb;
       --danger: #dc2626;
       --gray-badge: #64748b;
       
@@ -183,27 +184,36 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
-    /* Modal */
+    /* Modal - 優化緊湊排版 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
-      backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
+      backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
     }
     .custom-modal {
-      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 340px;
-      padding: 20px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); max-height: 80vh; display: flex; flex-direction: column;
+      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 320px;
+      padding: 16px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); max-height: 85vh; display: flex; flex-direction: column;
     }
-    .custom-modal h3 { margin-bottom: 12px; font-size: 16px; font-weight: 700; color: var(--text-primary); text-align: center; }
-    .custom-modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; white-space: pre-line; text-align: center; line-height: 1.5; }
-    .custom-modal-btns { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
-    .modal-btn { flex: 1; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-weight: 600; font-size: 13px; cursor: pointer; }
+    .custom-modal h3 { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
+    .custom-modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; white-space: pre-line; text-align: center; line-height: 1.4; }
+    .custom-modal-btns { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+    .modal-btn { flex: 1; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-weight: 600; font-size: 13px; cursor: pointer; }
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    .detail-list { text-align: left; overflow-y: auto; max-height: 50vh; font-size: 12px; padding: 4px 2px; }
-    .detail-row { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
+    /* 緊湊型詳細資訊卡片 */
+    .detail-list { text-align: left; overflow-y: auto; max-height: 55vh; font-size: 12px; padding: 2px; }
+    .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
-    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 2px; }
-    .detail-value { font-weight: 600; color: var(--text-primary); line-height: 1.4; word-break: break-word; }
+    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 35%; flex-shrink: 0; line-height: 1.3; }
+    .detail-value { font-weight: 600; color: var(--text-primary); width: 65%; text-align: right; line-height: 1.3; word-break: break-word; }
+
+    /* 動態說明提示區塊 [info] 與 [warning] */
+    .desc-alert {
+      padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; line-height: 1.45;
+      margin: 6px 0 10px 0; border: 1px solid transparent; word-break: break-word;
+    }
+    .desc-alert.info { background: #f0f9ff; color: #0369a1; border-color: #bae6fd; }
+    .desc-alert.warning { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -553,6 +563,30 @@
     return result;
   }
 
+  // 動態解析說明標籤（包含 [warning] 與 [info] 及 \n 換行符號）
+  function renderFieldDescription(descText) {
+    if (!descText) return '';
+    
+    let text = descText.replace(/\\n/g, '\n'); // 正規化 \n
+    let alertType = '';
+
+    if (text.includes('[warning]')) {
+      alertType = 'warning';
+      text = text.replace(/\[warning\]/gi, '').trim();
+    } else if (text.includes('[info]')) {
+      alertType = 'info';
+      text = text.replace(/\[info\]/gi, '').trim();
+    }
+
+    const formattedHtml = text.replace(/\n/g, '<br>');
+
+    if (alertType) {
+      return `<div class="desc-alert ${alertType}">${formattedHtml}</div>`;
+    } else {
+      return `<div class="field-desc">${formattedHtml}</div>`;
+    }
+  }
+
   async function refreshDashboard(showBlur = true) {
     const btnRef = document.getElementById('btnRefresh');
     const blurOverlay = document.getElementById('blurOverlay');
@@ -785,7 +819,6 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  // 強健的 JSON 解析與「備註 (notes)」統一語意化讀取
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -916,7 +949,7 @@
     }
   }
 
-  // 點擊今日卡片：優先讀取 JSON 內的標準 "notes" 備註欄位
+  // 彈窗優化：緊湊顯示詳細資訊與備註
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -926,10 +959,7 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 優先採用標準 "notes" 鍵值
     let notesVal = formData['notes'] || '';
-    
-    // 備用防護：若沒有標準 "notes"，自動搜尋任何包含「備註」或 field_ 的輸入字串
     if (!notesVal) {
       const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes_label'];
       let notesList = [];
@@ -944,20 +974,20 @@
       notesVal = notesList.join('\n');
     }
 
-    const notesStr = notesVal ? notesVal : (isZH ? '無附加備註' : 'No notes available');
+    const notesStr = notesVal ? notesVal : (isZH ? '無' : 'None');
 
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row">
-          <div class="detail-label">${isZH?'實驗編號':'Experiment ID'}</div>
+          <div class="detail-label">${isZH?'實驗編號':'ID'}</div>
           <div class="detail-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'當前狀態':'Status'}</div>
-          <div class="detail-value"><span class="status-badge-lg active" style="font-size:11px;">${displayStatus}</span></div>
+          <div class="detail-value"><span class="status-badge-lg active" style="font-size:10px; padding:2px 8px;">${displayStatus}</span></div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'實驗大綱與目的':'Outline & Purpose'}</div>
+          <div class="detail-label">${isZH?'大綱與目的':'Outline & Purpose'}</div>
           <div class="detail-value">${displayInfo}</div>
         </div>
         <div class="detail-row">
@@ -969,8 +999,8 @@
           <div class="detail-value">${exp.date}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'備註與詳細內容':'Notes & Details'}</div>
-          <div class="detail-value" style="background:var(--bg-main); padding:8px; border-radius:6px; font-size:12px; white-space:pre-line;">${notesStr}</div>
+          <div class="detail-label">${isZH?'備註紀錄':'Notes'}</div>
+          <div class="detail-value" style="white-space:pre-line; color:var(--primary);">${notesStr}</div>
         </div>
       </div>
     `;
@@ -1221,7 +1251,7 @@
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
-  // 自動帶入：讀取 JSON 內的 "notes" 鍵值，並正確套用回對應輸入框
+  // 自動帶入：精準填入「負責人、大綱、目的 Radio 以及備註文字」
   function handleExpSelectChange(expId) {
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
@@ -1235,9 +1265,22 @@
 
         const savedData = existingRecord.formData || {};
         
-        // 完整複製舊 JSON 欄位（包含解耦後的 "notes" 屬性）
+        // 1. 複製舊 JSON 資料
         Object.keys(savedData).forEach(key => {
           currentFormCtx.data[key] = savedData[key];
+        });
+
+        // 2. 自動找出備註內容 (優先取 notes 屬性，若沒有則搜尋 field_)
+        const targetNotesVal = savedData['notes'] || savedData['field_14_4'] || '';
+
+        // 3. 自動對應寫回 DOM 中帶有「備註」標題或 `_input` 的輸入框 ID
+        currentFormCtx.pages.forEach(page => {
+          page.fields.forEach(field => {
+            const isNoteField = field.label && (field.label.includes('備註') || field.label.toLowerCase().includes('note'));
+            if (isNoteField && targetNotesVal) {
+              currentFormCtx.data[field.id] = targetNotesVal;
+            }
+          });
         });
 
         let savedOutline = savedData['outline_select_val'] || '';
@@ -1274,8 +1317,7 @@
           });
         });
 
-        const displayNote = savedData['notes'] || '無';
-        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、大綱、目的與備註 (${displayNote}) 已自動填入。`);
+        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、大綱、目的與備註已自動填入。`);
       }
     }
     renderFormCurrentPage();
@@ -1364,7 +1406,7 @@
           <div class="form-group">
             <label>${field.label}</label>
             <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}')">
-            ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
+            ${renderFieldDescription(field.desc)}
           </div>
         `;
       }
@@ -1373,7 +1415,7 @@
           <div class="form-group">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
             <input type="${field.type}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}')">
-            ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
+            ${renderFieldDescription(field.desc)}
           </div>
         `;
       }
@@ -1384,7 +1426,7 @@
             <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}');">
             <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
           </div>
-          ${field.desc ? `<div class="field-desc" style="margin:-4px 0 10px 4px;">${field.desc}</div>` : ''}
+          ${renderFieldDescription(field.desc)}
         `;
       }
       else if (field.type === "radio") {
@@ -1481,7 +1523,6 @@
   function saveFormFieldData(fieldId, val, fieldLabel = '') {
     currentFormCtx.data[fieldId] = val;
 
-    // 只要標題帶有「備註」或屬性是帶有輸入框的 field_X_Y_input，自動同步賦予語意化標籤 "notes"
     if (fieldLabel.includes('備註') || fieldId.endsWith('_input') || fieldLabel.toLowerCase().includes('note') || fieldLabel.toLowerCase().includes('remark')) {
       currentFormCtx.data['notes'] = val;
       currentFormCtx.data['notes_label'] = fieldLabel || '備註';
