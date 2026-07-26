@@ -615,43 +615,71 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 終極版同頁面即時公式計算引擎（直接抓取 DOM 所有 input 陣列）
-  // 終極絕對對應版：依據同頁面欄位順序直接抓取數值計算
+  // 通用動態公式解析引擎：自動解析公式文字並對應同頁面欄位
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
+    let evalStr = formulaTemplate;
     
-    // 取得當前頁面的所有數字輸入框 DOM 元素
-    const container = document.getElementById('formContent');
-    const inputs = container ? container.querySelectorAll('input.form-control, textarea.form-control') : [];
-    
-    // 將當前頁面所有輸入框的值轉成陣列
-    let values = [];
-    inputs.forEach(input => {
-      // 排除唯讀的公式框本身
-      if (!input.readOnly) {
-        values.push(parseFloat(input.value) || 0);
-      }
-    });
+    // 1. 找出公式中所有大括號包住的變數，例如 {大鼠體重 (g)} 或 {電極原始插入位置-ML}
+    const matches = formulaTemplate.match(/\{([^}]+)\}/g);
+    if (matches) {
+      matches.forEach(match => {
+        const rawVarName = match.slice(1, -1).trim(); // 原始變數名稱
+        // 標準化變數名稱（去除括號、空格、轉小寫以利模糊比對）
+        const cleanVarName = rawVarName.replace(/\([^)]+\)/g, '').replace(/[\s-_]/g, '').toLowerCase();
+        
+        let val = 0;
+        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
 
-    // 依照你固定的表單順序：values[0] = 大鼠體重, values[1] = PTZ使用劑量
-    const weight = values[0] || 0;
-    const dose = values[1] !== undefined ? values[1] : 1; // 預設 1
+        if (page && page.fields) {
+          // 在當前頁面的欄位中尋找最匹配的輸入值
+          for (let f of page.fields) {
+            if (f.label) {
+              const cleanFieldLabel = cleanDisplayLabel(f.label).replace(/\([^)]+\)/g, '').replace(/[\s-_]/g, '').toLowerCase();
+              
+              // 檢查欄位標籤是否包含變數名稱，或變數名稱包含欄位標籤
+              if (cleanFieldLabel && (cleanFieldLabel === cleanVarName || cleanFieldLabel.includes(cleanVarName) || cleanVarName.includes(cleanFieldLabel))) {
+                const domEl = document.getElementById(f.id);
+                const domVal = domEl ? domEl.value : '';
+                val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[f.id]) || 0;
+                break;
+              }
+            }
+          }
+        }
 
-    let result = 0;
-    if (formulaTemplate.includes('700 -')) {
-      // Saline 公式: 700 - (體重 * 劑量)
-      result = 700 - (weight * dose);
-    } else if (formulaTemplate.includes('*')) {
-      // PTZ 公式: 體重 * 劑量
-      result = weight * dose;
-    } else if (formulaTemplate.includes('-')) {
-      // 座標校正公式
-      result = weight - dose; 
+        // 備用：若 page fields 沒對到，直接掃描畫面上所有的 input 標籤
+        if (val === 0) {
+          const allInputs = document.querySelectorAll('#formContent .form-control, #formContent input');
+          for (let input of allInputs) {
+            const formGroup = input.closest('.form-group');
+            if (formGroup) {
+              const labelEl = formGroup.querySelector('label');
+              if (labelEl) {
+                const cleanLabelText = cleanDisplayLabel(labelEl.innerText).replace(/\([^)]+\)/g, '').replace(/[\s-_]/g, '').toLowerCase();
+                if (cleanLabelText.includes(cleanVarName) || cleanVarName.includes(cleanLabelText)) {
+                  val = parseFloat(input.value) || 0;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        // 將公式中的 {變數} 動態替換為實際數值
+        evalStr = evalStr.replace(match, val);
+      });
     }
 
-    return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
+    try {
+      // 執行動態數學運算
+      const result = Function('"use strict";return (' + evalStr + ')')();
+      return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
+    } catch (e) {
+      console.error("公式計算錯誤: ", evalStr, e);
+      return '';
+    }
   }
-
   // 全域即時公式計算觸發器（修復 Uncaught ReferenceError）
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
