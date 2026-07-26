@@ -1144,7 +1144,7 @@
     }
   }
 
-  // 🚀 關鍵修復一：FORM_002_1, FORM_002_2, FORM_006 精簡呈現在明細，顯示「已完成檢查」或「已完成檢查*」
+  // 🚀 精準表單分流解析器：針對 FORM_001 / FORM_002 / 其他表單進行個別明細渲染
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1155,8 +1155,13 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    const notesStr = formData['notes'] ? formData['notes'] : (isZH ? '無' : 'None');
+    // 1. 精準提取真正的備註（只認 JSON 中的 "notes" 或 FORM_002 底部的 "field_79_8"）
+    let notesStr = formData['notes'] || formData['field_14_4'] || formData['field_79_8'] || '';
+    if (!notesStr || String(notesStr).trim() === '') {
+      notesStr = isZH ? '無' : 'None';
+    }
 
+    // 2. 歷程時間軸渲染
     let timeLogsHtml = '';
     if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
       timeLogsHtml = Object.entries(formData['_time_logs']).map(([st, time]) => `
@@ -1169,28 +1174,50 @@
       timeLogsHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</span>`;
     }
 
+    // 3. 🚀 表單類型分流數據解析
     let filledDataHtml = '';
 
-    // 🚀 判斷是否為檢查表類型（FORM_002_1, FORM_002_2, FORM_006）
-    const isChecklistForm = formData['_is_checklist'] || formData['field_8_0'] || formData['field_13_0'] || exp.status === '準備完成' || exp.status === '實驗完成';
-    
-    if (isChecklistForm) {
-      const isForce = formData['_is_force_submitted'] || false;
+    // 判斷是否已經進行到 FORM_002 階段 (或者狀態為 "準備完成")
+    const hasForm002Data = Object.keys(formData).some(k => k.endsWith('_8')); 
+
+    if (hasForm002Data || exp.status === '準備完成') {
+      // 🚀【FORM_002 檢查表邏輯】
+      // 收集 FORM_002 專屬的所有勾選欄位 (排除欄位尾號 _8 且代表備註的 field_79_8)
+      let isAllChecked = true;
+      let checkCount = 0;
+
+      Object.keys(formData).forEach(k => {
+        if (k.endsWith('_8') && k !== 'field_79_8') {
+          checkCount++;
+          if (formData[k] !== true && formData[k] !== 'true') {
+            isAllChecked = false; // 只要有任何一項不是 true 或為空白，代表非完整勾選
+          }
+        }
+      });
+
+      // 如果有被手動標記強制提交，或是檢查欄位沒全滿/有缺漏
+      const isForce = formData['_is_force_submitted'] || !isAllChecked || checkCount === 0;
       const statusText = isForce ? '已完成檢查*' : '已完成檢查';
-      filledDataHtml = `<span style="font-weight:700; color:var(--success); font-size:12px;">${statusText}</span>`;
-    } else {
-      const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes', 'notes_label', '_time_logs', '_is_checklist', '_is_force_submitted'];
+      const statusColor = isForce ? 'var(--warning)' : 'var(--success)';
+
+      filledDataHtml = `<span style="font-weight:700; color:${statusColor}; font-size:12px;">${statusText}</span>`;
+    } 
+    else {
+      // 🚀【FORM_001 及其他表單數據邏輯】
+      // 只提取非系統保留欄位，將 field_xx 轉換為「問題標題: 數據」
+      const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes', 'notes_label', '_time_logs', '_is_checklist', '_is_force_submitted', 'field_14_4'];
       let filledDataList = [];
 
       Object.keys(formData).forEach(k => {
-        if (!systemKeys.includes(k) && !k.endsWith('_input') && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
+        if (!systemKeys.includes(k) && !k.endsWith('_input') && !k.endsWith('_8') && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
           const valStr = String(formData[k]).trim();
           const questionLabel = state.fieldLabelMap[k] || k;
           
+          // 過濾掉與標題/目的完全相同的重複文字
           if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name'] && valStr !== 'true' && valStr !== 'false') {
             filledDataList.push(`
               <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; border-bottom:1px solid #f1f5f9; padding-bottom:2px;">
-                <span style="color:var(--text-muted); font-weight:600; max-width:60%; font-size:10px;">${questionLabel}:</span>
+                <span style="color:var(--text-muted); font-weight:600; max-width:65%; font-size:10px;">${questionLabel}:</span>
                 <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${valStr}</span>
               </div>
             `);
@@ -1201,6 +1228,7 @@
       filledDataHtml = filledDataList.length > 0 ? filledDataList.join('') : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
     }
 
+    // 4. 組裝 Modal HTML
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row">
