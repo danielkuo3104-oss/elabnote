@@ -17,7 +17,9 @@
       --primary-light: #f0f9ff;
       
       --success: #059669;
+      --success-bg: #ecfdf5;
       --warning: #d97706;
+      --warning-bg: #fffbeb;
       --danger: #dc2626;
       --gray-badge: #64748b;
       
@@ -45,6 +47,7 @@
       position: relative; overflow: hidden;
     }
 
+    /* Header Styling */
     .header {
       background: var(--card-bg); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border-color); z-index: 10; padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
@@ -59,31 +62,59 @@
     .user-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
     .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
     
-    /* 點擊時熄滅反應按鈕 */
     .btn-refresh-touch {
       display: flex; align-items: center; gap: 4px; background: var(--primary-light); color: var(--primary);
       border: 1px solid #bae6fd; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; cursor: pointer;
       transition: all 0.2s ease;
     }
-    .btn-refresh-touch.refreshing {
-      background: #e2e8f0 !important; color: #94a3b8 !important; border-color: #cbd5e1 !important; opacity: 0.6;
-    }
+    .btn-refresh-touch.refreshing { background: #e2e8f0 !important; color: #94a3b8 !important; border-color: #cbd5e1 !important; opacity: 0.6; }
 
     .update-time { font-size: 10px; color: var(--text-muted); font-family: ui-monospace, monospace; margin-top: 2px; }
 
     .main-content { padding: 16px; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 40px; }
 
-    .dashboard-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+    /* 戰情室 / 手術室監控風格 Dashboard Card */
+    .dashboard-card { 
+      background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); 
+      padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); 
+    }
     
-    .active-exp-list-item { padding: 10px 0; border-bottom: 1px dashed var(--border-color); }
-    .active-exp-list-item:last-child { border-bottom: none; }
+    .monitor-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .monitor-title {
+      font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; display: inline-block;
+      box-shadow: 0 0 0 rgba(16, 185, 129, 0.4); animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
 
-    .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; float: right; border: 1px solid transparent; }
-    .status-badge.reserved { background: #f1f5f9; color: var(--gray-badge); border-color: #cbd5e1; }
-    .status-badge.active { background: #fef3c7; color: var(--warning); border-color: #fde68a; }
-    .status-badge.completed { background: #ecfdf5; color: var(--success); border-color: #a7f3d0; }
+    .active-exp-card {
+      background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md);
+      padding: 12px 14px; margin-bottom: 10px; position: relative; transition: all 0.2s ease;
+    }
+    .active-exp-card:last-child { margin-bottom: 0; }
+    
+    .status-badge-lg {
+      display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
+      letter-spacing: 0.3px; border: 1px solid transparent;
+    }
+    .status-badge-lg.reserved { background: #f1f5f9; color: var(--gray-badge); border-color: #cbd5e1; }
+    .status-badge-lg.active { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+    .status-badge-lg.completed { background: #dcfce7; color: #15803d; border-color: #86efac; }
 
-    .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+    .exp-title-main { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 6px 0 4px 0; line-height: 1.35; }
+    .exp-meta-bar { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+    .exp-code-tag { font-family: ui-monospace, monospace; color: var(--text-muted); font-size: 10px; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color); }
+
+    .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
     .schedule-tag { border-radius: 4px; padding: 2px 8px; font-size: 11px; margin-right: 8px; font-weight: 600; font-family: ui-monospace, monospace; }
 
     .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -99,12 +130,16 @@
     .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
     .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
+    /* 時間軸優化：以「日期」為主核心 */
     .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; margin-bottom: 20px; }
-    .timeline-line { position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; background: var(--border-color); }
-    .timeline-item { position: relative; margin-bottom: 16px; cursor: pointer; }
+    .timeline-line { position: absolute; left: 5px; top: 12px; bottom: 8px; width: 2px; background: var(--border-color); }
+    .timeline-item { position: relative; margin-bottom: 14px; cursor: pointer; }
     .timeline-node { position: absolute; left: -19px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 2px var(--primary); }
     .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
+
+    .timeline-date-head { font-size: 14px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; }
+    .timeline-exp-id { font-size: 10px; font-family: ui-monospace, monospace; color: var(--text-muted); font-weight: 500; }
 
     .section-divider {
       font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
@@ -116,9 +151,7 @@
     .upload-status-tag.uploaded { background: #dcfce7; color: #15803d; }
     .upload-status-tag.pending { background: #fee2e2; color: #b91c1c; }
 
-    .copyright-notice {
-      text-align: center; font-size: 11px; color: var(--text-muted); padding: 16px 0; font-weight: 500; font-family: ui-monospace, monospace;
-    }
+    .copyright-notice { text-align: center; font-size: 11px; color: var(--text-muted); padding: 16px 0; font-weight: 500; font-family: ui-monospace, monospace; }
 
     /* 霧面毛玻璃載入遮罩 */
     .blur-overlay {
@@ -329,17 +362,23 @@
 
   <!-- 3. 主頁面內容 -->
   <div class="main-content">
+    
+    <!-- 戰情室監控風格 Dashboard Card -->
     <div class="dashboard-card" id="dashboardCard">
-      <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:8px;" id="txtTodayHeader">
-        今日進行中項目 / Today Active Experiments
+      <div class="monitor-header">
+        <div class="monitor-title" id="txtTodayHeader">
+          <span class="pulse-dot"></span> 今日進行中項目 / Active Experiments
+        </div>
       </div>
+      
       <div id="todayActiveExpList">
         <div style="font-size:13px; color:var(--text-muted); padding:6px 0;">載入中...</div>
       </div>
-      <hr style="margin:12px 0; border:0; border-top:1px solid var(--border-color);">
+
+      <hr style="margin:14px 0 10px 0; border:0; border-top:1px solid var(--border-color);">
       
       <div id="scheduleSection" onclick="openScheduleCenter()">
-        <div id="txtScheduleHeader" style="font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">未來排程 (最靠近兩筆)</div>
+        <div id="txtScheduleHeader" style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">未來排程 (最靠近兩筆)</div>
         <div id="scheduleList">
           <div class="schedule-item"><span class="schedule-tag">--</span><span>載入中...</span></div>
         </div>
@@ -668,7 +707,7 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  // 讀取資料中心（已平移 6 欄位：A:編號, B:日期, C:負責人, D:狀態, E:資訊, F:時間）
+  // 讀取資料中心
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -706,6 +745,7 @@
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
+  // 渲染 Monitor 版面 (手術室/戰情室風格優化)
   function renderMainDashboardUI() {
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束');
     const todayListContainer = document.getElementById('todayActiveExpList');
@@ -713,16 +753,25 @@
     if(todayExps.length > 0) {
       todayListContainer.innerHTML = todayExps.map(exp => {
         const badgeClass = exp.status === '已預約' ? 'reserved' : 'active';
+        const userObj = state.membersList.find(m => m.name === exp.user);
+        const userColor = userObj ? userObj.color : '#f1f5f9';
+
         return `
-          <div class="active-exp-list-item">
-            <span class="status-badge ${badgeClass}">${exp.status}</span>
-            <div style="font-size:12px; font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">[${exp.expId}] ${exp.user}</div>
-            <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-top:2px;">${exp.info || '實驗專案'}</div>
+          <div class="active-exp-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="status-badge-lg ${badgeClass}">${exp.status}</span>
+              <span class="exp-code-tag">${exp.expId}</span>
+            </div>
+            <div class="exp-title-main">${exp.info || '實驗專案'}</div>
+            <div class="exp-meta-bar">
+              <span>負責人：<strong style="background:${userColor}; padding:1px 6px; border-radius:4px; font-weight:700;">${exp.user}</strong></span>
+              <span>日期：${exp.date}</span>
+            </div>
           </div>
         `;
       }).join('');
     } else {
-      todayListContainer.innerHTML = `<div style="font-size:13px; color:var(--text-muted); padding:6px 0;">${state.currentLang==='ZH'?'本日無進行中實驗':'No active experiments today'}</div>`;
+      todayListContainer.innerHTML = `<div style="font-size:13px; color:var(--text-muted); padding:10px 0; text-align:center;">${state.currentLang==='ZH'?'目前無進行中實驗':'No active experiments'}</div>`;
     }
 
     const futureExps = state.dataCenter
@@ -738,13 +787,59 @@
         return `
           <div class="schedule-item">
             <span class="schedule-tag" style="background:${userColor}; color:var(--text-primary);">${f.date.slice(5)} ${f.user}</span>
-            <span>[${f.expId}] ${f.info || '預約排程'}</span>
+            <span>${f.info || '預約排程'} <small style="color:var(--text-muted);">(${f.expId})</small></span>
           </div>
         `;
       }).join('');
     } else {
       scheduleContainer.innerHTML = `<div class="schedule-item" style="color:var(--text-muted);">${state.currentLang==='ZH'?'無未來預約排程':'No upcoming schedule'}</div>`;
     }
+  }
+
+  // 渲染歷史紀錄：重點改為「日期」優先，編號縮小為定位標記
+  function renderTimeline() {
+    const container = document.getElementById('timelineContainer');
+    let html = `<div class="timeline-line"></div>`;
+    const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
+    
+    if(sorted.length === 0) {
+      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">無歷史實驗紀錄</div>`;
+      return;
+    }
+
+    sorted.forEach(item => {
+      const isToday = item.date === state.simulatedDate;
+      const userObj = state.membersList.find(m => m.name === item.user);
+      const userColor = userObj ? userObj.color : '#f1f5f9';
+      
+      const isCompleted = item.status === '已完成' || item.status === '實驗結束';
+      const statusColor = isCompleted ? 'var(--success)' : (item.status === '已預約' ? 'var(--gray-badge)' : 'var(--warning)');
+      
+      const uploadTagHtml = isCompleted 
+        ? (item.hasDataUpload 
+            ? `<span class="upload-status-tag uploaded">已上傳資料</span>` 
+            : `<span class="upload-status-tag pending">待上傳資料</span>`) 
+        : '';
+
+      html += `
+        <div class="timeline-item">
+          <div class="timeline-node" style="background:${statusColor}"></div>
+          <div class="timeline-card ${isToday ? 'today' : ''}">
+            <div class="timeline-date-head">
+              <span>${item.date} <span style="background:${userColor}; font-size:11px; font-weight:600; border-radius:4px; padding:2px 6px; margin-left:4px;">${item.user}</span></span>
+              <div>
+                <span style="color:${statusColor}; font-size:11px; font-weight:700;">${item.status}</span>
+                ${uploadTagHtml}
+              </div>
+            </div>
+            <div style="font-size:13px; margin-top:6px; color:var(--text-primary); font-weight:600;">${item.info || '實驗專案'}</div>
+            <div class="timeline-exp-id" style="margin-top:4px;">編號: ${item.expId}</div>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
   }
 
   async function syncToGoogleSheet(actionType, payload) {
@@ -874,7 +969,7 @@
     document.getElementById('menuProfile').innerText = isZH ? "更改個人資訊" : "Edit Profile";
     document.getElementById('menuLogout').innerText = isZH ? "登出系統" : "Logout";
     document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
-    document.getElementById('txtTodayHeader').innerText = isZH ? "今日進行中項目" : "Today Active Experiments";
+    document.getElementById('txtTodayHeader').innerHTML = isZH ? '<span class="pulse-dot"></span> 今日進行中項目 / Active Experiments' : '<span class="pulse-dot"></span> Active Experiments Today';
   }
 
   function updateDashboardButtons() {
@@ -896,50 +991,6 @@
     document.getElementById('btnTomorrowPrep').classList.toggle('btn-disabled', !tomorrowHasExp);
     document.getElementById('btnReserveExp').classList.remove('btn-disabled');
     document.getElementById('btnMakeupExp').classList.remove('btn-disabled');
-  }
-
-  function renderTimeline() {
-    const container = document.getElementById('timelineContainer');
-    let html = `<div class="timeline-line"></div>`;
-    const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
-    
-    if(sorted.length === 0) {
-      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">無歷史實驗紀錄</div>`;
-      return;
-    }
-
-    sorted.forEach(item => {
-      const isToday = item.date === state.simulatedDate;
-      const userObj = state.membersList.find(m => m.name === item.user);
-      const userColor = userObj ? userObj.color : '#f1f5f9';
-      
-      const isCompleted = item.status === '已完成' || item.status === '實驗結束';
-      const statusColor = isCompleted ? 'var(--success)' : (item.status === '已預約' ? 'var(--gray-badge)' : 'var(--warning)');
-      
-      const uploadTagHtml = isCompleted 
-        ? (item.hasDataUpload 
-            ? `<span class="upload-status-tag uploaded">已上傳資料</span>` 
-            : `<span class="upload-status-tag pending">待上傳資料</span>`) 
-        : '';
-
-      html += `
-        <div class="timeline-item">
-          <div class="timeline-node" style="background:${statusColor}"></div>
-          <div class="timeline-card ${isToday ? 'today' : ''}">
-            <div style="display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:12px;">
-              <span>[${item.expId}] ${item.date} <span style="background:${userColor}; border-radius:4px; padding:2px 6px; margin-left:4px;">${item.user}</span></span>
-              <div>
-                <span style="color:${statusColor}">${item.status}</span>
-                ${uploadTagHtml}
-              </div>
-            </div>
-            <div style="font-size:13px; margin-top:6px; color:var(--text-primary); font-weight:500;">${item.info || '實驗專案'}</div>
-          </div>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
   }
 
   let currentFormCtx = {
@@ -985,6 +1036,26 @@
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
+  // 選擇已存在實驗時，自動帶入歷史資料邏輯
+  function handleExpSelectChange(expId) {
+    currentFormCtx.data['exp_select_val'] = expId;
+    saveFormFieldData('exp_select_val', expId);
+
+    if (expId && expId !== 'NEW_PROJECT') {
+      const existingRecord = state.dataCenter.find(d => d.expId === expId);
+      if (existingRecord) {
+        if (existingRecord.user) saveFormFieldData('user_select_val', existingRecord.user);
+        if (existingRecord.info) {
+          const parts = existingRecord.info.split('-');
+          if (parts.length > 0) currentFormCtx.data['outline_select_val'] = parts[0].trim();
+          if (parts.length > 1) currentFormCtx.data['selected_purpose_name'] = parts[1].trim();
+        }
+        showCustomAlert("資料已自動帶入", `已找到 [${expId}] 的歷史紀錄，並為您自動填入相關資料！`);
+      }
+    }
+    renderFormCurrentPage();
+  }
+
   function renderFormSidebar() {
     const sb = document.getElementById('formSidebar');
     sb.innerHTML = currentFormCtx.pages.map((p, idx) => `
@@ -1024,7 +1095,7 @@
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <select class="form-control" onchange="currentFormCtx.data['exp_select_val'] = this.value; saveFormFieldData('${field.id}', this.value);">
+            <select class="form-control" onchange="handleExpSelectChange(this.value)">
               <option value="NEW_PROJECT">${newProjText}</option>
               ${activeProjects.map(p => {
                 const optText = `[${p.expId}] ${p.date} (${p.user})`;
@@ -1051,11 +1122,12 @@
         `;
       }
       else if (field.type === "user_select") {
+        const selectedUser = currentFormCtx.data['user_select_val'] || val;
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value)">
-              ${state.membersList.map(m => `<option value="${m.name}" ${val === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
+            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value); saveFormFieldData('user_select_val', this.value);">
+              ${state.membersList.map(m => `<option value="${m.name}" ${selectedUser === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
             </select>
           </div>
         `;
@@ -1247,7 +1319,6 @@
     return `${outlineCode}${purposeCode}${yyMMdd}${checksum}`;
   }
 
-  // 核心：修復 A 欄編號覆蓋錯誤與格式校正
   async function submitFormFinal() {
     if (state.isSubmitting) return;
 
@@ -1261,7 +1332,6 @@
       targetStatus = currentFormCtx.selectedStatusTag || "已完成";
     }
 
-    // 正確抓取日期 (YYYY-MM-DD)
     let submitDate = state.simulatedDate;
     Object.keys(currentFormCtx.data).forEach(k => {
       const v = currentFormCtx.data[k];
@@ -1270,18 +1340,14 @@
       }
     });
 
-    // 精準抓取下拉選單中的「實驗編號/Exp. Number」 (欄位類型為 exp_select)
     let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || "";
-
     let finalExpId = "";
     let isUpdateMode = false;
 
-    // 只有當選中的字串符合英數編號格式時，才判定為 Update
     if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
       finalExpId = selectedExpSelectVal;
       isUpdateMode = true;
     } else {
-      // 否則一律生成強健的正規編號 (如 A01260726X7K)
       finalExpId = generateExperimentId(submitDate);
       isUpdateMode = false;
     }
@@ -1290,13 +1356,12 @@
     const purposeVal = currentFormCtx.data['selected_purpose_name'] || '';
     const dynamicInfo = (outlineVal || purposeVal) ? `${outlineVal} - ${purposeVal}`.trim() : "實驗專案";
 
-    // 傳送平移後的標準 payload
     await syncToGoogleSheet("submitForm", {
-      expId: finalExpId,       // 👈 確保一定是正規編號 (如 A01260726X7K)
-      date: submitDate,        // B欄
-      user: state.currentUser ? state.currentUser.name : "Daniel", // C欄
-      status: targetStatus,    // D欄
-      info: dynamicInfo,       // E欄
+      expId: finalExpId,
+      date: submitDate,
+      user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
+      status: targetStatus,
+      info: dynamicInfo,
       isUpdate: isUpdateMode,
       formData: currentFormCtx.data
     });
