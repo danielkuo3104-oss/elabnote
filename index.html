@@ -650,32 +650,66 @@
     if (!page || !page.fields) return;
 
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
-    let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
-    let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
 
-    let formulaIndex = 0; // 用來計算當前是第幾個公式欄位
+    // 🚀 分頁 0：第一頁「劑量計算」
+    if (currentFormCtx.currentPageIdx === 0) {
+      let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
+      let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
+      let formulaIndex = 0;
 
-    page.fields.forEach(f => {
-      if (f.type === "formula") {
-        let calculatedVal = 0;
-        
-        // 🚀 依序號分流：第 0 個公式算乘法，第 1 個公式算 700 扣除
-        if (formulaIndex === 1) {
-          calculatedVal = 700 - (weight * dose);
-        } else {
-          calculatedVal = weight * dose;
+      page.fields.forEach(f => {
+        if (f.type === "formula") {
+          let calculatedVal = 0;
+          if (formulaIndex === 1) {
+            calculatedVal = 700 - (weight * dose); // Saline 需要量
+          } else {
+            calculatedVal = weight * dose;        // PTZ 需要量
+          }
+
+          currentFormCtx.data[f.id] = calculatedVal;
+          const domEl = document.getElementById(f.id);
+          if (domEl) {
+            domEl.value = isNaN(calculatedVal) ? '' : calculatedVal;
+          }
+          formulaIndex++;
         }
+      });
+      return;
+    }
 
-        currentFormCtx.data[f.id] = calculatedVal;
-        
-        const domEl = document.getElementById(f.id);
-        if (domEl) {
-          domEl.value = isNaN(calculatedVal) ? '' : calculatedVal;
+    // 🚀 分頁 1：第二頁「電極位置與座標」
+    if (currentFormCtx.currentPageIdx === 1) {
+      const valArr = Array.from(allInputs).map(inp => parseFloat(inp.value) || 0);
+      
+      const lamdaML = valArr[2] || 0;
+      const lamdaAP = valArr[3] || 0;
+      const rawML = valArr[4] || 0;
+      const rawAP = valArr[5] || 0;
+      const rawDH = valArr[6] || 0;
+
+      page.fields.forEach(f => {
+        if (f.type === "formula") {
+          let calculatedVal = 0;
+          const formulaFieldsInPage = page.fields.filter(x => x.type === 'formula');
+          const formulaIdx = formulaFieldsInPage.indexOf(f);
+
+          if (formulaIdx === 0) {
+            calculatedVal = rawML - lamdaML; // 校正 ML
+          } else if (formulaIdx === 1) {
+            calculatedVal = rawAP - lamdaAP; // 校正 AP
+          } else {
+            calculatedVal = rawDH;         // 校正 DH
+          }
+
+          currentFormCtx.data[f.id] = calculatedVal;
+          const domEl = document.getElementById(f.id);
+          if (domEl) {
+            domEl.value = isNaN(calculatedVal) ? '' : calculatedVal;
+          }
         }
-
-        formulaIndex++;
-      }
-    });
+      });
+      return;
+    }
   }
 
   async function refreshDashboard(showBlur = true) {
@@ -1418,17 +1452,45 @@
     openForm("FORM_002_1");
   }
 
-  function openForm(formId, isMakeup = false) {
+  function openForm(formId, isMakeup = false, savedRecordData = null) {
     currentFormCtx.formId = formId;
-    currentFormCtx.currentPageIdx = 0;
     currentFormCtx.isMakeup = isMakeup;
-    currentFormCtx.data = {}; 
     currentFormCtx.selectedAction = null;
     currentFormCtx.selectedStatusTag = null;
 
+    // 1. 載入該表單結構
     currentFormCtx.pages = getFormStructure(formId);
     document.getElementById('formTitle').innerText = formId;
 
+    // 2. 恢復歷史儲存資料（若有傳入該筆實驗的歷史資料）
+    if (savedRecordData && typeof savedRecordData === 'object') {
+      currentFormCtx.data = JSON.parse(JSON.stringify(savedRecordData));
+    } else {
+      currentFormCtx.data = {}; 
+    }
+
+    // 3. 🚀 智慧進度恢復：檢查該表單是否有未填完的頁面，或依據狀態決定預設頁面
+    let targetPageIdx = 0;
+    if (currentFormCtx.pages && currentFormCtx.pages.length > 0) {
+      // 尋找第一個尚未填寫完畢的頁面，或者維持記錄中的最後頁面
+      for (let i = 0; i < currentFormCtx.pages.length; i++) {
+        const page = currentFormCtx.pages[i];
+        let pageHasData = false;
+        if (page.fields) {
+          pageHasData = page.fields.some(f => currentFormCtx.data[f.id] !== undefined && currentFormCtx.data[f.id] !== '');
+        }
+        // 如果這一頁有資料，就繼續往下看；如果這一頁完全沒資料，就停在這一頁讓使用者繼續填
+        if (!pageHasData) {
+          targetPageIdx = i;
+          break;
+        }
+        targetPageIdx = i; // 若全部都有填，預設停在最後一頁
+      }
+    }
+    
+    currentFormCtx.currentPageIdx = targetPageIdx;
+
+    // 4. 渲染側邊欄與當前頁面
     renderFormSidebar();
     renderFormCurrentPage();
 
@@ -1484,19 +1546,34 @@
         if (selectedOutline !== field.dependsOn) return;
       }
 
-      if (field.type === "formula") {
+      if (field.type === "formula" && currentFormCtx.currentPageIdx === 1) { // 假設第二頁 index 是 1
         let calculatedVal = 0;
         const allInputs = container.querySelectorAll('input.form-control, input[type="number"]');
-        let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
-        let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
+        
+        // 依據你第二頁的輸入框順序精準抓取：
+        // 0: Bregma ML, 1: Bregma AP
+        // 2: Lamda ML, 3: Lamda AP
+        // 4: 原始 ML, 5: 原始 AP, 6: 原始 DH
+        const valArr = Array.from(allInputs).map(inp => parseFloat(inp.value) || 0);
+        
+        const lamdaML = valArr[2] || 0;
+        const lamdaAP = valArr[3] || 0;
+        const rawML = valArr[4] || 0;
+        const rawAP = valArr[5] || 0;
+        const rawDH = valArr[6] || 0;
 
-        // 計算目前是該頁面的第幾個公式欄位（透過已渲染的數量判定）
+        // 依據當前是第幾個公式欄位進行寫死計算
         const renderedFormulaCount = container.querySelectorAll('.formula-field').length;
 
-        if (renderedFormulaCount === 1) {
-          calculatedVal = 700 - (weight * dose);
+        if (renderedFormulaCount === 0) {
+          // 校正 ML = 原始 ML - Lamda ML
+          calculatedVal = rawML - lamdaML;
+        } else if (renderedFormulaCount === 1) {
+          // 校正 AP = 原始 AP - Lamda AP
+          calculatedVal = rawAP - lamdaAP;
         } else {
-          calculatedVal = weight * dose;
+          // 校正 DH = 原始 DH
+          calculatedVal = rawDH;
         }
 
         currentFormCtx.data[field.id] = calculatedVal;
