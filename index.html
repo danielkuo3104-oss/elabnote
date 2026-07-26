@@ -85,11 +85,12 @@
       100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
-    /* 今日進行中項目卡片 */
+    /* 今日進行中項目卡片（可點擊效果） */
     .active-exp-card {
       background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md);
-      padding: 12px 14px; margin-bottom: 10px; position: relative;
+      padding: 12px 14px; margin-bottom: 10px; position: relative; cursor: pointer; transition: all 0.2s ease;
     }
+    .active-exp-card:active { transform: scale(0.98); background: #f1f5f9; }
     .active-exp-card:last-child { margin-bottom: 0; }
     
     .status-badge-lg { 
@@ -182,20 +183,27 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
+    /* 彈窗細節與詳細資訊彈窗樣式 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
     }
     .custom-modal {
-      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 320px;
-      padding: 20px; box-shadow: var(--shadow-md); text-align: center; border: 1px solid var(--border-color);
+      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 340px;
+      padding: 20px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); max-height: 80vh; display: flex; flex-direction: column;
     }
-    .custom-modal h3 { margin-bottom: 8px; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .custom-modal h3 { margin-bottom: 12px; font-size: 16px; font-weight: 700; color: var(--text-primary); text-align: center; }
     .custom-modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; white-space: pre-line; text-align: center; line-height: 1.5; }
-    .custom-modal-btns { display: flex; gap: 8px; justify-content: center; }
+    .custom-modal-btns { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
     .modal-btn { flex: 1; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-weight: 600; font-size: 13px; cursor: pointer; }
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
+
+    .detail-list { text-align: left; overflow-y: auto; max-height: 50vh; font-size: 12px; padding: 4px 2px; }
+    .detail-row { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
+    .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
+    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; text-transform: uppercase; margin-bottom: 2px; }
+    .detail-value { font-weight: 600; color: var(--text-primary); line-height: 1.4; word-break: break-word; }
 
     .form-page-container {
       display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -482,7 +490,6 @@
     await refreshDashboard(false);
   });
 
-  // 1. 單一中英多語系處理（處理單一個「中文 / English」字串）
   function parseSingleBilingualStr(str, lang) {
     if (!str) return '';
     if (!str.includes('/')) return str.trim();
@@ -492,10 +499,8 @@
     return lang === 'EN' ? enText : zhText;
   }
 
-  // 2. 完整標題剖析（解決 "-" 截斷英文大綱的問題）
   function formatBilingualText(fullInfoStr, lang) {
     if (!fullInfoStr) return '';
-    // 如果包含 " - "，先拆成「大綱」與「目的」兩部分
     if (fullInfoStr.includes(' - ')) {
       const parts = fullInfoStr.split(' - ');
       const outlineFormatted = parseSingleBilingualStr(parts[0], lang);
@@ -780,7 +785,6 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  // 升級資料中心讀取（完美解析含 CSV 包裹引號的 JSON）
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -853,6 +857,7 @@
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
+  // 渲染 Dashboard UI，今日卡片加上點擊事件 (showActiveExpDetail)
   function renderMainDashboardUI() {
     const isZH = state.currentLang === 'ZH';
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束' && d.status !== 'Completed');
@@ -868,7 +873,7 @@
         const displayInfo = formatBilingualText(exp.info, state.currentLang);
 
         return `
-          <div class="active-exp-card">
+          <div class="active-exp-card" onclick="showActiveExpDetail('${exp.expId}')" title="點擊查看詳細資訊">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span class="status-badge-lg ${badgeClass}">${displayStatus}</span>
               <span class="exp-code-tag">${exp.expId}</span>
@@ -909,6 +914,61 @@
     } else {
       scheduleContainer.innerHTML = `<div class="schedule-item" style="color:var(--text-muted);">${isZH?'無未來預約排程':'No upcoming schedule'}</div>`;
     }
+  }
+
+  // 點擊今日卡片跳出詳細資訊 Modal
+  function showActiveExpDetail(expId) {
+    const exp = state.dataCenter.find(d => d.expId === expId);
+    if (!exp) return;
+
+    const isZH = state.currentLang === 'ZH';
+    const displayStatus = getStatusText(exp.status, state.currentLang);
+    const displayInfo = formatBilingualText(exp.info, state.currentLang);
+    const formData = exp.formData || {};
+
+    // 擷取備註與附帶輸入資訊
+    let notesList = [];
+    Object.keys(formData).forEach(k => {
+      if ((k.includes('notes') || k.includes('remark') || k.endsWith('_input')) && formData[k]) {
+        notesList.push(formData[k]);
+      }
+    });
+
+    const notesStr = notesList.length > 0 ? notesList.join('\n') : (isZH ? '無附加備註' : 'No notes available');
+
+    const htmlContent = `
+      <div class="detail-list">
+        <div class="detail-row">
+          <div class="detail-label">${isZH?'實驗編號':'Experiment ID'}</div>
+          <div class="detail-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH?'當前狀態':'Status'}</div>
+          <div class="detail-value"><span class="status-badge-lg active" style="font-size:11px;">${displayStatus}</span></div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH?'實驗大綱與目的':'Outline & Purpose'}</div>
+          <div class="detail-value">${displayInfo}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH?'負責人':'Owner'}</div>
+          <div class="detail-value">${exp.user}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH?'實驗日期':'Date'}</div>
+          <div class="detail-value">${exp.date}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH?'備註內容':'Notes & Details'}</div>
+          <div class="detail-value" style="background:var(--bg-main); padding:8px; border-radius:6px; font-size:12px; white-space:pre-line;">${notesStr}</div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
+    document.getElementById('modalMessage').innerHTML = htmlContent;
+    document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">關閉</button>`;
+    document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
   function renderTimeline() {
@@ -1151,7 +1211,7 @@
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
-  // 自動帶入核心邏輯（完美精準對齊大綱選單與 Radio 目的）
+  // 自動帶入核心邏輯（完美解析 JSON 自動比對大綱、目的 Radio 以及備註欄位）
   function handleExpSelectChange(expId) {
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
@@ -1166,7 +1226,11 @@
 
         const savedData = existingRecord.formData || {};
         
-        // 剖析完整字串（相容歷史字串或 JSON 內的屬性）
+        // 完整拷貝舊 JSON 的所有欄位（自動還原備註等所有 input 狀態）
+        Object.keys(savedData).forEach(key => {
+          currentFormCtx.data[key] = savedData[key];
+        });
+
         let savedOutline = savedData['outline_select_val'] || '';
         let savedPurpose = savedData['selected_purpose_name'] || '';
 
@@ -1179,7 +1243,6 @@
         // 帶入大綱
         if (savedOutline) {
           currentFormCtx.data['outline_select_val'] = savedOutline;
-          // 設定 outline code
           const outlineField = currentFormCtx.pages[0]?.fields.find(f => f.type === 'outline_select');
           if (outlineField) {
             saveFormFieldData(outlineField.id, savedOutline);
@@ -1193,7 +1256,6 @@
               field.options.forEach((opt, idx) => {
                 const optName = typeof opt === 'string' ? opt : opt.name;
                 
-                // 智慧雙向比對：比對完整的原始 string 或除去空格的 String
                 if (savedPurpose && (optName.trim() === savedPurpose.trim() || optName.includes(savedPurpose) || savedPurpose.includes(optName))) {
                   currentFormCtx.data[field.id] = optName;
                   currentFormCtx.data['selected_purpose_name'] = optName;
@@ -1206,10 +1268,9 @@
           });
         });
 
-        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、實驗大綱與目的已自動填入。`);
+        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、實驗大綱、目的與備註已自動填入。`);
       }
     }
-    // 強制重繪表單以立即套用選取狀態
     renderFormCurrentPage();
   }
 
