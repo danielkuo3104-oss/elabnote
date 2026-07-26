@@ -725,9 +725,11 @@
     const now = new Date();
     document.getElementById('txtUpdateTime').innerText = `${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
+    // 抓取雲端最新資料
     await fetchMembersFromSheet();
     await fetchDataCenterFromSheet();
 
+    // 重新渲染主頁面（背景默不作聲進行）
     renderMainDashboardUI();
     renderTimeline();
     updateDashboardButtons();
@@ -2016,8 +2018,10 @@
 
     state.isSubmitting = true;
     const btnNext = document.getElementById('btnFormNext');
-    btnNext.disabled = true;
-    btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
+    if (btnNext) {
+      btnNext.disabled = true;
+      btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
+    }
 
     let targetStatus = "準備中";
 
@@ -2060,6 +2064,7 @@
 
     const jsonPayloadString = JSON.stringify(currentFormCtx.data);
 
+    // 1. 發送給 GAS 後端進行同步
     await syncToGoogleSheet("submitForm", {
       expId: finalExpId,
       date: submitDate,
@@ -2071,13 +2076,39 @@
       formData: currentFormCtx.data
     });
 
+    // 🚀 2. 本地優先更新 (Local Optimistic Update)：防止 CSV 發布快取延遲導致畫面狀態沒變
+    let targetExpInMemory = state.dataCenter.find(d => d.expId === finalExpId);
+    if (targetExpInMemory) {
+      targetExpInMemory.status = targetStatus;
+      targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
+    } else {
+      // 若是全新專案，直接塞入 state.dataCenter
+      const outlineName = currentFormCtx.data['outline_select_val'] || '';
+      const purposeName = currentFormCtx.data['selected_purpose_name'] || '';
+      state.dataCenter.unshift({
+        expId: finalExpId,
+        date: submitDate,
+        user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
+        status: targetStatus,
+        info: (outlineName && purposeName) ? `${outlineName} - ${purposeName}` : (outlineName || purposeName || "實驗專案"),
+        formData: { ...currentFormCtx.data },
+        hasDataUpload: false
+      });
+    }
+
+    // 3. 清除快取與狀態
     state.activeSelectedExpId = null;
     delete state.formDataCache[currentFormCtx.formId];
 
     state.isSubmitting = false;
     closeFormPage();
-    await refreshDashboard(true);
-    
+
+    // 4. 即時刷新 Local UI（不需要跳全螢幕遮罩）
+    renderMainDashboardUI();
+    renderTimeline();
+    updateDashboardButtons();
+
+    // 5. 提示使用者提交成功
     const msg = isUpdateMode 
       ? `實驗編號 [${finalExpId}] 紀錄已更新！\n狀態更新為：[${targetStatus}]` 
       : `新實驗專案建立成功！\n實驗編號：[${finalExpId}]\n狀態：[${targetStatus}]`;
