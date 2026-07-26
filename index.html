@@ -615,14 +615,14 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 安全動態公式解析引擎
+  // 防呆版安全動態公式解析引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     
-    // 🚀 關鍵：清除開頭可能殘留的 [formula] 標籤與空白
+    // 1. 過濾掉開頭的 [formula] 標籤與空白
     let evalStr = formulaTemplate.replace(/\[formula\]/gi, '').trim();
     
-    // 找出所有 {欄位名稱}
+    // 2. 找出所有 {欄位名稱}
     const matches = evalStr.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
@@ -661,13 +661,17 @@
           });
         }
 
-        // 安全替換變數為純數字
+        // 安全替換變數為純數字（若為空則補 0，避免產生空括號）
+        const safeVal = isNaN(val) ? 0 : val;
         const safeRegex = new RegExp(match.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
-        evalStr = evalStr.replace(safeRegex, val);
+        evalStr = evalStr.replace(safeRegex, safeVal);
       });
     }
 
     try {
+      // 🚀 防呆清洗：若算式中不小心留下無效的空括號，進行預防性替換
+      evalStr = evalStr.replace(/\(\s*\)/g, '(0)');
+
       // 執行動態數學運算
       const result = Function('"use strict";return (' + evalStr + ')')();
       return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
@@ -676,7 +680,6 @@
       return '';
     }
   }
-  
   // 升級版即時公式計算觸發器（帶偵測訊息顯示）
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
