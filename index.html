@@ -1773,7 +1773,7 @@
     refreshDashboard(false);
   }
 
-  // 精準必填檢查：僅 FORM_002_1, FORM_002_2, FORM_006 執行檢查，備註完全豁免
+  // 嚴格規定：僅 FORM_002_1、FORM_002_2、FORM_006 執行必填檢查（涵蓋簡答題、單選與勾選題）
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
     const targetForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
@@ -1793,6 +1793,7 @@
         const isNoteField = f.label && (f.label.includes('備註') || f.label.toLowerCase().includes('note'));
         if (isNoteField || f.type === 'formula' || f.type === 'section') return; 
 
+        // 1. 檢查簡答題與數字填空
         if (f.type === 'text' || f.type === 'number') {
           const domEl = document.getElementById(f.id);
           const val = domEl ? domEl.value : currentFormCtx.data[f.id];
@@ -1800,13 +1801,21 @@
             uncompletedFields.push(f.label);
           }
         } 
+        // 2. 檢查單選題 (Radio) 或大綱選單
         else if (f.type === 'radio' || f.type === 'outline_select') {
           if (!currentFormCtx.data[f.id] && !currentFormCtx.data['outline_select_val']) {
             uncompletedFields.push(f.label);
           }
         } 
+        // 3. 檢查複選框群組 (Checkbox Group)
         else if (f.type === 'checkbox_group') {
           if (!currentFormCtx.data[f.id] || currentFormCtx.data[f.id].length === 0) {
+            uncompletedFields.push(f.label);
+          }
+        }
+        // 4. 檢查單一勾選框 (Checkbox)
+        else if (f.type === 'checkbox') {
+          if (!currentFormCtx.data[f.id] || currentFormCtx.data[f.id] !== true) {
             uncompletedFields.push(f.label);
           }
         }
