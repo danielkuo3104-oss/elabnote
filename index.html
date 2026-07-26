@@ -670,8 +670,8 @@
     }
   }
 
-  // 強制全面刷新當前頁面所有計算框
-  function triggerRealtimeFormulaCalculationLocally() {
+  // 全域即時公式計算觸發器（修復 Uncaught ReferenceError）
+  function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
 
