@@ -1617,8 +1617,15 @@
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
     const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
     
+    // 指定表單直接顯示「提交與檢查」
+    const targetDirectForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     const btnNext = document.getElementById('btnFormNext');
-    btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+
+    if (targetDirectForms.includes(currentFormCtx.formId)) {
+      btnNext.innerText = state.currentLang === 'ZH' ? '提交與檢查' : 'Check & Submit';
+    } else {
+      btnNext.innerText = isSubmit ? (state.currentLang === 'ZH' ? '提交' : 'Submit') : (state.currentLang === 'ZH' ? '下一頁' : 'Next');
+    }
     btnNext.disabled = state.isSubmitting;
   }
 
@@ -1687,17 +1694,28 @@
   async function nextFormPage() {
     if (state.isSubmitting) return;
 
+    // 抓取當前頁面 DOM 上的最新值
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-    page.fields.forEach(f => {
-      const el = document.getElementById(f.id);
-      if (el && el.value !== undefined) {
-        currentFormCtx.data[f.id] = el.value;
-      }
-      if (f.type === 'formula') {
-        currentFormCtx.data[f.id] = evaluateFormula(f.formula);
-      }
-    });
+    if (page && page.fields) {
+      page.fields.forEach(f => {
+        const el = document.getElementById(f.id);
+        if (el && el.value !== undefined) {
+          currentFormCtx.data[f.id] = el.value;
+        }
+        if (f.type === 'formula') {
+          currentFormCtx.data[f.id] = evaluateFormula(f.formula);
+        }
+      });
+    }
 
+    // 若是 FORM_002_1, FORM_002_2, FORM_006，不進行跳頁，直接進行檢查與提交
+    const targetDirectForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
+    if (targetDirectForms.includes(currentFormCtx.formId)) {
+      checkFormAndSubmit();
+      return;
+    }
+
+    // 一般表單的中途狀態發送與換頁邏輯
     if (currentFormCtx.currentPageIdx === 0) {
       let interimStatus = "";
       if (currentFormCtx.formId === "FORM_003") interimStatus = "手術中";
@@ -1735,7 +1753,6 @@
       renderFormCurrentPage();
     }
   }
-
   async function syncInterimStatus(statusStr) {
     const selectedExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
     if (!selectedExpId) return;
@@ -1759,45 +1776,53 @@
   // 精準必填檢查：僅 FORM_002_1, FORM_002_2, FORM_006 執行檢查，備註完全豁免
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
-    const needsValidation = ["FORM_002_1", "FORM_002_2", "FORM_006"].includes(formId);
+    const targetForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
+    
+    // 如果不是這三張表單，直接通過提交
+    if (!targetForms.includes(formId)) {
+      submitFormFinal();
+      return;
+    }
 
     const uncompletedFields = [];
-    const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
 
-    if (needsValidation) {
+    // 掃描整張表單的所有頁面欄位
+    currentFormCtx.pages.forEach(page => {
       page.fields.forEach(f => {
+        // 自動忽略「備註」、公式、標題區塊
         const isNoteField = f.label && (f.label.includes('備註') || f.label.toLowerCase().includes('note'));
         if (isNoteField || f.type === 'formula' || f.type === 'section') return; 
 
         if (f.type === 'text' || f.type === 'number') {
           const domEl = document.getElementById(f.id);
-          const domVal = domEl ? domEl.value : '';
-          const memVal = currentFormCtx.data[f.id];
-          
-          if ((!memVal || String(memVal).trim() === '') && (!domVal || String(domVal).trim() === '')) {
+          const val = domEl ? domEl.value : currentFormCtx.data[f.id];
+          if (!val || String(val).trim() === '') {
             uncompletedFields.push(f.label);
-          } else if (domVal) {
-            currentFormCtx.data[f.id] = domVal;
           }
-        } else if (f.type === 'radio' || f.type === 'outline_select') {
+        } 
+        else if (f.type === 'radio' || f.type === 'outline_select') {
           if (!currentFormCtx.data[f.id] && !currentFormCtx.data['outline_select_val']) {
+            uncompletedFields.push(f.label);
+          }
+        } 
+        else if (f.type === 'checkbox_group') {
+          if (!currentFormCtx.data[f.id] || currentFormCtx.data[f.id].length === 0) {
             uncompletedFields.push(f.label);
           }
         }
       });
-    }
+    });
 
+    // 發現有未填/未勾項目時跳出彈窗警告
     if (uncompletedFields.length > 0) {
       const listHtml = uncompletedFields.map(name => `<li style="margin-bottom:2px;">• ${name}</li>`).join('');
       const msgHtml = `
-        <div style="text-align:left; font-size:12px; margin-bottom:10px;">檢測到以下項目尚未填寫：</div>
+        <div style="text-align:left; font-size:12px; margin-bottom:10px;">檢測到以下項目尚未填寫或勾選：</div>
         <ul style="text-align:left; font-size:11px; color:var(--danger); padding-left:16px; max-height:120px; overflow-y:auto;">${listHtml}</ul>
       `;
 
       showCustomConfirm("填寫未完成警告", msgHtml, "返回填寫", "仍要提交", (confirmed) => {
-        if (confirmed) {
-          submitFormFinal();
-        }
+        if (confirmed) submitFormFinal();
       });
     } else {
       submitFormFinal();
