@@ -465,7 +465,7 @@
     "休息中": { bg: "#f0fdf4", text: "#10b981", border: "#86efac" },       
     "已死亡": { bg: "#0f172a", text: "#ffffff", border: "#0f172a" },       
     "訊號蒐集中": { bg: "#fffbeb", text: "#d97706", border: "#fde68a" },   
-    "訊號搜集完成": { bg: "#fefce8", text: "#ca8a04", border: "#fef08a" }, 
+    "訊號蒐集完成": { bg: "#fefce8", text: "#ca8a04", border: "#fef08a" }, // 🚀 統一用「蒐」
     "犧牲中": { bg: "#f3e8ff", text: "#7c3aed", border: "#d8b4fe" },       
     "實驗善後": { bg: "#faf5ff", text: "#a855f7", border: "#e9d5ff" },     
     "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },     
@@ -482,7 +482,7 @@
     "休息中": { ZH: "休息中", EN: "In Break" },
     "已死亡": { ZH: "已死亡", EN: "Deceased" },
     "訊號蒐集中": { ZH: "訊號蒐集中", EN: "Recording" },
-    "訊號搜集完成": { ZH: "訊號搜集完成", EN: "Signal Done" },
+    "訊號蒐集完成": { ZH: "訊號蒐集完成", EN: "Signal Done" },
     "犧牲中": { ZH: "犧牲中", EN: "Sacrificing" },
     "實驗善後": { ZH: "實驗善後", EN: "Cleaning" },
     "已完成": { ZH: "已完成", EN: "Completed" },
@@ -1452,7 +1452,7 @@
       targetFormId = "FORM_003";
     } else if (status === '休息中' || status === '訊號蒐集中') {
       targetFormId = "FORM_004";
-    } else if (status === '已死亡' || status === '訊號搜集完成' || status === '犧牲中') {
+    } else if (status === '已死亡' || status === '訊號蒐集完成' || status === '犧牲中') {
       // 🚀 關鍵修復：大鼠已死亡不熔斷，直接進入 FORM_005 進行犧牲與組織保存記錄
       targetFormId = "FORM_005";
     } else if (status === '實驗善後') {
@@ -2047,7 +2047,7 @@
     } else if (currentFormCtx.formId === "FORM_003") {
       targetStatus = currentFormCtx.selectedStatusTag || "休息中";
     } else if (currentFormCtx.formId === "FORM_004") {
-      targetStatus = "訊號搜集完成";
+      targetStatus = "訊號蒐集完成";
     } else if (currentFormCtx.formId === "FORM_005") {
       targetStatus = "實驗善後";
     } else if (currentFormCtx.formId === "FORM_006") {
