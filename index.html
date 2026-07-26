@@ -916,7 +916,6 @@
     }
   }
 
-  // 點擊今日卡片跳出詳細資訊 Modal
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -926,11 +925,18 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 擷取備註與附帶輸入資訊
+    // 排除系統控制欄位，精準抓取使用者填寫的備註 / 輸入內容
+    const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val'];
     let notesList = [];
+
     Object.keys(formData).forEach(k => {
-      if ((k.includes('notes') || k.includes('remark') || k.endsWith('_input')) && formData[k]) {
-        notesList.push(formData[k]);
+      // 只要不是系統 key，且值存在、不為空
+      if (!systemKeys.includes(k) && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
+        const valStr = String(formData[k]).trim();
+        // 避免重複放入跟「大綱」或「目的」完全相同的字串
+        if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name']) {
+          notesList.push(valStr);
+        }
       }
     });
 
@@ -959,7 +965,7 @@
           <div class="detail-value">${exp.date}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'備註內容':'Notes & Details'}</div>
+          <div class="detail-label">${isZH?'備註與詳細內容':'Notes & Details'}</div>
           <div class="detail-value" style="background:var(--bg-main); padding:8px; border-radius:6px; font-size:12px; white-space:pre-line;">${notesStr}</div>
         </div>
       </div>
@@ -1211,7 +1217,6 @@
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
-  // 自動帶入核心邏輯（完美解析 JSON 自動比對大綱、目的 Radio 以及備註欄位）
   function handleExpSelectChange(expId) {
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
@@ -1226,7 +1231,7 @@
 
         const savedData = existingRecord.formData || {};
         
-        // 完整拷貝舊 JSON 的所有欄位（自動還原備註等所有 input 狀態）
+        // 2. 完整拷貝舊 JSON 的所有動態欄位 (包含 field_14_4 等備註與輸入框)
         Object.keys(savedData).forEach(key => {
           currentFormCtx.data[key] = savedData[key];
         });
@@ -1268,7 +1273,7 @@
           });
         });
 
-        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、實驗大綱、目的與備註已自動填入。`);
+        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、大綱、目的與備註 (${savedData['field_14_4'] || '無'}) 已自動填入。`);
       }
     }
     renderFormCurrentPage();
