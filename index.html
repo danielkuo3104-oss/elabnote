@@ -1628,18 +1628,24 @@
 
     container.innerHTML = html;
 
-    // 🚀 關鍵：在 DOM 渲染後，統一為所有輸入框綁定事件，確保焦點不跑掉且即時響應計算
-    const dynamicInputs = container.querySelectorAll('.dynamic-input');
-    dynamicInputs.forEach(input => {
+    // 🚀 強制全面監聽當頁所有 input 與 textarea，絕不漏接
+  const allFormInputs = container.querySelectorAll('input, textarea');
+  allFormInputs.forEach(input => {
+    // 避免重複綁定
+    if (!input.dataset.bound) {
+      input.dataset.bound = 'true';
       input.addEventListener('input', (e) => {
-        const fId = e.target.getAttribute('data-field-id');
-        const fLabel = e.target.getAttribute('data-label');
+        const fId = e.target.getAttribute('id') || e.target.getAttribute('data-field-id');
+        const fLabel = e.target.getAttribute('data-label') || '';
+        
+        // 儲存數值
         saveFormFieldData(fId, e.target.value, fLabel);
         
-        // 即時驅動整頁所有公式重新計算
-        triggerRealtimeFormulaCalculationLocally();
+        // 強制立刻觸發公式計算
+        triggerRealtimeFormulaCalculation();
       });
-    });
+    }
+  });
 
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
