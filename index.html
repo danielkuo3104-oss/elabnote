@@ -1005,6 +1005,7 @@
           
           let parsedFormData = {};
 
+          // 1. 合併所有表單 JSON 資料供表單內部帶入歷史紀錄
           const jsonCols = [4, 6, 8, 10, 12];
           jsonCols.forEach(colIdx => {
             if (row[colIdx]) {
@@ -1021,8 +1022,23 @@
             }
           });
 
-          const outlineName = parsedFormData['outline_select_val'] || '';
-          const purposeName = parsedFormData['selected_purpose_name'] || '';
+          // 🚀 2. 關鍵修正：【卡片標題/大綱與目的】只專一讀取 E 欄 (FORM_001, index=4) 的原始設定！
+          let form001Data = {};
+          if (row[4]) {
+            let rawForm1Str = row[4].trim();
+            if (rawForm1Str.startsWith('"') && rawForm1Str.endsWith('"')) {
+              rawForm1Str = rawForm1Str.slice(1, -1).replace(/""/g, '"');
+            }
+            if (rawForm1Str.startsWith('{') && rawForm1Str.endsWith('}')) {
+              try {
+                form001Data = JSON.parse(rawForm1Str);
+              } catch (e) {}
+            }
+          }
+
+          // 嚴格只從 E 欄 (FORM_001) 提取大綱與目的名稱，並經過 cleanDisplayLabel 清理標籤
+          const outlineName = cleanDisplayLabel(form001Data['outline_select_val'] || '');
+          const purposeName = cleanDisplayLabel(form001Data['selected_purpose_name'] || '');
           
           let dynamicInfo = "";
           if (outlineName && purposeName) {
@@ -1039,7 +1055,7 @@
             date: date,
             user: user,
             status: status,
-            info: dynamicInfo,
+            info: dynamicInfo, // 永遠只呈現最純淨的 E 欄 (FORM_001) 專案資訊
             formData: parsedFormData,
             hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
           });
@@ -2163,16 +2179,30 @@
     }
   }
 
-  // 🚀 獨立全域定時器：每 60 秒背景靜默同步一次
+  // 🚀 手機與桌面雙重背景靜默同步機制
+  
+  // 1. 前台計時器（頁面開著時每 60 秒同步一次）
   if (window.bgRefreshTimer) clearInterval(window.bgRefreshTimer);
   window.bgRefreshTimer = setInterval(async () => {
-    // 當使用者正在填寫表單時，不干擾輸入，僅更新背景資料
+    checkAndSilentRefresh();
+  }, 60000);
+
+  // 2. 📱 手機專用喚醒監聽：從背景切回前台、螢幕解鎖時，瞬間無感更新！
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      console.log("📱 [手機切回前台] 觸發靜默同步...");
+      checkAndSilentRefresh();
+    }
+  });
+
+  // 靜默刷新執行器
+  async function checkAndSilentRefresh() {
+    // 若正在填寫表單，不打擾使用者輸入
     const isFormOpen = document.getElementById('formPageContainer').style.display === 'flex';
     if (!isFormOpen) {
-      console.log("⏱️ [每分鐘背景刷新] 向雲端同步資料中...");
       await refreshDashboard(false); // false 代表不安裝毛玻璃遮罩、不轉圈
     }
-  }, 60000);
+  }
   
 </script>
 </body>
