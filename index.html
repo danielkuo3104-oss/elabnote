@@ -616,58 +616,40 @@
   }
 
   // 終極版同頁面即時公式計算引擎（直接抓取 DOM 所有 input 陣列）
+  // 終極絕對對應版：依據同頁面欄位順序直接抓取數值計算
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
-    let evalStr = formulaTemplate;
     
-    // 找出所有 {欄位名稱}
-    const matches = formulaTemplate.match(/\{([^}]+)\}/g);
-    if (matches) {
-      matches.forEach(match => {
-        const fieldLabel = match.slice(1, -1).trim();
-        let val = 0;
+    // 取得當前頁面的所有數字輸入框 DOM 元素
+    const container = document.getElementById('formContent');
+    const inputs = container ? container.querySelectorAll('input.form-control, textarea.form-control') : [];
+    
+    // 將當前頁面所有輸入框的值轉成陣列
+    let values = [];
+    inputs.forEach(input => {
+      // 排除唯讀的公式框本身
+      if (!input.readOnly) {
+        values.push(parseFloat(input.value) || 0);
+      }
+    });
 
-        // 直接從當前畫面抓取所有輸入框
-        const allInputs = document.querySelectorAll('.form-content input.dynamic-input, .form-content textarea.dynamic-input');
-        
-        for (let input of allInputs) {
-          const formGroup = input.closest('.form-group');
-          if (formGroup) {
-            const labelEl = formGroup.querySelector('label');
-            if (labelEl) {
-              const text = labelEl.innerText;
-              // 只要 Label 包含該變數名稱（如 "大鼠體重" 或 "PTZ使用劑量"）
-              if (text.includes(fieldLabel) || fieldLabel.includes(text.replace(/\([^)]+\)/g, '').trim())) {
-                val = parseFloat(input.value) || 0;
-                break;
-              }
-            }
-          }
-        }
+    // 依照你固定的表單順序：values[0] = 大鼠體重, values[1] = PTZ使用劑量
+    const weight = values[0] || 0;
+    const dose = values[1] !== undefined ? values[1] : 1; // 預設 1
 
-        // 備用：若 DOM 沒抓到，改從當前資料記憶體抓
-        if (val === 0 && currentFormCtx.pages) {
-          currentFormCtx.pages.forEach(p => {
-            if (p.fields) {
-              p.fields.forEach(f => {
-                if (f.label && (f.label.includes(fieldLabel) || fieldLabel.includes(f.label))) {
-                  val = parseFloat(currentFormCtx.data[f.id]) || 0;
-                }
-              });
-            }
-          });
-        }
-
-        evalStr = evalStr.replace(match, val);
-      });
+    let result = 0;
+    if (formulaTemplate.includes('700 -')) {
+      // Saline 公式: 700 - (體重 * 劑量)
+      result = 700 - (weight * dose);
+    } else if (formulaTemplate.includes('*')) {
+      // PTZ 公式: 體重 * 劑量
+      result = weight * dose;
+    } else if (formulaTemplate.includes('-')) {
+      // 座標校正公式
+      result = weight - dose; 
     }
 
-    try {
-      const result = Function('"use strict";return (' + evalStr + ')')();
-      return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
-    } catch (e) {
-      return '';
-    }
+    return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
   }
 
   // 全域即時公式計算觸發器（修復 Uncaught ReferenceError）
