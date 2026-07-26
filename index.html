@@ -649,13 +649,27 @@
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
 
+    // 抓取畫面上前兩個輸入框的數值作為即時基準
+    const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
+    let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
+    let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
+
     page.fields.forEach(f => {
       if (f.type === "formula") {
-        const calculatedVal = evaluateFormula(f.formula);
+        let calculatedVal = 0;
+        
+        // 🚀 關鍵：即時運算時同步檢查欄位名稱，Saline 走 700 扣除，其餘走乘法
+        if (f.label.includes('Saline')) {
+          calculatedVal = 700 - (weight * dose);
+        } else {
+          calculatedVal = weight * dose;
+        }
+
         currentFormCtx.data[f.id] = calculatedVal;
+        
         const domEl = document.getElementById(f.id);
         if (domEl) {
-          domEl.value = calculatedVal;
+          domEl.value = isNaN(calculatedVal) ? '' : calculatedVal;
         }
       }
     });
