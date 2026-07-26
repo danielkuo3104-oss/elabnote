@@ -782,7 +782,111 @@
     }
   }
 
-  function parseCSV(text) { return text.split('\n').map(r => r.split(',')); }
+  // 1. 強健型 CSV 解析器（支援字串內包含逗號與雙引號的情形，解決 JSON 被剖半問題）
+function parseCSV(text) {
+  const lines = text.split(/\r\n|\n/);
+  const result = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    
+    const row = [];
+    let insideQuote = false;
+    let entry = '';
+    
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      const nextChar = line[j + 1];
+      
+      if (char === '"') {
+        if (insideQuote && nextChar === '"') {
+          entry += '"';
+          j++; // 跳過轉義的雙引號
+        } else {
+          insideQuote = !insideQuote; // 切換引號狀態
+        }
+      } else if (char === ',' && !insideQuote) {
+        row.push(entry);
+        entry = '';
+      } else {
+        entry += char;
+      }
+    }
+    row.push(entry);
+    result.push(row);
+  }
+  return result;
+}
+
+// 2. 升級資料中心讀取（完美解讀完整的 JSON 內容）
+async function fetchDataCenterFromSheet() {
+  try {
+    const res = await fetch(URL_DATA);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
+    
+    const records = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[0] || row[1]) {
+        const expId = row[0] ? row[0].trim() : '未編號';
+        const date = row[1] ? row[1].trim() : '';
+        const user = row[2] ? row[2].trim() : '';
+        const status = row[3] ? row[3].trim() : '';
+        
+        let parsedFormData = {};
+
+        // E欄(index 4)=FORM_001, G欄(6)=FORM_002, I欄(8)=FORM_003, K欄(10)=FORM_004, M欄(12)=FORM_005
+        const jsonCols = [4, 6, 8, 10, 12];
+        jsonCols.forEach(colIdx => {
+          if (row[colIdx]) {
+            let rawJsonStr = row[colIdx].trim();
+            // 去除 CSV 包裹的首尾雙引號
+            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
+              rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+            }
+            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+              try {
+                const jsonObj = JSON.parse(rawJsonStr);
+                parsedFormData = { ...parsedFormData, ...jsonObj };
+              } catch (e) {
+                console.warn(`[Row ${i} Col ${colIdx}] JSON 解析跳過:`, e);
+              }
+            }
+          }
+        });
+
+        // 從完整解析出來的 JSON 中取出大綱與目的
+        const outlineName = parsedFormData['outline_select_val'] || '';
+        const purposeName = parsedFormData['selected_purpose_name'] || '';
+        
+        let dynamicInfo = "";
+        if (outlineName && purposeName) {
+          dynamicInfo = `${outlineName} - ${purposeName}`;
+        } else if (outlineName || purposeName) {
+          dynamicInfo = outlineName || purposeName;
+        } else {
+          dynamicInfo = "實驗專案"; // 備用
+        }
+
+        const colV = row[21] ? row[21].trim() : '';
+        records.push({
+          expId: expId,
+          date: date,
+          user: user,
+          status: status,
+          info: dynamicInfo,
+          formData: parsedFormData,
+          hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
+        });
+      }
+    }
+    state.dataCenter = records;
+  } catch (err) {
+    console.error("同步資料中心失敗:", err);
+  }
+}
 
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
