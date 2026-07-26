@@ -1405,68 +1405,117 @@
     return `${outlineCode}${purposeCode}${yyMMdd}${checksum}`;
   }
 
-  // 重構提交邏輯：把表單數據包成 JSON，並歸類傳入主表單欄位 (如 FORM_001)
-  async function submitFormFinal() {
-    if (state.isSubmitting) return;
+  // 1. 修正提交邏輯：精準傳遞原始 formId (如 FORM_001_1)，並在前端就正規化為主欄位名稱 "FORM_001"
+async function submitFormFinal() {
+  if (state.isSubmitting) return;
 
-    state.isSubmitting = true;
-    const btnNext = document.getElementById('btnFormNext');
-    btnNext.disabled = true;
-    btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
+  state.isSubmitting = true;
+  const btnNext = document.getElementById('btnFormNext');
+  btnNext.disabled = true;
+  btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
 
-    let targetStatus = "已預約";
-    if (currentFormCtx.formId !== "FORM_001_2") {
-      targetStatus = currentFormCtx.selectedStatusTag || "已完成";
-    }
-
-    let submitDate = state.simulatedDate;
-    Object.keys(currentFormCtx.data).forEach(k => {
-      const v = currentFormCtx.data[k];
-      if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        submitDate = v;
-      }
-    });
-
-    let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || "";
-    let finalExpId = "";
-    let isUpdateMode = false;
-
-    if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
-      finalExpId = selectedExpSelectVal;
-      isUpdateMode = true;
-    } else {
-      finalExpId = generateExperimentId(submitDate);
-      isUpdateMode = false;
-    }
-
-    // 歸類主欄位編號 (例如 FORM_001_1 或 FORM_001_2 都轉成 FORM_001)
-    const rawFormId = currentFormCtx.formId;
-    const mainFormColumn = rawFormId.split('_').slice(0, 2).join('_'); // 取得 "FORM_001"
-
-    // 把完整的表單輸入資料包裝成 JSON 字串
-    const jsonPayloadString = JSON.stringify(currentFormCtx.data);
-
-    await syncToGoogleSheet("submitForm", {
-      expId: finalExpId,
-      date: submitDate,
-      user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
-      status: targetStatus,
-      formColumn: mainFormColumn,     // 👈 告知後端要存入哪個 FORM 欄位
-      formJson: jsonPayloadString,   // 👈 JSON 內容
-      isUpdate: isUpdateMode,
-      formData: currentFormCtx.data
-    });
-
-    state.isSubmitting = false;
-    closeFormPage();
-    await refreshDashboard(true);
-    
-    const msg = isUpdateMode 
-      ? `實驗編號 [${finalExpId}] 紀錄已更新！\n狀態：[${targetStatus}]` 
-      : `新實驗專案建立成功！\n實驗編號：[${finalExpId}]\n狀態：[${targetStatus}]`;
-
-    showCustomAlert("提交成功", msg);
+  let targetStatus = "已預約";
+  if (currentFormCtx.formId !== "FORM_001_2") {
+    targetStatus = currentFormCtx.selectedStatusTag || "已完成";
   }
+
+  let submitDate = state.simulatedDate;
+  Object.keys(currentFormCtx.data).forEach(k => {
+    const v = currentFormCtx.data[k];
+    if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      submitDate = v;
+    }
+  });
+
+  let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || "";
+  let finalExpId = "";
+  let isUpdateMode = false;
+
+  if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
+    finalExpId = selectedExpSelectVal;
+    isUpdateMode = true;
+  } else {
+    finalExpId = generateExperimentId(submitDate);
+    isUpdateMode = false;
+  }
+
+  // 取得基礎表單代碼 (FORM_001_1 / FORM_001_2 一律對應到 FORM_001)
+  const rawFormId = currentFormCtx.formId; 
+  const mainFormColName = rawFormId.startsWith("FORM_001") ? "FORM_001" : rawFormId.split('_').slice(0, 2).join('_');
+
+  const jsonPayloadString = JSON.stringify(currentFormCtx.data);
+
+  await syncToGoogleSheet("submitForm", {
+    expId: finalExpId,
+    date: submitDate,
+    user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
+    status: targetStatus,
+    formColumnName: mainFormColName, // 👈 明確指定目標 Header 欄位名稱 (如 "FORM_001")
+    formJson: jsonPayloadString,
+    isUpdate: isUpdateMode,
+    formData: currentFormCtx.data
+  });
+
+  state.isSubmitting = false;
+  closeFormPage();
+  await refreshDashboard(true);
+  
+  const msg = isUpdateMode 
+    ? `實驗編號 [${finalExpId}] 紀錄已更新！\n狀態：[${targetStatus}]` 
+    : `新實驗專案建立成功！\n實驗編號：[${finalExpId}]\n狀態：[${targetStatus}]`;
+
+  showCustomAlert("提交成功", msg);
+}
+
+// 2. 修正試算表資料讀取解析 (對應 correct 列：E=FORM_001, G=FORM_002, I=FORM_003, K=FORM_004, M=FORM_005)
+async function fetchDataCenterFromSheet() {
+  try {
+    const res = await fetch(URL_DATA);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
+    
+    const records = [];
+    for(let i = 1; i < rows.length; i++) {
+      if(rows[i][0] || rows[i][1]) {
+        const expId = rows[i][0] ? rows[i][0].trim() : '未編號';
+        const date = rows[i][1] ? rows[i][1].trim() : '';
+        const user = rows[i][2] ? rows[i][2].trim() : '';
+        const status = rows[i][3] ? rows[i][3].trim() : '';
+        
+        let parsedFormData = {};
+        // E欄(index 4)為 FORM_001，G欄(6)為 FORM_002，I欄(8)為 FORM_003...
+        const jsonColumns = [4, 6, 8, 10, 12]; 
+        jsonColumns.forEach(colIdx => {
+          const rawJsonStr = rows[i][colIdx] ? rows[i][colIdx].trim() : '';
+          if (rawJsonStr && rawJsonStr.startsWith('{')) {
+            try {
+              const jsonObj = JSON.parse(rawJsonStr);
+              parsedFormData = { ...parsedFormData, ...jsonObj };
+            } catch(e) {}
+          }
+        });
+
+        const outlineName = parsedFormData['outline_select_val'] || '';
+        const purposeName = parsedFormData['selected_purpose_name'] || '';
+        let dynamicInfo = (outlineName || purposeName) ? `${outlineName}${purposeName ? ' - ' + purposeName : ''}`.trim() : "實驗專案";
+
+        const colV = rows[i][21] ? rows[i][21].trim() : '';
+        records.push({
+          expId: expId,
+          date: date,
+          user: user,
+          status: status,
+          info: dynamicInfo,
+          formData: parsedFormData,
+          hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
+        });
+      }
+    }
+    state.dataCenter = records;
+  } catch(err) {
+    console.error("同步資料中心失敗:", err);
+  }
+}
 
   function showCustomAlert(title, message) {
     document.getElementById('modalTitle').innerText = title;
