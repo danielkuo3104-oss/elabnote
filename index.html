@@ -1024,7 +1024,7 @@
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value)">
+            <select class="form-control" onchange="currentFormCtx.data['exp_select_val'] = this.value; saveFormFieldData('${field.id}', this.value);">
               <option value="NEW_PROJECT">${newProjText}</option>
               ${activeProjects.map(p => {
                 const optText = `[${p.expId}] ${p.date} (${p.user})`;
@@ -1247,7 +1247,7 @@
     return `${outlineCode}${purposeCode}${yyMMdd}${checksum}`;
   }
 
-  // 核心：對齊平移後的欄位上傳（A:編號, B:日期, C:負責人, D:狀態, E:資訊）
+  // 核心：修復 A 欄編號覆蓋錯誤與格式校正
   async function submitFormFinal() {
     if (state.isSubmitting) return;
 
@@ -1261,28 +1261,27 @@
       targetStatus = currentFormCtx.selectedStatusTag || "已完成";
     }
 
-    // 正確抓取日期（優先抓取表單內的日曆值，沒有才拿系統日期）
+    // 正確抓取日期 (YYYY-MM-DD)
     let submitDate = state.simulatedDate;
     Object.keys(currentFormCtx.data).forEach(k => {
-      if (k.includes('field_') && typeof currentFormCtx.data[k] === 'string' && currentFormCtx.data[k].match(/^\d{4}-\d{2}-\d{2}$/)) {
-        submitDate = currentFormCtx.data[k];
+      const v = currentFormCtx.data[k];
+      if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        submitDate = v;
       }
     });
 
-    let selectedExpSelectVal = "";
-    Object.keys(currentFormCtx.data).forEach(k => {
-      if (currentFormCtx.data[k] && typeof currentFormCtx.data[k] === 'string' && currentFormCtx.data[k].length > 8 && currentFormCtx.data[k] !== 'NEW_PROJECT') {
-        selectedExpSelectVal = currentFormCtx.data[k];
-      }
-    });
+    // 精準抓取下拉選單中的「實驗編號/Exp. Number」 (欄位類型為 exp_select)
+    let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || "";
 
     let finalExpId = "";
     let isUpdateMode = false;
 
-    if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT') {
+    // 只有當選中的字串符合英數編號格式時，才判定為 Update
+    if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
       finalExpId = selectedExpSelectVal;
       isUpdateMode = true;
     } else {
+      // 否則一律生成強健的正規編號 (如 A01260726X7K)
       finalExpId = generateExperimentId(submitDate);
       isUpdateMode = false;
     }
@@ -1291,13 +1290,13 @@
     const purposeVal = currentFormCtx.data['selected_purpose_name'] || '';
     const dynamicInfo = (outlineVal || purposeVal) ? `${outlineVal} - ${purposeVal}`.trim() : "實驗專案";
 
-    // 正確平移寫入 Google 試算表（A欄: expId, B欄: date, C欄: user, D欄: status, E欄: info）
+    // 傳送平移後的標準 payload
     await syncToGoogleSheet("submitForm", {
-      expId: finalExpId,
-      date: submitDate,
-      user: state.currentUser ? state.currentUser.name : "Daniel",
-      status: targetStatus,
-      info: dynamicInfo,
+      expId: finalExpId,       // 👈 確保一定是正規編號 (如 A01260726X7K)
+      date: submitDate,        // B欄
+      user: state.currentUser ? state.currentUser.name : "Daniel", // C欄
+      status: targetStatus,    // D欄
+      info: dynamicInfo,       // E欄
       isUpdate: isUpdateMode,
       formData: currentFormCtx.data
     });
