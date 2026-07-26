@@ -180,7 +180,7 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
-    /* Modal - 修正跑版與比例對齊 */
+    /* Modal - 緊湊優化 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
@@ -196,11 +196,12 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
+    /* 緊湊對齊詳細資訊列表 */
     .detail-list { text-align: left; overflow-y: auto; max-height: 55vh; font-size: 12px; padding: 2px; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
-    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 30%; flex-shrink: 0; line-height: 1.3; }
-    .detail-value { font-weight: 600; color: var(--text-primary); width: 70%; text-align: right; line-height: 1.3; word-break: break-word; }
+    .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 32%; flex-shrink: 0; line-height: 1.3; }
+    .detail-value { font-weight: 600; color: var(--text-primary); width: 68%; text-align: right; line-height: 1.3; word-break: break-word; }
 
     .desc-alert {
       padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; line-height: 1.45;
@@ -457,6 +458,7 @@
   const URL_FORMS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=0&single=true&output=csv";
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
+  // 全域狀態淡色背景與邊框樣式 Mapping
   const STATUS_STYLES = {
     "已預約": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },       
     "準備中": { bg: "#f0f9ff", text: "#0284c7", border: "#bae6fd" },       
@@ -609,7 +611,7 @@
     }
   }
 
-  // 數學公式動態即時計算引擎
+  // 毫秒級全頁面變數即時數學公式計算引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     let evalStr = formulaTemplate;
@@ -619,15 +621,20 @@
       matches.forEach(match => {
         const fieldLabel = match.slice(1, -1).trim();
         let val = 0;
-        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-        if (page && page.fields) {
-          const targetField = page.fields.find(f => f.label && f.label.includes(fieldLabel));
-          if (targetField) {
-            // 優先從當前 DOM 抓取即時輸入值
-            const domEl = document.getElementById(targetField.id);
-            const domVal = domEl ? domEl.value : '';
-            val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[targetField.id]) || 0;
-          }
+        
+        // 全表單所有頁面動態搜尋該 Label 數值
+        if (currentFormCtx.pages) {
+          currentFormCtx.pages.forEach(p => {
+            if (p.fields) {
+              p.fields.forEach(f => {
+                if (f.label && (f.label === fieldLabel || f.label.includes(fieldLabel) || fieldLabel.includes(f.label))) {
+                  const domEl = document.getElementById(f.id);
+                  const domVal = domEl ? domEl.value : '';
+                  val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[f.id]) || 0;
+                }
+              });
+            }
+          });
         }
         evalStr = evalStr.replace(match, val);
       });
@@ -639,6 +646,23 @@
     } catch (e) {
       return '';
     }
+  }
+
+  // 打字時即時重新計算整頁所有 [formula] 欄位
+  function triggerRealtimeFormulaCalculation() {
+    const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+    if (!page || !page.fields) return;
+
+    page.fields.forEach(f => {
+      if (f.type === "formula") {
+        const calculatedVal = evaluateFormula(f.formula);
+        currentFormCtx.data[f.id] = calculatedVal;
+        const domEl = document.getElementById(f.id);
+        if (domEl) {
+          domEl.value = calculatedVal;
+        }
+      }
+    });
   }
 
   async function refreshDashboard(showBlur = true) {
@@ -1023,7 +1047,7 @@
     }
   }
 
-  // 詳細紀錄：精簡化（不印出冗長檢查表詳情，僅顯示核心資訊與備註）
+  // 精簡彈窗：只輸出乾淨的關鍵摘要與條列備註
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1334,7 +1358,7 @@
 
     if (status === '已預約') {
       openForm("FORM_001_1");
-    } else if (status === '準備中' || status === '實驗準備' || status === '已預約') {
+    } else if (status === '準備中' || status === '實驗準備') {
       const isControlGroup = targetExp.info.includes("控制組") || (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
       openForm(isControlGroup ? "FORM_002_2" : "FORM_002_1");
     } else if (status === '準備完成') {
@@ -1363,7 +1387,7 @@
     currentFormCtx.formId = formId;
     currentFormCtx.currentPageIdx = 0;
     currentFormCtx.isMakeup = isMakeup;
-    currentFormCtx.data = {}; // 每次打開表單初始化
+    currentFormCtx.data = {}; 
     currentFormCtx.selectedAction = null;
     currentFormCtx.selectedStatusTag = null;
 
@@ -1432,7 +1456,7 @@
         html += `
           <div class="form-group">
             <label>${field.label} (${field.unit || ''})</label>
-            <input type="text" class="form-control" readonly style="background:#e2e8f0; font-weight:700;" value="${calculatedVal}">
+            <input type="text" id="${field.id}" class="form-control" readonly style="background:#e2e8f0; font-weight:700;" value="${calculatedVal}">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -1508,13 +1532,12 @@
         `;
       }
       else if (field.type === "text" || field.type === "number") {
-        // 若標題包含「備註」或 "Notes"，強制改用 textarea 以支援多行分點 Enter 記錄
         const isNoteInput = field.label.includes('備註') || field.label.toLowerCase().includes('note');
         if (isNoteInput) {
           html += `
             <div class="form-group">
               <label>${field.label}</label>
-              <textarea id="${field.id}" class="form-control" rows="3" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}')">${val}</textarea>
+              <textarea id="${field.id}" class="form-control" rows="3" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}'); triggerRealtimeFormulaCalculation();">${val}</textarea>
               ${renderFieldDescription(field.desc)}
             </div>
           `;
@@ -1522,7 +1545,7 @@
           html += `
             <div class="form-group">
               <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-              <input type="${field.type}" id="${field.id}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}')">
+              <input type="${field.type}" id="${field.id}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}'); triggerRealtimeFormulaCalculation();">
               ${renderFieldDescription(field.desc)}
             </div>
           `;
@@ -1551,7 +1574,7 @@
               <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
               <label for="${optId}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<textarea class="form-control" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註')">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isSelected) ? `<textarea class="form-control" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註'); triggerRealtimeFormulaCalculation();">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1568,7 +1591,7 @@
               <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
               <label for="${field.id}_${idx}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<textarea class="form-control" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註')">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isChecked) ? `<textarea class="form-control" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註'); triggerRealtimeFormulaCalculation();">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1650,7 +1673,6 @@
   async function nextFormPage() {
     if (state.isSubmitting) return;
 
-    // 抓取當前頁面所有輸入框與公式數值
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     page.fields.forEach(f => {
       const el = document.getElementById(f.id);
@@ -1720,19 +1742,18 @@
     refreshDashboard(false);
   }
 
-  // 檢查表單必填：FORM_001 與備註系列全面豁免，僅檢查 FORM_002_1, FORM_002_2, FORM_006 等指定表單
+  // 嚴格規定：僅 FORM_002_1, FORM_002_2, FORM_006 執行必填檢查（FORM_001 與 備註 完全跳過）
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
-    // 豁免名單：FORM_001 系列與備註欄位不檢查
-    const isExemptForm = formId.startsWith("FORM_001");
+    const needsValidation = ["FORM_002_1", "FORM_002_2", "FORM_006"].includes(formId);
 
     const uncompletedFields = [];
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
 
-    if (!isExemptForm) {
+    if (needsValidation) {
       page.fields.forEach(f => {
         const isNoteField = f.label && (f.label.includes('備註') || f.label.toLowerCase().includes('note'));
-        if (isNoteField) return; // 備註不檢查
+        if (isNoteField || f.type === 'formula' || f.type === 'section') return; 
 
         if (f.type === 'text' || f.type === 'number') {
           const domEl = document.getElementById(f.id);
@@ -1857,7 +1878,6 @@
       formData: currentFormCtx.data
     });
 
-    // 提交後立即清除記憶選擇，避免下次誤導
     state.activeSelectedExpId = null;
     delete state.formDataCache[currentFormCtx.formId];
 
