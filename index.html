@@ -615,7 +615,7 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 終極防呆版動態公式解析引擎
+  // 終極完美匹配版動態公式解析引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     
@@ -626,9 +626,11 @@
     const matches = evalStr.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
-        const rawVarName = match.slice(1, -1).trim();
+        const rawVarName = match.slice(1, -1).trim(); // 例如 "PTZ使用劑量" 或 "大鼠體重 (g)"
+        const keyword = rawVarName.split('(')[0].trim(); // 抓取核心關鍵字（例如 "PTZ使用劑量" 或 "大鼠體重"）
         let val = 0;
 
+        // 從當前畫面上所有的動態輸入框尋找對應數值
         const allInputs = document.querySelectorAll('#formContent input.dynamic-input, #formContent input.form-control, #formContent textarea.dynamic-input');
         for (let input of allInputs) {
           const group = input.closest('.form-group');
@@ -636,7 +638,9 @@
             const lbl = group.querySelector('label');
             if (lbl) {
               const lblText = cleanDisplayLabel(lbl.innerText);
-              if (lblText.includes(rawVarName) || rawVarName.includes(lblText) || lblText.replace(/\([^)]+\)/g, '').trim() === rawVarName.replace(/\([^)]+\)/g, '').trim()) {
+              
+              // 🚀 寬鬆模糊比對：只要畫面的 Label 包含公式的變數關鍵字（例如包含 "PTZ使用劑量" 或 "大鼠體重"）
+              if (lblText.includes(keyword) || keyword.includes(lblText)) {
                 if (input.value !== '') {
                   val = parseFloat(input.value) || 0;
                   break;
@@ -646,12 +650,13 @@
           }
         }
 
+        // 若 DOM 沒抓到，改從記憶體 currentFormCtx.data 尋找
         if (val === 0 && currentFormCtx.pages) {
           currentFormCtx.pages.forEach(p => {
             if (p.fields) {
               p.fields.forEach(f => {
                 const cleanLabel = cleanDisplayLabel(f.label);
-                if (cleanLabel && (cleanLabel.includes(rawVarName) || rawVarName.includes(cleanLabel))) {
+                if (cleanLabel && (cleanLabel.includes(keyword) || keyword.includes(cleanLabel))) {
                   val = parseFloat(currentFormCtx.data[f.id]) || 0;
                 }
               });
@@ -666,10 +671,9 @@
     }
 
     try {
-      // 🚀 清洗所有可能造成語法崩潰的無效括號與符號
+      // 🚀 防呆清洗：確保無效括號轉為 (0)
       evalStr = evalStr.replace(/\(\s*\)/g, '(0)');
       
-      // 如果算式裡面還留有文字或奇怪符號，直接攔截不執行
       if (/[a-zA-Z一-龥]/.test(evalStr)) {
         return '';
       }
@@ -677,7 +681,6 @@
       const result = Function('"use strict";return (' + evalStr + ')')();
       return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
     } catch (e) {
-      // 就算公式語法暫時不完整，也只安靜回傳空白，絕不噴錯
       return '';
     }
   }
