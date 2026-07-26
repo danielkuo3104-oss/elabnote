@@ -17,9 +17,7 @@
       --primary-light: #f0f9ff;
       
       --success: #059669;
-      --success-bg: #ecfdf5;
       --warning: #d97706;
-      --warning-bg: #fffbeb;
       --danger: #dc2626;
       --gray-badge: #64748b;
       
@@ -47,7 +45,7 @@
       position: relative; overflow: hidden;
     }
 
-    /* Header Styling */
+    /* Header */
     .header {
       background: var(--card-bg); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border-color); z-index: 10; padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
@@ -59,7 +57,7 @@
     
     .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .header-btn-group { display: flex; gap: 6px; align-items: center; }
-    .user-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; }
+    .user-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; border: 1px solid var(--border-color); cursor: pointer; max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
     
     .btn-refresh-touch {
@@ -73,49 +71,42 @@
 
     .main-content { padding: 16px; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 40px; }
 
-    /* 戰情室 / 手術室監控風格 Dashboard Card */
     .dashboard-card { 
       background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); 
       padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); 
     }
     
-    .monitor-header {
-      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
-    }
-    .monitor-title {
-      font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .pulse-dot {
-      width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; display: inline-block;
-      box-shadow: 0 0 0 rgba(16, 185, 129, 0.4); animation: pulse 1.8s infinite;
-    }
+    .monitor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .monitor-title { font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+    .pulse-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 rgba(16, 185, 129, 0.4); animation: pulse 1.8s infinite; }
     @keyframes pulse {
       0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
       70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
       100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
+    /* 今日進行中項目卡片（保持文字完整） */
     .active-exp-card {
       background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md);
-      padding: 12px 14px; margin-bottom: 10px; position: relative; transition: all 0.2s ease;
+      padding: 12px 14px; margin-bottom: 10px; position: relative;
     }
     .active-exp-card:last-child { margin-bottom: 0; }
     
-    .status-badge-lg {
-      display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
-      letter-spacing: 0.3px; border: 1px solid transparent;
-    }
+    .status-badge-lg { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; border: 1px solid transparent; flex-shrink: 0; }
     .status-badge-lg.reserved { background: #f1f5f9; color: var(--gray-badge); border-color: #cbd5e1; }
     .status-badge-lg.active { background: #fef3c7; color: #b45309; border-color: #fde68a; }
     .status-badge-lg.completed { background: #dcfce7; color: #15803d; border-color: #86efac; }
 
-    .exp-title-main { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 6px 0 4px 0; line-height: 1.35; }
-    .exp-meta-bar { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
-    .exp-code-tag { font-family: ui-monospace, monospace; color: var(--text-muted); font-size: 10px; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color); }
+    /* 今日實驗：必須完整顯示 */
+    .exp-title-main { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 8px 0 6px 0; line-height: 1.4; word-break: break-word; }
+    .exp-meta-bar { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); gap: 8px; flex-wrap: wrap; }
+    .exp-code-tag { font-family: ui-monospace, monospace; color: var(--text-muted); font-size: 11px; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color); word-break: break-all; }
 
-    .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
-    .schedule-tag { border-radius: 4px; padding: 2px 8px; font-size: 11px; margin-right: 8px; font-weight: 600; font-family: ui-monospace, monospace; }
+    /* 未來排程視覺修正（拆開日期與負責人，防破版） */
+    .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary); cursor: pointer; gap: 8px; width: 100%; }
+    .schedule-date-tag { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace; flex-shrink: 0; }
+    .schedule-info { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--text-primary); }
+    .schedule-user-tag { background: #f1f5f9; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; flex-shrink: 0; max-width: 70px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
     .btn-action {
@@ -130,16 +121,21 @@
     .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
     .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
-    /* 時間軸優化：以「日期」為主核心 */
+    /* 時間軸歷史紀錄（日期優先，長標題截斷防破版） */
     .timeline-container { position: relative; padding-left: 20px; margin-top: 16px; margin-bottom: 20px; }
     .timeline-line { position: absolute; left: 5px; top: 12px; bottom: 8px; width: 2px; background: var(--border-color); }
-    .timeline-item { position: relative; margin-bottom: 14px; cursor: pointer; }
+    .timeline-item { position: relative; margin-bottom: 12px; cursor: pointer; }
     .timeline-node { position: absolute; left: -19px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 2px var(--primary); }
-    .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); }
+    .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); overflow: hidden; }
     .timeline-card.today { border-color: #93c5fd; background: #f0f9ff; }
 
-    .timeline-date-head { font-size: 14px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; }
-    .timeline-exp-id { font-size: 10px; font-family: ui-monospace, monospace; color: var(--text-muted); font-weight: 500; }
+    .timeline-date-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .timeline-date-title { font-size: 14px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .timeline-user-badge { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+    .timeline-status-group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    
+    .timeline-info-text { font-size: 13px; margin-top: 6px; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .timeline-exp-id { font-size: 10px; font-family: ui-monospace, monospace; color: var(--text-muted); font-weight: 500; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .section-divider {
       font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
@@ -147,13 +143,12 @@
     }
     .section-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-color); }
 
-    .upload-status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-left: 6px; }
+    .upload-status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; flex-shrink: 0; }
     .upload-status-tag.uploaded { background: #dcfce7; color: #15803d; }
     .upload-status-tag.pending { background: #fee2e2; color: #b91c1c; }
 
     .copyright-notice { text-align: center; font-size: 11px; color: var(--text-muted); padding: 16px 0; font-weight: 500; font-family: ui-monospace, monospace; }
 
-    /* 霧面毛玻璃載入遮罩 */
     .blur-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -242,7 +237,7 @@
     }
     .option-card.selected { background: var(--primary-light); border-color: var(--border-focus); }
     .option-card input[type="radio"], .option-card input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); }
-    .option-card label { font-size: 13px; font-weight: 500; color: var(--text-primary); cursor: pointer; flex: 1; }
+    .option-card label { font-size: 13px; font-weight: 500; color: var(--text-primary); cursor: pointer; flex: 1; word-break: break-word; }
 
     .field-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
     .section-header { font-size: 12px; font-weight: 700; color: var(--primary); background: var(--primary-light); padding: 6px 10px; border-radius: 4px; margin: 16px 0 10px 0; }
@@ -363,11 +358,10 @@
   <!-- 3. 主頁面內容 -->
   <div class="main-content">
     
-    <!-- 戰情室監控風格 Dashboard Card -->
     <div class="dashboard-card" id="dashboardCard">
       <div class="monitor-header">
         <div class="monitor-title" id="txtTodayHeader">
-          <span class="pulse-dot"></span> 今日進行中項目 / Active Experiments
+          <span class="pulse-dot"></span> 今日進行中項目 / ACTIVE EXPERIMENTS
         </div>
       </div>
       
@@ -380,7 +374,7 @@
       <div id="scheduleSection" onclick="openScheduleCenter()">
         <div id="txtScheduleHeader" style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">未來排程 (最靠近兩筆)</div>
         <div id="scheduleList">
-          <div class="schedule-item"><span class="schedule-tag">--</span><span>載入中...</span></div>
+          <div class="schedule-item"><span class="schedule-date-tag">--</span><span class="schedule-info">載入中...</span></div>
         </div>
       </div>
     </div>
@@ -392,7 +386,7 @@
       <button id="btnMakeupExp" class="btn-action btn-makeup" onclick="openForm('FORM_001_1', true)">實驗補登</button>
     </div>
 
-    <div class="section-divider">實驗歷史紀錄 / History Log</div>
+    <div class="section-divider">實驗歷史紀錄 / HISTORY LOG</div>
 
     <div id="timelineContainer" class="timeline-container" onclick="openRecordCenter()">
       <div class="timeline-line"></div>
@@ -401,7 +395,7 @@
     <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.1</div>
   </div>
 
-  <!-- FAB 懸浮選單 -->
+  <!-- FAB 選單 -->
   <div id="fabMenuOverlay" class="fab-menu-overlay" onclick="closeFabMenu()">
     <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
     <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄中心</div>
@@ -473,7 +467,6 @@
     await refreshDashboard(false);
   });
 
-  // 刷新面板（含按鈕熄滅與全螢幕霧面遮罩）
   async function refreshDashboard(showBlur = true) {
     const btnRef = document.getElementById('btnRefresh');
     const blurOverlay = document.getElementById('blurOverlay');
@@ -502,7 +495,6 @@
     }
   }
 
-  // 表單動態解析 Engine
   async function fetchAndParseFormsFromSheet() {
     try {
       const res = await fetch(URL_FORMS);
@@ -707,7 +699,6 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  // 讀取資料中心
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -719,11 +710,11 @@
         if(rows[i][0] || rows[i][1]) {
           const colV = rows[i][21] ? rows[i][21].trim() : '';
           records.push({
-            expId: rows[i][0] ? rows[i][0].trim() : '未編號', // A欄: 實驗編號
-            date: rows[i][1] ? rows[i][1].trim() : '',       // B欄: 實驗日期
-            user: rows[i][2] ? rows[i][2].trim() : '',       // C欄: 負責人
-            status: rows[i][3] ? rows[i][3].trim() : '',     // D欄: 狀態
-            info: rows[i][4] ? rows[i][4].trim() : '',       // E欄: 實驗資訊
+            expId: rows[i][0] ? rows[i][0].trim() : '未編號',
+            date: rows[i][1] ? rows[i][1].trim() : '',
+            user: rows[i][2] ? rows[i][2].trim() : '',
+            status: rows[i][3] ? rows[i][3].trim() : '',
+            info: rows[i][4] ? rows[i][4].trim() : '',
             hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
           });
         }
@@ -745,7 +736,6 @@
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
-  // 渲染 Monitor 版面 (手術室/戰情室風格優化)
   function renderMainDashboardUI() {
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束');
     const todayListContainer = document.getElementById('todayActiveExpList');
@@ -774,6 +764,7 @@
       todayListContainer.innerHTML = `<div style="font-size:13px; color:var(--text-muted); padding:10px 0; text-align:center;">${state.currentLang==='ZH'?'目前無進行中實驗':'No active experiments'}</div>`;
     }
 
+    // 未來排程渲染（修正版面：拆開日期與負責人，防破版）
     const futureExps = state.dataCenter
       .filter(d => new Date(d.date) > new Date(state.simulatedDate))
       .sort((a,b) => new Date(a.date) - new Date(b.date))
@@ -784,10 +775,12 @@
       scheduleContainer.innerHTML = futureExps.map(f => {
         const userObj = state.membersList.find(m => m.name === f.user);
         const userColor = userObj ? userObj.color : '#f1f5f9';
+        const displayDate = f.date ? f.date.slice(5) : '--';
         return `
           <div class="schedule-item">
-            <span class="schedule-tag" style="background:${userColor}; color:var(--text-primary);">${f.date.slice(5)} ${f.user}</span>
-            <span>${f.info || '預約排程'} <small style="color:var(--text-muted);">(${f.expId})</small></span>
+            <span class="schedule-date-tag">${displayDate}</span>
+            <span class="schedule-info" title="${f.info}">${f.info || '預約排程'}</span>
+            <span class="schedule-user-tag" style="background:${userColor};">${f.user}</span>
           </div>
         `;
       }).join('');
@@ -796,7 +789,7 @@
     }
   }
 
-  // 渲染歷史紀錄：重點改為「日期」優先，編號縮小為定位標記
+  // 歷史紀錄渲染（防破版修正：截斷過長字串）
   function renderTimeline() {
     const container = document.getElementById('timelineContainer');
     let html = `<div class="timeline-line"></div>`;
@@ -826,14 +819,17 @@
           <div class="timeline-node" style="background:${statusColor}"></div>
           <div class="timeline-card ${isToday ? 'today' : ''}">
             <div class="timeline-date-head">
-              <span>${item.date} <span style="background:${userColor}; font-size:11px; font-weight:600; border-radius:4px; padding:2px 6px; margin-left:4px;">${item.user}</span></span>
-              <div>
+              <div class="timeline-date-title">
+                <span>${item.date}</span>
+                <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
+              </div>
+              <div class="timeline-status-group">
                 <span style="color:${statusColor}; font-size:11px; font-weight:700;">${item.status}</span>
                 ${uploadTagHtml}
               </div>
             </div>
-            <div style="font-size:13px; margin-top:6px; color:var(--text-primary); font-weight:600;">${item.info || '實驗專案'}</div>
-            <div class="timeline-exp-id" style="margin-top:4px;">編號: ${item.expId}</div>
+            <div class="timeline-info-text" title="${item.info}">${item.info || '實驗專案'}</div>
+            <div class="timeline-exp-id">編號: ${item.expId}</div>
           </div>
         </div>
       `;
@@ -864,19 +860,13 @@
     const inputPwd = document.getElementById('txtLoginPwd').value.trim();
     const user = state.membersList.find(m => m.name === selectedName);
 
-    if (!user) {
-      showCustomAlert("提示", "請選擇會員帳號"); return;
-    }
-
-    if (user.password && inputPwd !== user.password) {
-      showCustomAlert("登入失敗", "識別密碼錯誤，請重新輸入！"); return;
-    }
+    if (!user) { showCustomAlert("提示", "請選擇會員帳號"); return; }
+    if (user.password && inputPwd !== user.password) { showCustomAlert("登入失敗", "識別密碼錯誤，請重新輸入！"); return; }
 
     state.currentUser = user;
     state.isGuest = false;
     state.currentLang = user.lang || "ZH";
     document.getElementById('authPage').style.display = 'none';
-    
     document.getElementById('fabBtn').style.display = 'flex';
 
     const badge = document.getElementById('userBadge');
@@ -893,7 +883,6 @@
     state.isGuest = true;
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('userBadge').innerText = "訪客";
-    
     document.getElementById('fabBtn').style.display = 'flex';
 
     applyLanguage();
@@ -910,7 +899,6 @@
         document.getElementById('txtLoginPwd').value = "";
         document.getElementById('userBadge').innerText = "未登入";
         document.getElementById('authPage').style.display = 'flex';
-        
         document.getElementById('fabBtn').style.display = 'none';
         refreshDashboard(false);
       }
@@ -969,7 +957,7 @@
     document.getElementById('menuProfile').innerText = isZH ? "更改個人資訊" : "Edit Profile";
     document.getElementById('menuLogout').innerText = isZH ? "登出系統" : "Logout";
     document.getElementById('txtScheduleHeader').innerText = isZH ? "未來排程 (最靠近兩筆)" : "Upcoming Schedule (Next 2)";
-    document.getElementById('txtTodayHeader').innerHTML = isZH ? '<span class="pulse-dot"></span> 今日進行中項目 / Active Experiments' : '<span class="pulse-dot"></span> Active Experiments Today';
+    document.getElementById('txtTodayHeader').innerHTML = isZH ? '<span class="pulse-dot"></span> 今日進行中項目 / ACTIVE EXPERIMENTS' : '<span class="pulse-dot"></span> ACTIVE EXPERIMENTS TODAY';
   }
 
   function updateDashboardButtons() {
@@ -1036,7 +1024,7 @@
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
-  // 選擇已存在實驗時，自動帶入歷史資料邏輯
+  // 自動帶入核心邏輯（完善大綱 + 目的 Radio 的自動帶入）
   function handleExpSelectChange(expId) {
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
@@ -1044,13 +1032,40 @@
     if (expId && expId !== 'NEW_PROJECT') {
       const existingRecord = state.dataCenter.find(d => d.expId === expId);
       if (existingRecord) {
-        if (existingRecord.user) saveFormFieldData('user_select_val', existingRecord.user);
-        if (existingRecord.info) {
-          const parts = existingRecord.info.split('-');
-          if (parts.length > 0) currentFormCtx.data['outline_select_val'] = parts[0].trim();
-          if (parts.length > 1) currentFormCtx.data['selected_purpose_name'] = parts[1].trim();
+        // 1. 自動帶入負責人
+        if (existingRecord.user) {
+          saveFormFieldData('user_select_val', existingRecord.user);
         }
-        showCustomAlert("資料已自動帶入", `已找到 [${expId}] 的歷史紀錄，並為您自動填入相關資料！`);
+
+        // 2. 自動剖析大綱與目的 (格式如 "Focused Ultrasound Brain Project - FUS刺激 / FUS stimulation")
+        if (existingRecord.info) {
+          const parts = existingRecord.info.split(' - ');
+          const outlineName = parts[0] ? parts[0].trim() : '';
+          const purposeName = parts[1] ? parts[1].trim() : (parts[0] || '').trim();
+
+          // 自動選擇大綱
+          currentFormCtx.data['outline_select_val'] = outlineName;
+          
+          // 自動搜尋並匹配實驗目的 (Radio 欄位)
+          currentFormCtx.pages.forEach(page => {
+            page.fields.forEach(field => {
+              if (field.type === 'radio' && field.options) {
+                field.options.forEach((opt, idx) => {
+                  const optName = typeof opt === 'string' ? opt : opt.name;
+                  if (optName === purposeName || optName.includes(purposeName) || purposeName.includes(optName)) {
+                    // 自動登記 Radio 的選取資料
+                    currentFormCtx.data[field.id] = optName;
+                    currentFormCtx.data['selected_purpose_name'] = optName;
+                    currentFormCtx.data['purpose_code'] = String(idx + 1).padStart(2, '0');
+                    if (opt.action) currentFormCtx.selectedAction = opt.action;
+                    if (opt.statusTag) currentFormCtx.selectedStatusTag = opt.statusTag;
+                  }
+                });
+              }
+            });
+          });
+        }
+        showCustomAlert("資料已自動帶入", `已找到 [${expId}] 的歷史紀錄！\n負責人、實驗大綱與目的已為您自動填入。`);
       }
     }
     renderFormCurrentPage();
@@ -1085,8 +1100,9 @@
       else if (field.type === "exp_select") {
         const isZH = state.currentLang === 'ZH';
         const newProjText = isZH ? "➕ 新增實驗專案" : "➕ New Experiment Project";
-        const isTodayLogin = currentFormCtx.formId === "FORM_001_1";
+        const isTodayLogin = currentFormCtx.formId === "FORM_001_1"; // 今日登錄
         
+        // 抓取符合條件的實驗
         const activeProjects = state.dataCenter.filter(d => {
           const notFinished = d.status !== '實驗結束' && d.status !== 'Completed';
           return isTodayLogin ? (d.date === state.simulatedDate && notFinished) : notFinished;
@@ -1096,7 +1112,9 @@
           <div class="form-group">
             <label>${field.label}</label>
             <select class="form-control" onchange="handleExpSelectChange(this.value)">
-              <option value="NEW_PROJECT">${newProjText}</option>
+              <!-- 如果是今日登錄，強制隱藏『新增實驗專案』選項 -->
+              ${!isTodayLogin ? `<option value="NEW_PROJECT">${newProjText}</option>` : ''}
+              ${activeProjects.length === 0 ? `<option value="">-- ${isZH?'無符合之實驗':'No Active Experiment'} --</option>` : ''}
               ${activeProjects.map(p => {
                 const optText = `[${p.expId}] ${p.date} (${p.user})`;
                 const selected = val === p.expId ? 'selected' : '';
