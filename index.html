@@ -615,8 +615,8 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  function evaluateFormula(formulaTemplate, fieldLabel = '') {
-    // 1. 抓取畫面上前兩個輸入框的數值：大鼠體重、PTZ使用劑量
+  function evaluateFormula() {
+    // 1. 直接抓取畫面上所有的輸入框
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
     let weight = 0;
     let dose = 1;
@@ -626,21 +626,19 @@
       dose = parseFloat(allInputs[1].value) || 1;
     }
 
+    // 2. 找出當前是哪一個公式欄位正在被渲染（透過頁面上所有公式框的順序）
+    const formulaInputs = document.querySelectorAll('#formContent .formula-field');
+    let currentIdx = 0;
+    
+    formulaInputs.forEach((el, idx) => {
+      // 藉由判斷當前正在處理哪一個元素來決定索引
+    });
+
     try {
-      let result = 0;
-      
-      // 2. 透過欄位標籤或公式內容進行精準分流計算
-      const labelStr = fieldLabel ? fieldLabel.toString() : '';
-      const templateStr = formulaTemplate ? formulaTemplate.toString() : '';
-      
-      if (labelStr.includes('Saline') || templateStr.includes('700') || templateStr.toLowerCase().includes('saline')) {
-        // Saline 需要量：700 扣掉 (體重 * 劑量)
-        result = 700 - (weight * dose);
-      } else {
-        // PTZ 需要量：體重 * 劑量
-        result = weight * dose;
-      }
-      
+      // 3. 我們直接用當前正在運算的 DOM 元素文字來判定
+      // 這裡直接用最簡單的：如果是第 1 個公式框就是乘法，第 2 個就是 700 扣除
+      // 由於我們無法直接得知當前 index，我們直接改寫渲染函式
+      let result = weight * dose;
       return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
     } catch (e) {
       return '';
@@ -1470,9 +1468,20 @@
       }
 
       if (field.type === "formula") {
-        // 🚀 關鍵：把 field.label 傳進去，讓公式能精準辨識現在算的是哪一格
-        const calculatedVal = evaluateFormula(field.formula, field.label);
+        let calculatedVal = 0;
+        const allInputs = container.querySelectorAll('input.form-control, input[type="number"]');
+        let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
+        let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
+
+        // 🚀 直接用欄位名稱判斷：如果是 Saline 就用 700 扣，否則算乘法！
+        if (field.label.includes('Saline')) {
+          calculatedVal = 700 - (weight * dose);
+        } else {
+          calculatedVal = weight * dose;
+        }
+
         currentFormCtx.data[field.id] = calculatedVal;
+        
         html += `
           <div class="form-group">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
