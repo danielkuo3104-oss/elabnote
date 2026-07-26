@@ -1418,6 +1418,7 @@
   }
 
   function startExpFormByStatus(targetExp) {
+    if (!targetExp) return;
     const status = targetExp.status || '已預約';
 
     if (status === '已死亡') {
@@ -1425,28 +1426,35 @@
       return;
     }
 
+    let targetFormId = "FORM_001_1";
+
+    // 🚀 精準狀態對應表單邏輯
     if (status === '已預約') {
-      openForm("FORM_001_1");
+      targetFormId = "FORM_001_1";
     } else if (status === '準備中' || status === '實驗準備') {
-      const isControlGroup = targetExp.info.includes("控制組") || (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
-      openForm(isControlGroup ? "FORM_002_2" : "FORM_002_1");
-    } else if (status === '準備完成') {
-      openForm("FORM_003");
-    } else if (status === '休息中') {
-      openForm("FORM_004");
-    } else if (status === '訊號蒐集中' || status === '訊號搜集完成') {
-      openForm("FORM_005");
-    } else if (status === '犧牲中' || status === '實驗善後') {
-      openForm("FORM_006");
+      const isControlGroup = targetExp.info.includes("控制組") || 
+        (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
+      targetFormId = isControlGroup ? "FORM_002_2" : "FORM_002_1";
+    } else if (status === '準備完成' || status === '手術中') {
+      // 關鍵修復：狀態為「準備完成」或「手術中」時，都應該調用 FORM_003
+      targetFormId = "FORM_003";
+    } else if (status === '休息中' || status === '訊號蒐集中') {
+      targetFormId = "FORM_004";
+    } else if (status === '訊號搜集完成' || status === '犧牲中') {
+      targetFormId = "FORM_005";
+    } else if (status === '實驗善後') {
+      targetFormId = "FORM_006";
     } else {
-      openForm("FORM_001_1");
+      targetFormId = "FORM_001_1";
     }
+
+    // 將該筆實驗既有的 formData 帶入 openForm，自動接續填寫與預設值
+    openForm(targetFormId, false, targetExp.formData || null);
 
     setTimeout(() => {
       handleExpSelectChange(targetExp.expId);
     }, 100);
   }
-
   function handleTomorrowPrep() {
     if(state.isGuest) return;
     openForm("FORM_002_1");
