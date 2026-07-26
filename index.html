@@ -18,7 +18,6 @@
       
       --success: #059669;
       --warning: #d97706;
-      --warning-bg: #fffbeb;
       --danger: #dc2626;
       --gray-badge: #64748b;
       
@@ -94,14 +93,12 @@
     .active-exp-card:active { transform: scale(0.98); background: #f1f5f9; }
     .active-exp-card:last-child { margin-bottom: 0; }
     
+    /* 動態專屬顏色狀態標籤 */
     .status-badge-lg { 
-      display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 6px; 
-      font-size: 11px; font-weight: 800; border: 1px solid transparent; flex-shrink: 0; min-width: 70px; text-align: center;
-      white-space: nowrap;
+      display: inline-flex; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 6px; 
+      font-size: 11px; font-weight: 800; border: 1px solid transparent; flex-shrink: 0; text-align: center;
+      white-space: nowrap; color: #ffffff;
     }
-    .status-badge-lg.reserved { background: #f1f5f9; color: var(--gray-badge); border-color: #cbd5e1; }
-    .status-badge-lg.active { background: #fef3c7; color: #b45309; border-color: #fde68a; }
-    .status-badge-lg.completed { background: #dcfce7; color: #15803d; border-color: #86efac; }
 
     .exp-title-main { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 8px 0 6px 0; line-height: 1.4; word-break: break-word; }
     .exp-meta-bar { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); gap: 8px; flex-wrap: wrap; }
@@ -184,7 +181,7 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
-    /* Modal - 優化緊湊排版 */
+    /* Modal */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
@@ -207,7 +204,7 @@
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 35%; flex-shrink: 0; line-height: 1.3; }
     .detail-value { font-weight: 600; color: var(--text-primary); width: 65%; text-align: right; line-height: 1.3; word-break: break-word; }
 
-    /* 動態說明提示區塊 [info] 與 [warning] */
+    /* 動態說明提示區塊 */
     .desc-alert {
       padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; line-height: 1.45;
       margin: 6px 0 10px 0; border: 1px solid transparent; word-break: break-word;
@@ -446,7 +443,7 @@
   <div id="customModalBackdrop" class="custom-modal-backdrop">
     <div class="custom-modal">
       <h3 id="modalTitle">系統提示</h3>
-      <p id="modalMessage">提示內容</p>
+      <div id="modalMessage">提示內容</div>
       <div id="modalBtnGroup" class="custom-modal-btns">
         <button id="btnModalConfirm" class="modal-btn modal-btn-confirm" onclick="closeCustomModal(true)">確定</button>
       </div>
@@ -462,14 +459,35 @@
   const URL_FORMS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=0&single=true&output=csv";
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
+  // 全域狀態顏色定義 Mapping
+  const STATUS_COLORS = {
+    "已預約": "#64748b",      // 灰
+    "準備中": "#0284c7",      // 藍
+    "準備完成": "#059669",    // 綠
+    "手術中": "#dc2626",      // 紅
+    "休息中": "#10b981",      // 淡綠
+    "已死亡": "#0f172a",      // 黑
+    "訊號蒐集中": "#d97706",   // 橘
+    "訊號搜集完成": "#ca8a04", // 黃
+    "犧牲中": "#7c3aed",      // 紫
+    "實驗善後": "#a855f7",    // 淺紫
+    "實驗完成": "#334155",    // 深灰
+    "已完成": "#334155",      // 深灰
+    "實驗結束": "#334155",    // 深灰
+    "其他": "#64748b"         // 灰
+  };
+
   const STATUS_TRANS = {
     "已預約": { ZH: "已預約", EN: "Reserved" },
-    "實驗開始": { ZH: "實驗開始", EN: "Started" },
+    "準備中": { ZH: "準備中", EN: "Preparing" },
     "準備完成": { ZH: "準備完成", EN: "Prepared" },
-    "進行中": { ZH: "進行中", EN: "In Progress" },
+    "手術中": { ZH: "手術中", EN: "Surgery" },
     "休息中": { ZH: "休息中", EN: "In Break" },
+    "已死亡": { ZH: "已死亡", EN: "Deceased" },
+    "訊號蒐集中": { ZH: "訊號蒐集中", EN: "Recording" },
     "訊號搜集完成": { ZH: "訊號搜集完成", EN: "Signal Done" },
-    "開始善後": { ZH: "開始善後", EN: "Cleaning" },
+    "犧牲中": { ZH: "犧牲中", EN: "Sacrificing" },
+    "實驗善後": { ZH: "實驗善後", EN: "Cleaning" },
     "已完成": { ZH: "已完成", EN: "Completed" },
     "實驗結束": { ZH: "實驗結束", EN: "Finished" }
   };
@@ -491,7 +509,8 @@
     dataCenter: [],
     formDataCache: {},
     dynamicForms: {},
-    isSubmitting: false
+    isSubmitting: false,
+    activeSelectedExpId: null // 記憶今日選擇接力的實驗編號
   };
 
   window.addEventListener('DOMContentLoaded', async () => {
@@ -499,6 +518,12 @@
     await fetchAndParseFormsFromSheet();
     await refreshDashboard(false);
   });
+
+  function getStatusColor(statusStr) {
+    if (!statusStr) return STATUS_COLORS["其他"];
+    const key = Object.keys(STATUS_COLORS).find(k => statusStr.includes(k));
+    return key ? STATUS_COLORS[key] : STATUS_COLORS["其他"];
+  }
 
   function parseSingleBilingualStr(str, lang) {
     if (!str) return '';
@@ -563,11 +588,10 @@
     return result;
   }
 
-  // 動態解析說明標籤（包含 [warning] 與 [info] 及 \n 換行符號）
   function renderFieldDescription(descText) {
     if (!descText) return '';
     
-    let text = descText.replace(/\\n/g, '\n'); // 正規化 \n
+    let text = descText.replace(/\\n/g, '\n');
     let alertType = '';
 
     if (text.includes('[warning]')) {
@@ -893,12 +917,13 @@
 
   function renderMainDashboardUI() {
     const isZH = state.currentLang === 'ZH';
+    // 支援當天進行中多個實驗（非已完成/結束者）
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束' && d.status !== 'Completed');
     const todayListContainer = document.getElementById('todayActiveExpList');
     
     if(todayExps.length > 0) {
       todayListContainer.innerHTML = todayExps.map(exp => {
-        const badgeClass = exp.status === '已預約' ? 'reserved' : 'active';
+        const statusBg = getStatusColor(exp.status);
         const userObj = state.membersList.find(m => m.name === exp.user);
         const userColor = userObj ? userObj.color : '#f1f5f9';
         
@@ -908,7 +933,7 @@
         return `
           <div class="active-exp-card" onclick="showActiveExpDetail('${exp.expId}')" title="點擊查看詳細資訊">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span class="status-badge-lg ${badgeClass}">${displayStatus}</span>
+              <span class="status-badge-lg" style="background:${statusBg}">${displayStatus}</span>
               <span class="exp-code-tag">${exp.expId}</span>
             </div>
             <div class="exp-title-main">${displayInfo || (isZH ? '實驗專案' : 'Experiment Project')}</div>
@@ -949,12 +974,13 @@
     }
   }
 
-  // 彈窗優化：緊湊顯示詳細資訊與備註
+  // 點擊今日卡片：顯示詳細資訊（含統一色彩狀態標籤與備註）
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
 
     const isZH = state.currentLang === 'ZH';
+    const statusBg = getStatusColor(exp.status);
     const displayStatus = getStatusText(exp.status, state.currentLang);
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
@@ -984,7 +1010,7 @@
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'當前狀態':'Status'}</div>
-          <div class="detail-value"><span class="status-badge-lg active" style="font-size:10px; padding:2px 8px;">${displayStatus}</span></div>
+          <div class="detail-value"><span class="status-badge-lg" style="background:${statusBg}; font-size:10px;">${displayStatus}</span></div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'大綱與目的':'Outline & Purpose'}</div>
@@ -1027,12 +1053,11 @@
       const userObj = state.membersList.find(m => m.name === item.user);
       const userColor = userObj ? userObj.color : '#f1f5f9';
       
-      const isCompleted = item.status === '已完成' || item.status === '實驗結束' || item.status === 'Completed';
-      const statusColor = isCompleted ? 'var(--success)' : (item.status === '已預約' ? 'var(--gray-badge)' : 'var(--warning)');
-      
+      const statusColor = getStatusColor(item.status);
       const displayStatus = getStatusText(item.status, state.currentLang);
       const displayInfo = formatBilingualText(item.info, state.currentLang);
 
+      const isCompleted = item.status === '已完成' || item.status === '實驗結束' || item.status === 'Completed';
       const uploadTagHtml = isCompleted 
         ? (item.hasDataUpload 
             ? `<span class="upload-status-tag uploaded">${isZH?'已上傳':'Uploaded'}</span>` 
@@ -1049,7 +1074,7 @@
                 <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
               </div>
               <div class="timeline-status-group">
-                <span style="color:${statusColor}; font-size:11px; font-weight:700;">${displayStatus}</span>
+                <span class="status-badge-lg" style="background:${statusColor}; font-size:10px;">${displayStatus}</span>
                 ${uploadTagHtml}
               </div>
             </div>
@@ -1212,20 +1237,64 @@
     formId: '', pages: [], currentPageIdx: 0, data: {}, isMakeup: false, selectedAction: null, selectedStatusTag: null
   };
 
+  // 核心：今日實驗登錄（先跳出選擇今日實驗編號，支援多個實驗平行進行）
   function handleTodayExperiment() {
     if(state.isGuest) return;
-    const todayExp = state.dataCenter.find(d => d.date === state.simulatedDate);
-    if(!todayExp) return;
+    
+    const isZH = state.currentLang === 'ZH';
+    // 找出所有符合今日且未結束的實驗
+    const todayActiveExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束' && d.status !== 'Completed');
 
-    switch(todayExp.status) {
+    if (todayActiveExps.length === 0) {
+      showCustomAlert("提示", isZH ? "本日無進行中實驗可進行登錄" : "No active experiments today.");
+      return;
+    }
+
+    // 如果只有一個實驗，直接鎖定；若有多個，跳出選擇視窗
+    if (todayActiveExps.length === 1) {
+      state.activeSelectedExpId = todayActiveExps[0].expId;
+      startExpFormByStatus(todayActiveExps[0]);
+    } else {
+      let optionsHtml = todayActiveExps.map(exp => `
+        <div class="option-card" onclick="selectActiveTodayExp('${exp.expId}')">
+          <input type="radio" name="selTodayExp" id="exp_${exp.expId}" ${state.activeSelectedExpId === exp.expId ? 'checked' : ''}>
+          <label for="exp_${exp.expId}">[${exp.expId}] ${formatBilingualText(exp.info, state.currentLang)} (${exp.user})</label>
+        </div>
+      `).join('');
+
+      document.getElementById('modalTitle').innerText = isZH ? "選擇今日進行中實驗" : "Select Today Experiment";
+      document.getElementById('modalMessage').innerHTML = `<div style="text-align:left;">${optionsHtml}</div>`;
+      document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">取消</button>`;
+      document.getElementById('customModalBackdrop').style.display = 'flex';
+    }
+  }
+
+  function selectActiveTodayExp(expId) {
+    state.activeSelectedExpId = expId;
+    closeCustomModal();
+    const exp = state.dataCenter.find(d => d.expId === expId);
+    if (exp) {
+      startExpFormByStatus(exp);
+    }
+  }
+
+  // 依據實驗當前狀態，引導至對應接力表單
+  function startExpFormByStatus(targetExp) {
+    switch(targetExp.status) {
       case "已預約": openForm("FORM_001_1"); break;
-      case "實驗開始": openForm(todayExp.info.includes("控制組") ? "FORM_002_2" : "FORM_002_1"); break;
+      case "實驗開始": openForm(targetExp.info.includes("控制組") ? "FORM_002_2" : "FORM_002_1"); break;
       case "準備完成": openForm("FORM_003"); break;
       case "休息中": openForm("FORM_004"); break;
       case "訊號搜集完成": openForm("FORM_005"); break;
       case "開始善後": openForm("FORM_006"); break;
-      default: showCustomAlert("提示", `當前實驗狀態為 [${todayExp.status}]，無後續表單。`);
+      default: 
+        openForm("FORM_001_1"); // 預設備用引導
     }
+
+    // 自動把選擇的實驗編號代入表單
+    setTimeout(() => {
+      handleExpSelectChange(targetExp.expId);
+    }, 100);
   }
 
   function handleTomorrowPrep() {
@@ -1253,10 +1322,11 @@
 
   // 自動帶入：精準填入「負責人、大綱、目的 Radio 以及備註文字」
   function handleExpSelectChange(expId) {
+    if (!expId) return;
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
 
-    if (expId && expId !== 'NEW_PROJECT') {
+    if (expId !== 'NEW_PROJECT') {
       const existingRecord = state.dataCenter.find(d => d.expId === expId);
       if (existingRecord) {
         if (existingRecord.user) {
@@ -1265,15 +1335,13 @@
 
         const savedData = existingRecord.formData || {};
         
-        // 1. 複製舊 JSON 資料
         Object.keys(savedData).forEach(key => {
           currentFormCtx.data[key] = savedData[key];
         });
 
-        // 2. 自動找出備註內容 (優先取 notes 屬性，若沒有則搜尋 field_)
+        // 強制搜尋並對應備註內容
         const targetNotesVal = savedData['notes'] || savedData['field_14_4'] || '';
 
-        // 3. 自動對應寫回 DOM 中帶有「備註」標題或 `_input` 的輸入框 ID
         currentFormCtx.pages.forEach(page => {
           page.fields.forEach(field => {
             const isNoteField = field.label && (field.label.includes('備註') || field.label.toLowerCase().includes('note'));
@@ -1316,8 +1384,6 @@
             }
           });
         });
-
-        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、大綱、目的與備註已自動填入。`);
       }
     }
     renderFormCurrentPage();
@@ -1359,6 +1425,9 @@
           return isTodayLogin ? (d.date === state.simulatedDate && notFinished) : notFinished;
         });
 
+        // 若有記憶選擇的編號，預設選取
+        const currentExpValue = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
+
         html += `
           <div class="form-group">
             <label>${field.label}</label>
@@ -1367,7 +1436,7 @@
               ${activeProjects.length === 0 ? `<option value="">-- ${isZH?'無符合之實驗':'No Active Experiment'} --</option>` : ''}
               ${activeProjects.map(p => {
                 const optText = `[${p.expId}] ${p.date} (${p.user})`;
-                const selected = currentFormCtx.data['exp_select_val'] === p.expId ? 'selected' : '';
+                const selected = currentExpValue === p.expId ? 'selected' : '';
                 return `<option value="${p.expId}" ${selected}>${optText}</option>`;
               }).join('')}
             </select>
@@ -1519,7 +1588,6 @@
     renderFormCurrentPage();
   }
 
-  // 核心：輸入時自動維護標準 "notes" Key（題目含「備註」或包含 _input 著一律寫入 JSON 的 notes 屬性）
   function saveFormFieldData(fieldId, val, fieldLabel = '') {
     currentFormCtx.data[fieldId] = val;
 
@@ -1618,7 +1686,7 @@
       }
     });
 
-    let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || "";
+    let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
     let finalExpId = "";
     let isUpdateMode = false;
 
