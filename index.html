@@ -615,7 +615,8 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  function evaluateFormula(formulaTemplate) {
+  function evaluateFormula(formulaTemplate, fieldLabel = '') {
+    // 1. 抓取畫面上前兩個輸入框的數值：大鼠體重、PTZ使用劑量
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
     let weight = 0;
     let dose = 1;
@@ -627,12 +628,16 @@
 
     try {
       let result = 0;
+      
+      // 2. 透過欄位標籤或公式內容進行精準分流計算
+      const labelStr = fieldLabel ? fieldLabel.toString() : '';
       const templateStr = formulaTemplate ? formulaTemplate.toString() : '';
       
-      // 🚀 精準判斷：如果公式內容包含 700 或 saline，才執行減法；否則執行乘法
-      if (templateStr.includes('700') || templateStr.toLowerCase().includes('saline')) {
+      if (labelStr.includes('Saline') || templateStr.includes('700') || templateStr.toLowerCase().includes('saline')) {
+        // Saline 需要量：700 扣掉 (體重 * 劑量)
         result = 700 - (weight * dose);
       } else {
+        // PTZ 需要量：體重 * 劑量
         result = weight * dose;
       }
       
