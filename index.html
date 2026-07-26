@@ -615,54 +615,90 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 絕對命中版公式動態即時計算引擎
+  // 通用動態公式解析引擎（帶動態檢測）
   function evaluateFormula(formulaTemplate) {
-    if (!formulaTemplate) return '';
+    if (!formulaTemplate) return '無公式';
     let evalStr = formulaTemplate;
     
-    // 1. 蒐集當前頁面所有數字輸入框的即時數值
-    const container = document.getElementById('formContent');
-    const inputs = container ? container.querySelectorAll('input.form-control, textarea.form-control') : [];
-    
-    let inputValues = [];
-    inputs.forEach(input => {
-      if (!input.readOnly) { // 排除公式計算框本身
-        inputValues.push(parseFloat(input.value) || 0);
-      }
-    });
-
-    // 2. 自動將公式裡的任何變數標籤（例如 {大鼠體重 (g)} 或 {PTZ使用劑量}）依照順序對應到畫面上的輸入框
+    // 找出所有 {欄位名稱}
     const matches = formulaTemplate.match(/\{([^}]+)\}/g);
     if (matches) {
-      matches.forEach((match, idx) => {
-        // 依序取得畫面上第 idx 個輸入框的值，若沒有則補 0
-        const val = inputValues[idx] !== undefined ? inputValues[idx] : 0;
-        evalStr = evalStr.replace(match, val);
+      matches.forEach(match => {
+        const rawVarName = match.slice(1, -1).trim(); // 抓出大括號內的名稱，例如 "大鼠體重 (g)" 或 "PTZ使用劑量"
+        let val = null;
+
+        // 遍歷當前頁面的欄位與 DOM 輸入框
+        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+        if (page && page.fields) {
+          for (let f of page.fields) {
+            const cleanFLabel = cleanDisplayLabel(f.label);
+            // 只要標題關鍵字吻合
+            if (cleanFLabel && (cleanFLabel.includes(rawVarName) || rawVarName.includes(cleanFLabel))) {
+              const domEl = document.getElementById(f.id);
+              const inputVal = domEl ? domEl.value : currentFormCtx.data[f.id];
+              if (inputVal !== undefined && inputVal !== '') {
+                val = parseFloat(inputVal);
+              }
+              break;
+            }
+          }
+        }
+
+        // 若 DOM 沒抓到，備用方案：掃描畫面上所有的 input
+        if (val === null) {
+          const allInputs = document.querySelectorAll('#formContent input.dynamic-input, #formContent input.form-control');
+          allInputs.forEach(input => {
+            const group = input.closest('.form-group');
+            if (group) {
+              const lbl = group.querySelector('label');
+              if (lbl && (lbl.innerText.includes(rawVarName) || rawVarName.includes(cleanDisplayLabel(lbl.innerText)))) {
+                if (input.value !== '') val = parseFloat(input.value);
+              }
+            }
+          });
+        }
+
+        // 若依然沒有輸入值，填入 0
+        const finalVal = val !== null ? val : 0;
+        evalStr = evalStr.replace(match, finalVal);
       });
     }
 
     try {
-      // 3. 執行動態數學計算
+      // 運算結果
       const result = Function('"use strict";return (' + evalStr + ')')();
-      return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
+      return isNaN(result) ? '語法錯誤' : Math.round(result * 1000) / 1000;
     } catch (e) {
-      console.error("公式計算錯誤: ", evalStr, e);
-      return '';
+      console.error("公式解析失敗:", evalStr, e);
+      return '公式解析失敗';
     }
   }
   
-  // 全域即時公式計算觸發器（修復 Uncaught ReferenceError）
+  // 升級版即時公式計算觸發器（帶偵測訊息顯示）
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
 
     page.fields.forEach(f => {
       if (f.type === "formula") {
+        const domEl = document.getElementById(f.id);
+        
+        // 1. 先標示偵測到變動
+        if (domEl && (!domEl.value || domEl.value === '')) {
+          domEl.value = '計算中...';
+        }
+
+        // 2. 執行動態算式解析
         const calculatedVal = evaluateFormula(f.formula);
         currentFormCtx.data[f.id] = calculatedVal;
-        const domEl = document.getElementById(f.id);
+
+        // 3. 輸出結果或提示錯誤訊息
         if (domEl) {
-          domEl.value = calculatedVal;
+          if (calculatedVal !== '' && !isNaN(calculatedVal)) {
+            domEl.value = calculatedVal;
+          } else {
+            domEl.value = '待輸入有效數值'; // 若條件不滿足或沒抓到數值時顯示
+          }
         }
       }
     });
