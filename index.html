@@ -1470,7 +1470,8 @@
       }
 
       if (field.type === "formula") {
-        const calculatedVal = evaluateFormula(field.formula);
+        // 🚀 關鍵：把 field.label 傳進去，讓公式能精準辨識現在算的是哪一格
+        const calculatedVal = evaluateFormula(field.formula, field.label);
         currentFormCtx.data[field.id] = calculatedVal;
         html += `
           <div class="form-group">
