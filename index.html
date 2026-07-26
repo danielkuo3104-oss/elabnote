@@ -761,11 +761,20 @@
 
           let formulaExpr = null;
           let formulaUnit = '';
+          // 升級：只要 rawType 含有 [formula] 即視為公式欄位，並擷取表達式與單位
           if (rawType.includes("[formula]")) {
             const fMatch = rawType.match(/\[formula:\s*([^\]]+)\]/i);
-            if (fMatch) formulaExpr = fMatch[1].trim();
             const uMatch = rawType.match(/\[unit:\s*([^\]]+)\]/i);
-            if (uMatch) formulaUnit = uMatch[1].trim();
+            currentPage.fields.push({
+              id: `field_${r}_${col}`,
+              label: cleanDisplayLabel(rawLabel),
+              type: "formula",
+              formula: fMatch ? fMatch[1].trim() : '',
+              unit: uMatch ? uMatch[1].trim() : '',
+              desc: rawDesc
+            });
+            lastParentField = null;
+            continue;
           }
 
           if (formulaExpr) {
@@ -1414,14 +1423,13 @@
     if (expId !== 'NEW_PROJECT') {
       const existingRecord = state.dataCenter.find(d => d.expId === expId);
       if (existingRecord) {
-        if (existingRecord.user) {
-          saveFormFieldData('user_select_val', existingRecord.user);
-        }
-
+        if (existingRecord.user) saveFormFieldData('user_select_val', existingRecord.user);
         const savedData = existingRecord.formData || {};
-        Object.keys(savedData).forEach(key => {
-          currentFormCtx.data[key] = savedData[key];
-        });
+        
+        // 僅只帶入大綱與目的，不亂改勾選狀態
+        if (savedData['outline_select_val']) currentFormCtx.data['outline_select_val'] = savedData['outline_select_val'];
+        if (savedData['selected_purpose_name']) currentFormCtx.data['selected_purpose_name'] = savedData['selected_purpose_name'];
+        if (savedData['notes']) currentFormCtx.data['notes'] = savedData['notes'];
       }
     }
     renderFormCurrentPage();
@@ -1460,8 +1468,8 @@
         currentFormCtx.data[field.id] = calculatedVal;
         html += `
           <div class="form-group">
-            <label>${field.label} (${field.unit || ''})</label>
-            <input type="text" id="${field.id}" class="form-control" readonly style="background:#e2e8f0; font-weight:700;" value="${calculatedVal}">
+            <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+            <input type="text" id="${field.id}" class="form-control" readonly style="background:#e2e8f0; font-weight:700; color:var(--primary);" value="${calculatedVal}">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -1541,8 +1549,8 @@
         if (isNoteInput) {
           html += `
             <div class="form-group">
-              <label>${field.label}</label>
-              <textarea id="${field.id}" class="form-control" rows="3" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}'); triggerRealtimeFormulaCalculation();">${val}</textarea>
+              <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+              <input type="${field.type}" id="${field.id}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}'); triggerRealtimeFormulaCalculation();">
               ${renderFieldDescription(field.desc)}
             </div>
           `;
