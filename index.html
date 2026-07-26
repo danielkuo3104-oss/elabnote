@@ -795,16 +795,29 @@
 
           let formulaExpr = null;
           let formulaUnit = '';
-          // 升級：只要 rawType 含有 [formula] 即視為公式欄位，並擷取表達式與單位
-          if (rawType.includes("[formula]")) {
+          
+          // 🚀 強效寬鬆公式解析：只要包含 [formula] 或者是內容包含大括號 {} 與運算符號
+          if (rawType.includes("[formula]") || (rawType.includes("{") && (rawType.includes("*") || rawType.includes("-")))) {
+            // 嘗試抓取 [formula: 算式]
             const fMatch = rawType.match(/\[formula:\s*([^\]]+)\]/i);
+            if (fMatch) {
+              formulaExpr = fMatch[1].trim();
+            } else {
+              // 若沒有明確的 [formula: ...] 標籤，直接把整個 rawType 當作公式算式
+              formulaExpr = rawType.replace(/\[number\]|\[text\]/gi, '').trim();
+            }
+            
             const uMatch = rawType.match(/\[unit:\s*([^\]]+)\]/i);
+            if (uMatch) formulaUnit = uMatch[1].trim();
+          }
+
+          if (formulaExpr) {
             currentPage.fields.push({
               id: `field_${r}_${col}`,
               label: cleanDisplayLabel(rawLabel),
               type: "formula",
-              formula: fMatch ? fMatch[1].trim() : '',
-              unit: uMatch ? uMatch[1].trim() : '',
+              formula: formulaExpr,
+              unit: formulaUnit,
               desc: rawDesc
             });
             lastParentField = null;
