@@ -615,7 +615,7 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 同頁面精準公式即時計算引擎
+  // 終極版同頁面即時公式計算引擎（支援模糊對應與動態 DOM 抓取）
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     let evalStr = formulaTemplate;
@@ -624,14 +624,25 @@
     const matches = formulaTemplate.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
-        const keyName = match.slice(1, -1).trim(); // 例如 "大鼠體重 (g)" 或 "電極原始插入位置-ML"
+        let keyName = match.slice(1, -1).trim(); // 例如 "大鼠體重 (g)" 或 "電極原始插入位置-ML"
         let val = 0;
+
+        // 針對複合欄位名稱處理（例如 "電極原始插入位置-ML" -> 拆出 "電極原始插入位置" 與 "ML" 或直接抓最後的 ML）
+        let searchKeywords = [keyName];
+        if (keyName.includes('-')) {
+          searchKeywords = keyName.split('-'); // 變成 ['電極原始插入位置', 'ML']
+        }
 
         const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
         if (page && page.fields) {
-          // 在當前頁面的欄位中尋找 label 符合的項目
+          // 尋找符合關鍵字的欄位
           const targetField = page.fields.find(f => {
             const cleanLabel = cleanDisplayLabel(f.label);
+            if (!cleanLabel) return false;
+            // 如果是複合詞，確保同時符合或包含
+            if (searchKeywords.length > 1) {
+              return cleanLabel.includes(searchKeywords[1].trim());
+            }
             return cleanLabel === keyName || cleanLabel.includes(keyName) || keyName.includes(cleanLabel);
           });
 
@@ -639,6 +650,25 @@
             const domEl = document.getElementById(targetField.id);
             const domVal = domEl ? domEl.value : '';
             val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[targetField.id]) || 0;
+          }
+        }
+
+        // 萬一 field 沒對到，直接用 DOM 畫面上所有 input 進行關鍵字暴力比對
+        if (val === 0) {
+          const allInputs = document.querySelectorAll('input.form-control');
+          for (let input of allInputs) {
+            const formGroup = input.closest('.form-group');
+            if (formGroup) {
+              const labelEl = formGroup.querySelector('label');
+              if (labelEl) {
+                const labelText = labelEl.innerText;
+                const lastKey = searchKeywords[searchKeywords.length - 1].trim();
+                if (labelText.includes(lastKey) || labelText.includes(keyName)) {
+                  val = parseFloat(input.value) || 0;
+                  break;
+                }
+              }
+            }
           }
         }
 
@@ -653,7 +683,6 @@
       return '';
     }
   }
-
   function triggerRealtimeFormulaCalculation() {
     if (!currentFormCtx.pages) return;
     currentFormCtx.pages.forEach(p => {
