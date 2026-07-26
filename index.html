@@ -1585,10 +1585,24 @@
         if (existingRecord.user) saveFormFieldData('user_select_val', existingRecord.user);
         const savedData = existingRecord.formData || {};
         
-        // 僅只帶入大綱與目的，不亂改勾選狀態
         if (savedData['outline_select_val']) currentFormCtx.data['outline_select_val'] = savedData['outline_select_val'];
-        if (savedData['selected_purpose_name']) currentFormCtx.data['selected_purpose_name'] = savedData['selected_purpose_name'];
         if (savedData['notes']) currentFormCtx.data['notes'] = savedData['notes'];
+
+        // 🚀 關鍵修復：將 selected_purpose_name 淨化後帶入，並掃描對應的 radio 欄位 ID
+        const targetPurpose = cleanDisplayLabel(savedData['selected_purpose_name'] || '');
+        if (targetPurpose) {
+          currentFormCtx.data['selected_purpose_name'] = targetPurpose;
+          
+          // 遍歷當前頁面欄位，自動把值賦給 radio 欄位 ID
+          const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+          if (page && page.fields) {
+            page.fields.forEach(f => {
+              if (f.type === 'radio') {
+                currentFormCtx.data[f.id] = targetPurpose;
+              }
+            });
+          }
+        }
       }
     }
     renderFormCurrentPage();
@@ -1764,15 +1778,22 @@
       }
       else if (field.type === "radio") {
         html += `<div class="form-group"><label>${field.label}</label>`;
+        
+        // 🚀 容容錯取值：若 currentFormCtx.data[field.id] 為空，則自動拿 selected_purpose_name 來比對
+        const currentRadioVal = cleanDisplayLabel(currentFormCtx.data[field.id] || currentFormCtx.data['selected_purpose_name'] || field.default || "");
+
         field.options.forEach((opt, idx) => {
           const optName = typeof opt === 'string' ? opt : opt.name;
+          const cleanOptName = cleanDisplayLabel(optName);
           const displayOptName = formatBilingualText(optName, state.currentLang);
-          const isSelected = (val === optName);
+          
+          // 🚀 強效比對：無論是完整字串還是過濾後字串，只要符合就勾選！
+          const isSelected = (currentRadioVal === cleanOptName) || (currentRadioVal === optName);
           const optId = `${field.id}_opt_${idx}`;
           
           html += `
-            <div class="option-card ${isSelected ? 'selected' : ''}" onclick="selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})">
-              <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
+            <div class="option-card ${isSelected ? 'selected' : ''}" onclick="selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})">
+              <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
               <label for="${optId}">${displayOptName}</label>
             </div>
             ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="備註">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
