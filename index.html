@@ -615,31 +615,33 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 全頁面動態公式即時計算引擎
+  // 同頁面精準公式即時計算引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     let evalStr = formulaTemplate;
     
+    // 找出所有 {欄位名稱}
     const matches = formulaTemplate.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
-        const fieldLabel = match.slice(1, -1).trim();
+        const keyName = match.slice(1, -1).trim(); // 例如 "大鼠體重 (g)" 或 "電極原始插入位置-ML"
         let val = 0;
-        
-        if (currentFormCtx.pages) {
-          currentFormCtx.pages.forEach(p => {
-            if (p.fields) {
-              p.fields.forEach(f => {
-                const cleanFLabel = cleanDisplayLabel(f.label);
-                if (cleanFLabel && (cleanFLabel === fieldLabel || cleanFLabel.includes(fieldLabel) || fieldLabel.includes(cleanFLabel))) {
-                  const domEl = document.getElementById(f.id);
-                  const domVal = domEl ? domEl.value : '';
-                  val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[f.id]) || 0;
-                }
-              });
-            }
+
+        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+        if (page && page.fields) {
+          // 在當前頁面的欄位中尋找 label 符合的項目
+          const targetField = page.fields.find(f => {
+            const cleanLabel = cleanDisplayLabel(f.label);
+            return cleanLabel === keyName || cleanLabel.includes(keyName) || keyName.includes(cleanLabel);
           });
+
+          if (targetField) {
+            const domEl = document.getElementById(targetField.id);
+            const domVal = domEl ? domEl.value : '';
+            val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[targetField.id]) || 0;
+          }
         }
+
         evalStr = evalStr.replace(match, val);
       });
     }
