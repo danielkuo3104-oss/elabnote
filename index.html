@@ -993,7 +993,25 @@
       const res = await fetch(URL_DATA);
       const csvText = await res.text();
       const rows = parseCSV(csvText);
-      
+
+      // 狀態優先級順序表（數字越大越靠後，只許前進不許倒退）
+      const STATUS_RANK = {
+        "已預約": 1,
+        "準備中": 2,
+        "實驗準備": 2,
+        "準備完成": 3,
+        "手術中": 4,
+        "休息中": 5,
+        "訊號蒐集中": 6,
+        "訊號蒐集完成": 7,
+        "已死亡": 8,
+        "犧牲中": 8,
+        "實驗善後": 9,
+        "已完成": 10,
+        "實驗完成": 10,
+        "實驗結束": 10
+      };
+
       const records = [];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
@@ -1001,11 +1019,10 @@
           const expId = row[0] ? row[0].trim() : '未編號';
           const date = row[1] ? row[1].trim() : '';
           const user = row[2] ? row[2].trim() : '';
-          const status = row[3] ? row[3].trim() : '';
+          let statusFromSheet = row[3] ? row[3].trim() : '';
           
           let parsedFormData = {};
 
-          // 1. 合併所有表單 JSON 資料供表單內部帶入歷史紀錄
           const jsonCols = [4, 6, 8, 10, 12];
           jsonCols.forEach(colIdx => {
             if (row[colIdx]) {
@@ -1022,7 +1039,7 @@
             }
           });
 
-          // 🚀 2. 關鍵修正：【卡片標題/大綱與目的】只專一讀取 E 欄 (FORM_001, index=4) 的原始設定！
+          // 專一讀取 FORM_001 作為標題
           let form001Data = {};
           if (row[4]) {
             let rawForm1Str = row[4].trim();
@@ -1030,13 +1047,10 @@
               rawForm1Str = rawForm1Str.slice(1, -1).replace(/""/g, '"');
             }
             if (rawForm1Str.startsWith('{') && rawForm1Str.endsWith('}')) {
-              try {
-                form001Data = JSON.parse(rawForm1Str);
-              } catch (e) {}
+              try { form001Data = JSON.parse(rawForm1Str); } catch (e) {}
             }
           }
 
-          // 嚴格只從 E 欄 (FORM_001) 提取大綱與目的名稱，並經過 cleanDisplayLabel 清理標籤
           const outlineName = cleanDisplayLabel(form001Data['outline_select_val'] || '');
           const purposeName = cleanDisplayLabel(form001Data['selected_purpose_name'] || '');
           
@@ -1049,13 +1063,27 @@
             dynamicInfo = "實驗專案";
           }
 
+          // 🚀 關鍵防倒退機制：比對現有記憶體中的狀態
+          const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
+          let finalStatus = statusFromSheet;
+
+          if (existingLocalRecord) {
+            const currentRank = STATUS_RANK[existingLocalRecord.status] || 0;
+            const sheetRank = STATUS_RANK[statusFromSheet] || 0;
+
+            // 如果 CSV 抓回來的狀態比本地記憶體還舊（例如 CSV 還停在已預約，本地已經是準備中），維持本地最新的狀態！
+            if (currentRank > sheetRank) {
+              finalStatus = existingLocalRecord.status;
+            }
+          }
+
           const colV = row[21] ? row[21].trim() : '';
           records.push({
             expId: expId,
             date: date,
             user: user,
-            status: status,
-            info: dynamicInfo, // 永遠只呈現最純淨的 E 欄 (FORM_001) 專案資訊
+            status: finalStatus, // 確保狀態絕不倒退
+            info: dynamicInfo,
             formData: parsedFormData,
             hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
           });
@@ -2004,7 +2032,10 @@
     const selectedExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
     if (!selectedExpId) return;
 
-    // 🚀 保存中途時間戳 (例如：手術中、訊號蒐集中)
+    // 🚀 防呆：若表單是 FORM_001 家族，不觸發中途狀態同步，避免把已推進的狀態蓋回「已預約」
+    if (currentFormCtx.formId.startsWith("FORM_001")) return;
+
+    // 保存中途時間戳 (例如：手術中、訊號蒐集中)
     const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
     if (!currentFormCtx.data['_time_logs']) {
       currentFormCtx.data['_time_logs'] = {};
@@ -2012,7 +2043,7 @@
     currentFormCtx.data['_time_logs'][statusStr] = nowStr;
 
     const rawFormId = currentFormCtx.formId;
-    const mainFormColName = rawFormId.startsWith("FORM_001") ? "FORM_001" : rawFormId.split('_').slice(0, 2).join('_');
+    const mainFormColName = rawFormId.split('_').slice(0, 2).join('_');
 
     await syncToGoogleSheet("submitForm", {
       expId: selectedExpId,
