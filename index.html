@@ -615,62 +615,64 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 通用動態公式解析引擎（帶動態檢測）
+  // 安全動態公式解析引擎（確保大括號變數被安全替換為純數字）
   function evaluateFormula(formulaTemplate) {
-    if (!formulaTemplate) return '無公式';
+    if (!formulaTemplate) return '';
     let evalStr = formulaTemplate;
     
     // 找出所有 {欄位名稱}
     const matches = formulaTemplate.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
-        const rawVarName = match.slice(1, -1).trim(); // 抓出大括號內的名稱，例如 "大鼠體重 (g)" 或 "PTZ使用劑量"
-        let val = null;
+        const rawVarName = match.slice(1, -1).trim(); // 抓出大括號內的名稱
+        let val = 0;
 
-        // 遍歷當前頁面的欄位與 DOM 輸入框
-        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-        if (page && page.fields) {
-          for (let f of page.fields) {
-            const cleanFLabel = cleanDisplayLabel(f.label);
-            // 只要標題關鍵字吻合
-            if (cleanFLabel && (cleanFLabel.includes(rawVarName) || rawVarName.includes(cleanFLabel))) {
-              const domEl = document.getElementById(f.id);
-              const inputVal = domEl ? domEl.value : currentFormCtx.data[f.id];
-              if (inputVal !== undefined && inputVal !== '') {
-                val = parseFloat(inputVal);
+        // 從當前畫面上所有的動態輸入框尋找對應數值
+        const allInputs = document.querySelectorAll('#formContent input.dynamic-input, #formContent input.form-control, #formContent textarea.dynamic-input');
+        for (let input of allInputs) {
+          const group = input.closest('.form-group');
+          if (group) {
+            const lbl = group.querySelector('label');
+            if (lbl) {
+              const lblText = cleanDisplayLabel(lbl.innerText);
+              // 模糊比對標籤文字
+              if (lblText.includes(rawVarName) || rawVarName.includes(lblText) || lblText.replace(/\([^)]+\)/g, '').trim() === rawVarName.replace(/\([^)]+\)/g, '').trim()) {
+                if (input.value !== '') {
+                  val = parseFloat(input.value) || 0;
+                  break;
+                }
               }
-              break;
             }
           }
         }
 
-        // 若 DOM 沒抓到，備用方案：掃描畫面上所有的 input
-        if (val === null) {
-          const allInputs = document.querySelectorAll('#formContent input.dynamic-input, #formContent input.form-control');
-          allInputs.forEach(input => {
-            const group = input.closest('.form-group');
-            if (group) {
-              const lbl = group.querySelector('label');
-              if (lbl && (lbl.innerText.includes(rawVarName) || rawVarName.includes(cleanDisplayLabel(lbl.innerText)))) {
-                if (input.value !== '') val = parseFloat(input.value);
-              }
+        // 若 DOM 沒抓到，改從記憶體 currentFormCtx.data 尋找
+        if (val === 0 && currentFormCtx.pages) {
+          currentFormCtx.pages.forEach(p => {
+            if (p.fields) {
+              p.fields.forEach(f => {
+                const cleanLabel = cleanDisplayLabel(f.label);
+                if (cleanLabel && (cleanLabel.includes(rawVarName) || rawVarName.includes(cleanLabel))) {
+                  val = parseFloat(currentFormCtx.data[f.id]) || 0;
+                }
+              });
             }
           });
         }
 
-        // 若依然沒有輸入值，填入 0
-        const finalVal = val !== null ? val : 0;
-        evalStr = evalStr.replace(match, finalVal);
+        // 🚀 關鍵：使用正規表達式將整組 {變數名稱} 安全替換為純數字
+        const safeRegex = new RegExp(match.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
+        evalStr = evalStr.replace(safeRegex, val);
       });
     }
 
     try {
-      // 運算結果
+      // 執行安全的數學運算
       const result = Function('"use strict";return (' + evalStr + ')')();
-      return isNaN(result) ? '語法錯誤' : Math.round(result * 1000) / 1000;
+      return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
     } catch (e) {
-      console.error("公式解析失敗:", evalStr, e);
-      return '公式解析失敗';
+      console.error("公式運算錯誤:", evalStr, e);
+      return '';
     }
   }
   
