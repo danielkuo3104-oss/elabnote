@@ -615,64 +615,34 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 通用動態公式解析引擎：自動解析公式文字並對應同頁面欄位
+  // 絕對命中版公式動態即時計算引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     let evalStr = formulaTemplate;
     
-    // 1. 找出公式中所有大括號包住的變數，例如 {大鼠體重 (g)} 或 {電極原始插入位置-ML}
+    // 1. 蒐集當前頁面所有數字輸入框的即時數值
+    const container = document.getElementById('formContent');
+    const inputs = container ? container.querySelectorAll('input.form-control, textarea.form-control') : [];
+    
+    let inputValues = [];
+    inputs.forEach(input => {
+      if (!input.readOnly) { // 排除公式計算框本身
+        inputValues.push(parseFloat(input.value) || 0);
+      }
+    });
+
+    // 2. 自動將公式裡的任何變數標籤（例如 {大鼠體重 (g)} 或 {PTZ使用劑量}）依照順序對應到畫面上的輸入框
     const matches = formulaTemplate.match(/\{([^}]+)\}/g);
     if (matches) {
-      matches.forEach(match => {
-        const rawVarName = match.slice(1, -1).trim(); // 原始變數名稱
-        // 標準化變數名稱（去除括號、空格、轉小寫以利模糊比對）
-        const cleanVarName = rawVarName.replace(/\([^)]+\)/g, '').replace(/[\s-_]/g, '').toLowerCase();
-        
-        let val = 0;
-        const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-
-        if (page && page.fields) {
-          // 在當前頁面的欄位中尋找最匹配的輸入值
-          for (let f of page.fields) {
-            if (f.label) {
-              const cleanFieldLabel = cleanDisplayLabel(f.label).replace(/\([^)]+\)/g, '').replace(/[\s-_]/g, '').toLowerCase();
-              
-              // 檢查欄位標籤是否包含變數名稱，或變數名稱包含欄位標籤
-              if (cleanFieldLabel && (cleanFieldLabel === cleanVarName || cleanFieldLabel.includes(cleanVarName) || cleanVarName.includes(cleanFieldLabel))) {
-                const domEl = document.getElementById(f.id);
-                const domVal = domEl ? domEl.value : '';
-                val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[f.id]) || 0;
-                break;
-              }
-            }
-          }
-        }
-
-        // 備用：若 page fields 沒對到，直接掃描畫面上所有的 input 標籤
-        if (val === 0) {
-          const allInputs = document.querySelectorAll('#formContent .form-control, #formContent input');
-          for (let input of allInputs) {
-            const formGroup = input.closest('.form-group');
-            if (formGroup) {
-              const labelEl = formGroup.querySelector('label');
-              if (labelEl) {
-                const cleanLabelText = cleanDisplayLabel(labelEl.innerText).replace(/\([^)]+\)/g, '').replace(/[\s-_]/g, '').toLowerCase();
-                if (cleanLabelText.includes(cleanVarName) || cleanVarName.includes(cleanLabelText)) {
-                  val = parseFloat(input.value) || 0;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        // 將公式中的 {變數} 動態替換為實際數值
+      matches.forEach((match, idx) => {
+        // 依序取得畫面上第 idx 個輸入框的值，若沒有則補 0
+        const val = inputValues[idx] !== undefined ? inputValues[idx] : 0;
         evalStr = evalStr.replace(match, val);
       });
     }
 
     try {
-      // 執行動態數學運算
+      // 3. 執行動態數學計算
       const result = Function('"use strict";return (' + evalStr + ')')();
       return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
     } catch (e) {
@@ -680,6 +650,7 @@
       return '';
     }
   }
+  
   // 全域即時公式計算觸發器（修復 Uncaught ReferenceError）
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
