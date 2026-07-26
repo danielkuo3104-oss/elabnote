@@ -624,23 +624,33 @@
 
     // 2. 找出所有 {欄位名稱}
     const matches = evalStr.match(/\{([^}]+)\}/g);
+    
+    // 追蹤是否所有變數都成功取得有效數值
+    let hasValidValues = true;
+
     if (matches) {
       matches.forEach(match => {
-        const rawVarName = match.slice(1, -1).trim(); // 例如 "大鼠體重 (g)" 或 "PTZ使用劑量 (uL/g)"
-        let val = 0;
+        const rawVarName = match.slice(1, -1).trim();
+        let val = null;
 
-        // 直接透過畫面上的 input 或 currentFormCtx.data 抓取數值
         const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
         if (page && page.fields) {
           const targetField = page.fields.find(f => cleanDisplayLabel(f.label) === rawVarName);
           if (targetField) {
             const domEl = document.getElementById(targetField.id);
             const domVal = domEl ? domEl.value : '';
-            val = parseFloat(domVal !== '' ? domVal : currentFormCtx.data[targetField.id]) || 0;
-            console.log(`成功透過欄位對應抓到 [${rawVarName}] 的值:`, val);
-          } else {
-            console.warn(`找不到對應的 field label: "${rawVarName}"`);
+            if (domVal !== '' && !isNaN(domVal)) {
+              val = parseFloat(domVal);
+            } else if (currentFormCtx.data[targetField.id] !== undefined && currentFormCtx.data[targetField.id] !== '') {
+              val = parseFloat(currentFormCtx.data[targetField.id]);
+            }
           }
+        }
+
+        // 若該變數沒有有效填寫數值，標記為 false
+        if (val === null || isNaN(val)) {
+          hasValidValues = false;
+          val = 0; // 暫代 0 避免算式崩潰
         }
 
         const safeRegex = new RegExp(match.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
@@ -650,10 +660,19 @@
 
     console.log("替換數值後的算式:", evalStr);
 
-    // 3. 直接執行運算（不隱藏報錯，讓錯誤直接跳出來）
-    const result = Function('"use strict";return (' + evalStr + ')')();
-    console.log("計算結果:", result);
-    return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
+    // 🚀 關鍵防呆：若使用者尚未完整填寫變數，直接安靜回傳空白，不執行運算，徹底阻絕 SyntaxError
+    if (!hasValidValues) {
+      return '';
+    }
+
+    try {
+      const result = Function('"use strict";return (' + evalStr + ')')();
+      console.log("計算結果:", result);
+      return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
+    } catch (e) {
+      console.error("公式運算錯誤:", evalStr, e);
+      return '';
+    }
   }
   
   function triggerRealtimeFormulaCalculation() {
