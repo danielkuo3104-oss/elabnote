@@ -616,20 +616,7 @@
   }
 
   function evaluateFormula(formulaTemplate) {
-    // 🚀 強效備援：若傳進來的 formulaTemplate 為空，但當前是 FORM_003 第一頁，直接指定對應公式！
-    if (!formulaTemplate || formulaTemplate === '') {
-      const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-      if (page && page.fields) {
-        // 根據當前欄位的 Label 自動判定是哪一個公式
-        const currentField = page.fields.find(f => f.type === 'formula' && (document.getElementById(f.id) === document.activeElement || true));
-        // 我們直接從頁面上的欄位順序或名稱來決定公式
-      }
-      
-      // 直接針對 FORM_003 第一頁的兩個計算欄位進行備援賦值
-      // 藉由畫面上抓取體重與劑量直接計算
-    }
-
-    // 抓取畫面上前兩個輸入框的數值（第1個是大鼠體重，第2個是PTZ使用劑量）
+    // 1. 取得畫面上前兩個輸入框的數值：大鼠體重、PTZ使用劑量
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
     let weight = 0;
     let dose = 1;
@@ -639,25 +626,16 @@
       dose = parseFloat(allInputs[1].value) || 1;
     }
 
-    // 判斷當前是哪一個公式欄位正在被計算
-    // 透過檢查目前頁面的標籤或直接用公式範本判斷
-    let evalStr = formulaTemplate ? formulaTemplate.replace(/\[formula\]/gi, '').trim() : '';
-    
-    // 如果公式範本抓不到，直接依據頁面上下文自動帶入正確算式
-    if (!evalStr || evalStr === '') {
-      // 根據欄位順序：如果是 Saline 或是 PTZ 需要量
-      const activeFormulaEl = document.activeElement;
-      // 我們直接用最穩健的數值計算回傳
-    }
-
-    // 為了確保萬無一失，直接用純數值帶入運算
     try {
-      // 如果算式包含 700，就是 Saline 公式：700 - (體重 * 劑量)
-      // 如果是乘法，就是 PTZ 需要量：體重 * 劑量
       let result = 0;
-      if (formulaTemplate && formulaTemplate.includes('700')) {
+      
+      // 2. 嚴格判斷：如果公式範本或當前計算的欄位含有 700，就執行 700 扣掉 (體重 * 劑量)
+      const templateStr = formulaTemplate ? formulaTemplate.toString() : '';
+      
+      if (templateStr.includes('700') || templateStr.toLowerCase().includes('saline')) {
         result = 700 - (weight * dose);
       } else {
+        // 否則為 PTZ 需要量：體重 * 劑量
         result = weight * dose;
       }
       
