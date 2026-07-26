@@ -615,16 +615,18 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 安全動態公式解析引擎（確保大括號變數被安全替換為純數字）
+  // 安全動態公式解析引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
-    let evalStr = formulaTemplate;
+    
+    // 🚀 關鍵：清除開頭可能殘留的 [formula] 標籤與空白
+    let evalStr = formulaTemplate.replace(/\[formula\]/gi, '').trim();
     
     // 找出所有 {欄位名稱}
-    const matches = formulaTemplate.match(/\{([^}]+)\}/g);
+    const matches = evalStr.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
-        const rawVarName = match.slice(1, -1).trim(); // 抓出大括號內的名稱
+        const rawVarName = match.slice(1, -1).trim();
         let val = 0;
 
         // 從當前畫面上所有的動態輸入框尋找對應數值
@@ -635,7 +637,6 @@
             const lbl = group.querySelector('label');
             if (lbl) {
               const lblText = cleanDisplayLabel(lbl.innerText);
-              // 模糊比對標籤文字
               if (lblText.includes(rawVarName) || rawVarName.includes(lblText) || lblText.replace(/\([^)]+\)/g, '').trim() === rawVarName.replace(/\([^)]+\)/g, '').trim()) {
                 if (input.value !== '') {
                   val = parseFloat(input.value) || 0;
@@ -660,14 +661,14 @@
           });
         }
 
-        // 🚀 關鍵：使用正規表達式將整組 {變數名稱} 安全替換為純數字
+        // 安全替換變數為純數字
         const safeRegex = new RegExp(match.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
         evalStr = evalStr.replace(safeRegex, val);
       });
     }
 
     try {
-      // 執行安全的數學運算
+      // 執行動態數學運算
       const result = Function('"use strict";return (' + evalStr + ')')();
       return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
     } catch (e) {
