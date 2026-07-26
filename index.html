@@ -1773,12 +1773,11 @@
     refreshDashboard(false);
   }
 
-  // 嚴格規定：僅 FORM_002_1、FORM_002_2、FORM_006 執行必填檢查（涵蓋簡答題、單選與勾選題）
+  // 嚴格規定：僅 FORM_002_1、FORM_002_2、FORM_006 執行必填檢查
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
     const targetForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     
-    // 如果不是這三張表單，直接通過提交
     if (!targetForms.includes(formId)) {
       submitFormFinal();
       return;
@@ -1786,10 +1785,9 @@
 
     const uncompletedFields = [];
 
-    // 掃描整張表單的所有頁面欄位
+    // 掃描整張表單的所有頁面與欄位
     currentFormCtx.pages.forEach(page => {
       page.fields.forEach(f => {
-        // 自動忽略「備註」、公式、標題區塊
         const isNoteField = f.label && (f.label.includes('備註') || f.label.toLowerCase().includes('note'));
         if (isNoteField || f.type === 'formula' || f.type === 'section') return; 
 
@@ -1801,7 +1799,7 @@
             uncompletedFields.push(f.label);
           }
         } 
-        // 2. 檢查單選題 (Radio) 或大綱選單
+        // 2. 檢查單選題 (Radio) 或大綱選單：確保該群組有選值
         else if (f.type === 'radio' || f.type === 'outline_select') {
           if (!currentFormCtx.data[f.id] && !currentFormCtx.data['outline_select_val']) {
             uncompletedFields.push(f.label);
@@ -1822,7 +1820,6 @@
       });
     });
 
-    // 發現有未填/未勾項目時跳出彈窗警告
     if (uncompletedFields.length > 0) {
       const listHtml = uncompletedFields.map(name => `<li style="margin-bottom:2px;">• ${name}</li>`).join('');
       const msgHtml = `
@@ -1837,7 +1834,6 @@
       submitFormFinal();
     }
   }
-
   function jumpToFormPage(idx) {
     currentFormCtx.currentPageIdx = idx;
     renderFormSidebar();
