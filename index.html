@@ -85,7 +85,7 @@
       100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
-    /* 今日進行中項目卡片（可點擊效果） */
+    /* 今日進行中項目卡片 */
     .active-exp-card {
       background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md);
       padding: 12px 14px; margin-bottom: 10px; position: relative; cursor: pointer; transition: all 0.2s ease;
@@ -183,7 +183,7 @@
       width: 150px; text-align: center; border: 1px solid var(--border-color);
     }
 
-    /* 彈窗細節與詳細資訊彈窗樣式 */
+    /* Modal */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px;
@@ -785,6 +785,7 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
+  // 強健的 JSON 解析與「備註 (notes)」統一語意化讀取
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(URL_DATA);
@@ -857,7 +858,6 @@
     sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
   }
 
-  // 渲染 Dashboard UI，今日卡片加上點擊事件 (showActiveExpDetail)
   function renderMainDashboardUI() {
     const isZH = state.currentLang === 'ZH';
     const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗結束' && d.status !== 'Completed');
@@ -916,6 +916,7 @@
     }
   }
 
+  // 點擊今日卡片：優先讀取 JSON 內的標準 "notes" 備註欄位
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -925,22 +926,25 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 排除系統控制欄位，精準抓取使用者填寫的備註 / 輸入內容
-    const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val'];
-    let notesList = [];
-
-    Object.keys(formData).forEach(k => {
-      // 只要不是系統 key，且值存在、不為空
-      if (!systemKeys.includes(k) && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
-        const valStr = String(formData[k]).trim();
-        // 避免重複放入跟「大綱」或「目的」完全相同的字串
-        if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name']) {
-          notesList.push(valStr);
+    // 優先採用標準 "notes" 鍵值
+    let notesVal = formData['notes'] || '';
+    
+    // 備用防護：若沒有標準 "notes"，自動搜尋任何包含「備註」或 field_ 的輸入字串
+    if (!notesVal) {
+      const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes_label'];
+      let notesList = [];
+      Object.keys(formData).forEach(k => {
+        if (!systemKeys.includes(k) && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
+          const valStr = String(formData[k]).trim();
+          if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name']) {
+            notesList.push(valStr);
+          }
         }
-      }
-    });
+      });
+      notesVal = notesList.join('\n');
+    }
 
-    const notesStr = notesList.length > 0 ? notesList.join('\n') : (isZH ? '無附加備註' : 'No notes available');
+    const notesStr = notesVal ? notesVal : (isZH ? '無附加備註' : 'No notes available');
 
     const htmlContent = `
       <div class="detail-list">
@@ -1137,7 +1141,7 @@
     document.getElementById('lblUserSelect').innerText = isZH ? "選擇會員帳號" : "Select User Account";
     document.getElementById('lblPassword').innerText = isZH ? "識別密碼" : "Password";
     document.getElementById('btnLoginSubmit').innerText = isZH ? "登入" : "Login";
-    document.getElementById('btnGuestSubmit').innerText = isZH ? "訪客登入 (僅查看)" : "Guest Login (Read Only)";
+    document.getElementById('btnGuestSubmit').innerText = isZH ? "訪客登入 (僅說明)" : "Guest Login (Read Only)";
 
     document.getElementById('appTitle').innerText = isZH ? "智慧實驗日誌" : "Smart E-Labnote";
     document.getElementById('btnTodayExp').innerText = isZH ? "今日實驗登錄" : "Today Exp";
@@ -1217,6 +1221,7 @@
     document.getElementById('formPageContainer').style.display = 'flex';
   }
 
+  // 自動帶入：讀取 JSON 內的 "notes" 鍵值，並正確套用回對應輸入框
   function handleExpSelectChange(expId) {
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
@@ -1224,14 +1229,13 @@
     if (expId && expId !== 'NEW_PROJECT') {
       const existingRecord = state.dataCenter.find(d => d.expId === expId);
       if (existingRecord) {
-        // 1. 帶入負責人
         if (existingRecord.user) {
           saveFormFieldData('user_select_val', existingRecord.user);
         }
 
         const savedData = existingRecord.formData || {};
         
-        // 2. 完整拷貝舊 JSON 的所有動態欄位 (包含 field_14_4 等備註與輸入框)
+        // 完整複製舊 JSON 欄位（包含解耦後的 "notes" 屬性）
         Object.keys(savedData).forEach(key => {
           currentFormCtx.data[key] = savedData[key];
         });
@@ -1245,7 +1249,6 @@
           savedPurpose = parts[1].trim();
         }
 
-        // 帶入大綱
         if (savedOutline) {
           currentFormCtx.data['outline_select_val'] = savedOutline;
           const outlineField = currentFormCtx.pages[0]?.fields.find(f => f.type === 'outline_select');
@@ -1254,13 +1257,11 @@
           }
         }
 
-        // 比對並觸發選擇 Radio 目的選項
         currentFormCtx.pages.forEach(page => {
           page.fields.forEach(field => {
             if (field.type === 'radio' && field.options) {
               field.options.forEach((opt, idx) => {
                 const optName = typeof opt === 'string' ? opt : opt.name;
-                
                 if (savedPurpose && (optName.trim() === savedPurpose.trim() || optName.includes(savedPurpose) || savedPurpose.includes(optName))) {
                   currentFormCtx.data[field.id] = optName;
                   currentFormCtx.data['selected_purpose_name'] = optName;
@@ -1273,7 +1274,8 @@
           });
         });
 
-        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、大綱、目的與備註 (${savedData['field_14_4'] || '無'}) 已自動填入。`);
+        const displayNote = savedData['notes'] || '無';
+        showCustomAlert("資料已自動帶入", `已成功同步 [${expId}] 的歷史紀錄！\n負責人、大綱、目的與備註 (${displayNote}) 已自動填入。`);
       }
     }
     renderFormCurrentPage();
@@ -1351,7 +1353,7 @@
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value); saveFormFieldData('user_select_val', this.value);">
+            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}'); saveFormFieldData('user_select_val', this.value);">
               ${state.membersList.map(m => `<option value="${m.name}" ${selectedUser === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
             </select>
           </div>
@@ -1361,7 +1363,7 @@
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value)">
+            <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}')">
             ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
           </div>
         `;
@@ -1370,7 +1372,7 @@
         html += `
           <div class="form-group">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-            <input type="${field.type}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value)">
+            <input type="${field.type}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}')">
             ${field.desc ? `<div class="field-desc">${field.desc}</div>` : ''}
           </div>
         `;
@@ -1378,8 +1380,8 @@
       else if (field.type === "checkbox") {
         const isSelected = !!currentFormCtx.data[field.id];
         html += `
-          <div class="option-card ${isSelected ? 'selected' : ''}" onclick="toggleOptionCheckbox('${field.id}')">
-            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}');">
+          <div class="option-card ${isSelected ? 'selected' : ''}" onclick="toggleOptionCheckbox('${field.id}', '${field.label}')">
+            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}');">
             <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
           </div>
           ${field.desc ? `<div class="field-desc" style="margin:-4px 0 10px 4px;">${field.desc}</div>` : ''}
@@ -1398,7 +1400,7 @@
               <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
               <label for="${optId}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" value="${currentFormCtx.data[field.id+'_input'] || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
+            ${(opt.hasInput && isSelected) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" value="${currentFormCtx.data[field.id+'_input'] || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註')">` : ''}
           `;
         });
         html += `</div>`;
@@ -1415,7 +1417,7 @@
               <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
               <label for="${field.id}_${idx}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" value="${currentFormCtx.data[field.id+'_input'] || ''}" oninput="saveFormFieldData('${field.id}_input', this.value)">` : ''}
+            ${(opt.hasInput && isChecked) ? `<input type="text" class="form-control" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" value="${currentFormCtx.data[field.id+'_input'] || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註')">` : ''}
           `;
         });
         html += `</div>`;
@@ -1441,13 +1443,13 @@
     const outlineCode = String.fromCharCode(65 + parseInt(outlineIdx));
     currentFormCtx.data['outline_select_val'] = val;
     currentFormCtx.data['outline_code'] = outlineCode;
-    saveFormFieldData(fieldId, val);
+    saveFormFieldData(fieldId, val, '實驗大綱');
     
     renderFormCurrentPage();
   }
 
   function selectOptionRadio(fieldId, optName, action, statusTag, purposeIdx) {
-    saveFormFieldData(fieldId, optName);
+    saveFormFieldData(fieldId, optName, '實驗目的');
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
     
@@ -1457,9 +1459,9 @@
     renderFormCurrentPage();
   }
 
-  function toggleOptionCheckbox(fieldId) {
+  function toggleOptionCheckbox(fieldId, label) {
     const currentVal = !currentFormCtx.data[fieldId];
-    saveFormFieldData(fieldId, currentVal);
+    saveFormFieldData(fieldId, currentVal, label);
     renderFormCurrentPage();
   }
 
@@ -1475,8 +1477,16 @@
     renderFormCurrentPage();
   }
 
-  function saveFormFieldData(fieldId, val) {
+  // 核心：輸入時自動維護標準 "notes" Key（題目含「備註」或包含 _input 著一律寫入 JSON 的 notes 屬性）
+  function saveFormFieldData(fieldId, val, fieldLabel = '') {
     currentFormCtx.data[fieldId] = val;
+
+    // 只要標題帶有「備註」或屬性是帶有輸入框的 field_X_Y_input，自動同步賦予語意化標籤 "notes"
+    if (fieldLabel.includes('備註') || fieldId.endsWith('_input') || fieldLabel.toLowerCase().includes('note') || fieldLabel.toLowerCase().includes('remark')) {
+      currentFormCtx.data['notes'] = val;
+      currentFormCtx.data['notes_label'] = fieldLabel || '備註';
+    }
+
     state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
   }
 
