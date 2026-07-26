@@ -615,21 +615,20 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 防呆版安全動態公式解析引擎
+  // 終極防呆版動態公式解析引擎
   function evaluateFormula(formulaTemplate) {
     if (!formulaTemplate) return '';
     
-    // 1. 過濾掉開頭的 [formula] 標籤與空白
+    // 1. 清除標籤與空白
     let evalStr = formulaTemplate.replace(/\[formula\]/gi, '').trim();
     
-    // 2. 找出所有 {欄位名稱}
+    // 2. 將大括號變數取代為對應的數值
     const matches = evalStr.match(/\{([^}]+)\}/g);
     if (matches) {
       matches.forEach(match => {
         const rawVarName = match.slice(1, -1).trim();
         let val = 0;
 
-        // 從當前畫面上所有的動態輸入框尋找對應數值
         const allInputs = document.querySelectorAll('#formContent input.dynamic-input, #formContent input.form-control, #formContent textarea.dynamic-input');
         for (let input of allInputs) {
           const group = input.closest('.form-group');
@@ -647,7 +646,6 @@
           }
         }
 
-        // 若 DOM 沒抓到，改從記憶體 currentFormCtx.data 尋找
         if (val === 0 && currentFormCtx.pages) {
           currentFormCtx.pages.forEach(p => {
             if (p.fields) {
@@ -661,7 +659,6 @@
           });
         }
 
-        // 安全替換變數為純數字（若為空則補 0，避免產生空括號）
         const safeVal = isNaN(val) ? 0 : val;
         const safeRegex = new RegExp(match.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
         evalStr = evalStr.replace(safeRegex, safeVal);
@@ -669,17 +666,22 @@
     }
 
     try {
-      // 🚀 防呆清洗：若算式中不小心留下無效的空括號，進行預防性替換
+      // 🚀 清洗所有可能造成語法崩潰的無效括號與符號
       evalStr = evalStr.replace(/\(\s*\)/g, '(0)');
+      
+      // 如果算式裡面還留有文字或奇怪符號，直接攔截不執行
+      if (/[a-zA-Z一-龥]/.test(evalStr)) {
+        return '';
+      }
 
-      // 執行動態數學運算
       const result = Function('"use strict";return (' + evalStr + ')')();
       return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
     } catch (e) {
-      console.error("公式運算錯誤:", evalStr, e);
+      // 就算公式語法暫時不完整，也只安靜回傳空白，絕不噴錯
       return '';
     }
   }
+  
   // 升級版即時公式計算觸發器（帶偵測訊息顯示）
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
