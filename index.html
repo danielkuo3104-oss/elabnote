@@ -616,7 +616,6 @@
   }
 
   function evaluateFormula(formulaTemplate) {
-    // 1. 取得畫面上前兩個輸入框的數值：大鼠體重、PTZ使用劑量
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
     let weight = 0;
     let dose = 1;
@@ -628,14 +627,12 @@
 
     try {
       let result = 0;
-      
-      // 2. 嚴格判斷：如果公式範本或當前計算的欄位含有 700，就執行 700 扣掉 (體重 * 劑量)
       const templateStr = formulaTemplate ? formulaTemplate.toString() : '';
       
+      // 🚀 精準判斷：如果公式內容包含 700 或 saline，才執行減法；否則執行乘法
       if (templateStr.includes('700') || templateStr.toLowerCase().includes('saline')) {
         result = 700 - (weight * dose);
       } else {
-        // 否則為 PTZ 需要量：體重 * 劑量
         result = weight * dose;
       }
       
