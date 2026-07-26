@@ -1500,7 +1500,7 @@
         html += `
           <div class="form-group">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-            <input type="text" id="${field.id}" class="form-control" readonly style="background:#e2e8f0; font-weight:700; color:var(--primary);" value="${calculatedVal}">
+            <input type="text" id="${field.id}" class="form-control formula-field" readonly style="background:#e2e8f0; font-weight:700; color:var(--primary);" value="${calculatedVal}">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -1580,8 +1580,8 @@
         if (isNoteInput) {
           html += `
             <div class="form-group">
-              <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-              <input type="${field.type}" id="${field.id}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}'); triggerRealtimeFormulaCalculation();">
+              <label>${field.label}</label>
+              <textarea id="${field.id}" class="form-control dynamic-input" rows="3" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
               ${renderFieldDescription(field.desc)}
             </div>
           `;
@@ -1589,7 +1589,7 @@
           html += `
             <div class="form-group">
               <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-              <input type="${field.type}" id="${field.id}" class="form-control" value="${val}" placeholder="${field.placeholder || ''}" oninput="saveFormFieldData('${field.id}', this.value, '${field.label}'); triggerRealtimeFormulaCalculation();">
+              <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
               ${renderFieldDescription(field.desc)}
             </div>
           `;
@@ -1618,7 +1618,7 @@
               <input type="radio" name="${field.id}" id="${optId}" value="${optName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${optName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
               <label for="${optId}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<textarea class="form-control" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註'); triggerRealtimeFormulaCalculation();">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="備註">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1635,7 +1635,7 @@
               <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
               <label for="${field.id}_${idx}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<textarea class="form-control" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" oninput="saveFormFieldData('${field.id}_input', this.value, '備註'); triggerRealtimeFormulaCalculation();">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="備註">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1644,20 +1644,43 @@
 
     container.innerHTML = html;
 
+    // 🚀 關鍵：在 DOM 渲染後，統一為所有輸入框綁定事件，確保焦點不跑掉且即時響應計算
+    const dynamicInputs = container.querySelectorAll('.dynamic-input');
+    dynamicInputs.forEach(input => {
+      input.addEventListener('input', (e) => {
+        const fId = e.target.getAttribute('data-field-id');
+        const fLabel = e.target.getAttribute('data-label');
+        saveFormFieldData(fId, e.target.value, fLabel);
+        
+        // 即時驅動整頁所有公式重新計算
+        triggerRealtimeFormulaCalculationLocally();
+      });
+    });
+
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
     const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
     
-    // 指定表單直接顯示「提交與檢查」
-    const targetDirectForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     const btnNext = document.getElementById('btnFormNext');
-
-    if (targetDirectForms.includes(currentFormCtx.formId)) {
-      btnNext.innerText = state.currentLang === 'ZH' ? '提交與檢查' : 'Check & Submit';
-    } else {
-      btnNext.innerText = isSubmit ? (state.currentLang === 'ZH' ? '提交' : 'Submit') : (state.currentLang === 'ZH' ? '下一頁' : 'Next');
-    }
+    btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
     btnNext.disabled = state.isSubmitting;
+  }
+
+  // 同頁面即時刷新公式 DOM 顯示
+  function triggerRealtimeFormulaCalculationLocally() {
+    const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+    if (!page || !page.fields) return;
+
+    page.fields.forEach(f => {
+      if (f.type === "formula") {
+        const calculatedVal = evaluateFormula(f.formula);
+        currentFormCtx.data[f.id] = calculatedVal;
+        const domEl = document.getElementById(f.id);
+        if (domEl) {
+          domEl.value = calculatedVal; // 直接即時寫入畫面上對應的公式框
+        }
+      }
+    });
   }
 
   function onOutlineChange(fieldId, val) {
