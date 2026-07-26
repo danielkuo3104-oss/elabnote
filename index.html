@@ -649,17 +649,18 @@
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
 
-    // 抓取畫面上前兩個輸入框的數值作為即時基準
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
     let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
     let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
+
+    let formulaIndex = 0; // 用來計算當前是第幾個公式欄位
 
     page.fields.forEach(f => {
       if (f.type === "formula") {
         let calculatedVal = 0;
         
-        // 🚀 關鍵：即時運算時同步檢查欄位名稱，Saline 走 700 扣除，其餘走乘法
-        if (f.label.includes('Saline')) {
+        // 🚀 依序號分流：第 0 個公式算乘法，第 1 個公式算 700 扣除
+        if (formulaIndex === 1) {
           calculatedVal = 700 - (weight * dose);
         } else {
           calculatedVal = weight * dose;
@@ -671,6 +672,8 @@
         if (domEl) {
           domEl.value = isNaN(calculatedVal) ? '' : calculatedVal;
         }
+
+        formulaIndex++;
       }
     });
   }
@@ -1487,8 +1490,10 @@
         let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
         let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
 
-        // 🚀 直接用欄位名稱判斷：如果是 Saline 就用 700 扣，否則算乘法！
-        if (field.label.includes('Saline')) {
+        // 計算目前是該頁面的第幾個公式欄位（透過已渲染的數量判定）
+        const renderedFormulaCount = container.querySelectorAll('.formula-field').length;
+
+        if (renderedFormulaCount === 1) {
           calculatedVal = 700 - (weight * dose);
         } else {
           calculatedVal = weight * dose;
