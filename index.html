@@ -716,214 +716,80 @@
     }
   }
 
-  async function fetchAndParseFormsFromSheet() {
-  try {
-    const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
-    const csvText = await res.text();
-    const rows = parseCSV(csvText);
+  async function fetchDataCenterFromSheet() {
+    try {
+      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
 
-    if (rows.length < 2) return;
+      const records = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row[0] || row[1]) {
+          const expId = row[0] ? row[0].trim() : '未編號';
+          const date = row[1] ? row[1].trim() : '';
+          const user = row[2] ? row[2].trim() : '';
+          let statusFromSheet = row[3] ? row[3].trim() : '';
+          
+          let parsedFormData = {};
 
-    const headerRow = rows[0];
-    const formBlocks = [];
+          const jsonCols = [4, 6, 8, 10, 12];
+          jsonCols.forEach(colIdx => {
+            if (row[colIdx]) {
+              let rawJsonStr = row[colIdx].trim();
+              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
+                rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+              }
+              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+                try {
+                  const jsonObj = JSON.parse(rawJsonStr);
+                  parsedFormData = { ...parsedFormData, ...jsonObj };
+                } catch (e) {}
+              }
+            }
+          });
 
-    for (let colIdx = 0; colIdx < headerRow.length; colIdx++) {
-      const cellVal = (headerRow[colIdx] || "").trim();
-      if (cellVal.startsWith("FORM_")) {
-        formBlocks.push({ formId: cellVal, startCol: colIdx });
-      }
-    }
+          let form001Data = {};
+          if (row[4]) {
+            let rawForm1Str = row[4].trim();
+            if (rawForm1Str.startsWith('"') && rawForm1Str.endsWith('"')) {
+              rawForm1Str = rawForm1Str.slice(1, -1).replace(/""/g, '"');
+            }
+            if (rawForm1Str.startsWith('{') && rawForm1Str.endsWith('}')) {
+              try { form001Data = JSON.parse(rawForm1Str); } catch (e) {}
+            }
+          }
 
-    const parsedForms = {};
-    state.fieldLabelMap = {};
-
-    formBlocks.forEach(block => {
-      const formId = block.formId;
-      const col = block.startCol;
-      
-      const pages = [];
-      let currentPage = null;
-      let lastParentField = null;
-
-      for (let r = 2; r < rows.length; r++) {
-        const rawLabel = (rows[r][col] || "").trim();
-        const rawType = (rows[r][col + 1] || "").trim();
-        const rawOption = (rows[r][col + 2] || "").trim();
-        const rawDesc = (rows[r][col + 3] || "").trim();
-
-        if (!rawLabel && !rawType) continue;
-
-        if (rawLabel.includes("【") && rawLabel.includes("】")) {
-          const pageTitle = cleanDisplayLabel(rawLabel.replace(/【|】/g, ""));
-          currentPage = { title: pageTitle, fields: [] };
-          pages.push(currentPage);
-          lastParentField = null;
-          continue;
-        }
-
-        if (!currentPage) {
-          currentPage = { title: "Page 1 基本資訊", fields: [] };
-          pages.push(currentPage);
-        }
-
-        if (rawType.includes("[#]")) {
-          currentPage.fields.push({ type: "section", label: cleanDisplayLabel(rawLabel) });
-          lastParentField = null;
-          continue;
-        }
-
-        // 🚀 全相容解析：統一擷取群組屬性
-        let disableGroup = null;
-        if (rawType.includes("[disable_group:")) {
-          const match = rawType.match(/\[disable_group:\s*([^\]]+)\]/i);
-          if (match) disableGroup = match[1].trim();
-        }
-
-        let belongGroup = null;
-        if (rawType.includes("[group:")) {
-          const match = rawType.match(/\[group:\s*([^\]]+)\]/i);
-          if (match) belongGroup = match[1].trim();
-        }
-
-        let dependsOn = null;
-        if (rawType.includes("[depends_on:")) {
-          const match = rawType.match(/\[depends_on:\s*([^\]]+)\]/i);
-          if (match) dependsOn = match[1].trim();
-        }
-
-        let formulaExpr = null;
-        let formulaUnit = '';
-        
-        if (rawType.includes("[formula]") || (rawType.includes("{") && (rawType.includes("*") || rawType.includes("-")))) {
-          const fMatch = rawType.match(/\[formula:\s*([^\]]+)\]/i);
-          if (fMatch) {
-            formulaExpr = fMatch[1].trim();
+          const outlineName = cleanDisplayLabel(form001Data['outline_select_val'] || '');
+          const purposeName = cleanDisplayLabel(form001Data['selected_purpose_name'] || '');
+          
+          let dynamicInfo = "";
+          if (outlineName && purposeName) {
+            dynamicInfo = `${outlineName} - ${purposeName}`;
+          } else if (outlineName || purposeName) {
+            dynamicInfo = outlineName || purposeName;
           } else {
-            formulaExpr = rawType.replace(/\[number\]|\[text\]/gi, '').trim();
-          }
-          
-          const uMatch = rawType.match(/\[unit:\s*([^\]]+)\]/i);
-          if (uMatch) formulaUnit = uMatch[1].trim();
-        }
-
-        const fieldId = `field_${r}_${col}`;
-        const cleanLbl = cleanDisplayLabel(rawLabel);
-
-        if (cleanLbl) {
-          state.fieldLabelMap[fieldId] = cleanLbl;
-        }
-
-        if (formulaExpr) {
-          currentPage.fields.push({
-            id: fieldId,
-            label: cleanLbl,
-            type: "formula",
-            formula: formulaExpr,
-            unit: formulaUnit,
-            belongGroup: belongGroup,
-            desc: rawDesc
-          });
-          lastParentField = null;
-          continue;
-        }
-
-        if (rawType.includes("[v]") && rawLabel.includes("實驗大綱")) {
-          lastParentField = { id: fieldId, label: cleanLbl, type: "outline_select", options: [], belongGroup: belongGroup };
-          currentPage.fields.push(lastParentField);
-        }
-        else if (rawType.includes("[radio]")) {
-          lastParentField = { id: fieldId, label: cleanLbl, type: "radio", dependsOn: dependsOn, options: [], disableGroup: disableGroup, belongGroup: belongGroup };
-          currentPage.fields.push(lastParentField);
-        } 
-        else if (rawType.includes("[checkbox_group]")) {
-          lastParentField = { id: fieldId, label: cleanLbl, type: "checkbox_group", dependsOn: dependsOn, options: [], disableGroup: disableGroup, belongGroup: belongGroup };
-          currentPage.fields.push(lastParentField);
-        }
-        else if ((rawType.includes("[option]") || rawType.includes("[option_input]")) && lastParentField) {
-          const optName = cleanDisplayLabel(rawLabel.replace(/^-\s*/, ''));
-          const hasInput = rawType.includes("[option_input]");
-          
-          let action = null;
-          if (rawType.includes("[goto:")) {
-            const match = rawType.match(/\[goto:\s*(Page\s*\d+)\]/i);
-            if (match) action = { type: "goto", target: match[1] };
-          } else if (rawType.includes("[submit]")) {
-            action = { type: "submit" };
+            dynamicInfo = "實驗專案";
           }
 
-          let statusTag = null;
-          if (rawType.includes("[status:")) {
-            const match = rawType.match(/\[status:\s*([^\]]+)\]/i);
-            if (match) statusTag = match[1];
-          }
-
-          // 🚀 關鍵強化：讓子選項 option 也能掛載 disableGroup / belongGroup
-          lastParentField.options.push({
-            name: optName,
-            hasInput: hasInput,
-            action: action,
-            statusTag: statusTag,
-            disableGroup: disableGroup,
-            belongGroup: belongGroup,
-            placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "請說明..."
+          const colV = row[21] ? row[21].trim() : '';
+          records.push({
+            expId: expId,
+            date: date,
+            user: user,
+            status: statusFromSheet,
+            info: dynamicInfo,
+            formData: parsedFormData,
+            hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
           });
-        } 
-        else if (rawType.includes("[c]") || rawType.includes("[checkbox]")) {
-          currentPage.fields.push({
-            id: fieldId,
-            label: cleanDisplayLabel(rawLabel.replace(/^-\s*/, '')),
-            type: "checkbox",
-            disableGroup: disableGroup,
-            belongGroup: belongGroup,
-            desc: rawDesc
-          });
-          lastParentField = null;
-        } 
-        else if (rawType.includes("[v]")) {
-          const isExpSelect = rawType.includes("資料中心");
-          currentPage.fields.push({
-            id: fieldId,
-            label: cleanLbl,
-            type: isExpSelect ? "exp_select" : "user_select",
-            belongGroup: belongGroup,
-            default: state.currentUser ? state.currentUser.name : "Daniel"
-          });
-          lastParentField = null;
-        }
-        else if (rawType.includes("[datetime]")) {
-          currentPage.fields.push({
-            id: fieldId,
-            label: cleanLbl,
-            type: "date",
-            default: state.simulatedDate,
-            belongGroup: belongGroup,
-            desc: rawDesc
-          });
-          lastParentField = null;
-        }
-        else if (rawType.includes("[number]") || rawType.includes("[text]")) {
-          currentPage.fields.push({
-            id: fieldId,
-            label: cleanLbl,
-            type: rawType.includes("[number]") ? "number" : "text",
-            default: rawType.match(/\[default:\s*([^\]]+)\]/)?.[1] || "",
-            unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || "",
-            placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "",
-            belongGroup: belongGroup,
-            desc: rawDesc
-          });
-          lastParentField = null;
         }
       }
-
-      parsedForms[formId] = pages;
-    });
-
-    state.dynamicForms = parsedForms;
-  } catch (err) {
-    console.error("動態解析表單失敗:", err);
+      // 🚀 直接用試算表最新的真實資料完全覆蓋 local 記憶體，不留舊快取殘影！
+      state.dataCenter = records;
+    } catch (err) {
+      console.error("同步資料中心失敗:", err);
+    }
   }
-}
 
   function getFormStructure(formId) {
     if (state.dynamicForms && state.dynamicForms[formId]) {
