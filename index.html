@@ -1839,8 +1839,13 @@
         if (selectedOutline !== field.dependsOn) return;
       }
 
-      // 🚀 判斷是否屬於已關閉群組
-      const isGroupDisabled = field.belongGroup && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[field.belongGroup];
+      // 🚀 關鍵修復：比對 belongGroup 時強制去空白與大小寫轉換
+      let isGroupDisabled = false;
+      if (field.belongGroup && currentFormCtx.disabledGroups) {
+        const cleanBelongTag = String(field.belongGroup).trim().toLowerCase();
+        isGroupDisabled = !!currentFormCtx.disabledGroups[cleanBelongTag];
+      }
+
       const disabledAttr = isGroupDisabled ? 'disabled' : '';
       const disabledStyle = isGroupDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
 
@@ -1947,10 +1952,10 @@
       }
       else if (field.type === "checkbox") {
         const isSelected = !!currentFormCtx.data[field.id];
-        const disTag = field.disableGroup ? field.disableGroup : '';
+        const disTag = field.disableGroup ? field.disableGroup.trim() : '';
         
         html += `
-          <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}')">
+          <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="if(!${isGroupDisabled}) toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}')">
             <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}');">
             <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
           </div>
@@ -2018,7 +2023,7 @@
 
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     
-    // 🚀 特殊表單固定顯示「提交與檢查」
+    // 特殊表單按鈕
     const specialForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     const btnNext = document.getElementById('btnFormNext');
 
@@ -2031,6 +2036,7 @@
     }
     btnNext.disabled = state.isSubmitting;
   }
+  
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
     const selectedOption = sel.options[sel.selectedIndex];
@@ -2060,17 +2066,17 @@
     const currentVal = !currentFormCtx.data[fieldId];
     saveFormFieldData(fieldId, currentVal, label);
 
-    // 🚀 若有設定關閉群組標籤
-    if (disableGroupTag && disableGroupTag.trim() !== '') {
-      const tag = disableGroupTag.trim();
+    // 🚀 強制全全去空白，避免試算表空格搞鬼
+    if (disableGroupTag && String(disableGroupTag).trim() !== '') {
+      const cleanTag = String(disableGroupTag).trim().toLowerCase();
       if (!currentFormCtx.disabledGroups) currentFormCtx.disabledGroups = {};
-      currentFormCtx.disabledGroups[tag] = currentVal; // true 代表開啟「停用」
+      currentFormCtx.disabledGroups[cleanTag] = currentVal; // true 代表啟動停用
 
-      // 勾選停用時，連動清除屬於該群組的所有已填資料
+      // 勾選停用時，清除屬於該群組的所有已填資料
       if (currentVal) {
         currentFormCtx.pages.forEach(p => {
           p.fields.forEach(f => {
-            if (f.belongGroup === tag) {
+            if (f.belongGroup && String(f.belongGroup).trim().toLowerCase() === cleanTag) {
               delete currentFormCtx.data[f.id];
             }
           });
