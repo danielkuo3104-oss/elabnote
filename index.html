@@ -2630,9 +2630,21 @@
       btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
     }
 
+    // ✅ 修正後的完整邏輯：
     let targetStatus = "準備中";
-
-    if (currentFormCtx.formId === "FORM_001_1") {
+    
+    // 🚀 優先檢查當前填寫資料中是否有選擇「已死亡」或「登錄狀態-已死亡」
+    let isDeceasedSelected = false;
+    Object.keys(currentFormCtx.data).forEach(k => {
+      const v = currentFormCtx.data[k];
+      if (typeof v === 'string' && v.includes('已死亡')) {
+        isDeceasedSelected = true;
+      }
+    });
+    
+    if (isDeceasedSelected) {
+      targetStatus = "已死亡";
+    } else if (currentFormCtx.formId === "FORM_001_1") {
       targetStatus = "準備中";
     } else if (currentFormCtx.formId === "FORM_001_2") {
       targetStatus = "已預約";
