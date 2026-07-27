@@ -1137,7 +1137,7 @@
     }
   }
 
-  // 🚀 精準修復：過濾重複實驗目的、計算手術用時、排版檢查狀態順序
+  // 🚀 語意化精準解析明細彈窗
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1148,13 +1148,9 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 1. 備註欄位
-    let notesStr = formData['notes'] || '';
-    if (!notesStr || String(notesStr).trim() === '') {
-      notesStr = isZH ? '無' : 'None';
-    }
-
-    // 2. 歷程時間軸 & 自動計算手術用時
+    // -------------------------------------------------------------
+    // 1. 歷程時間軸 & 手術用時計算
+    // -------------------------------------------------------------
     let timeLogsHtml = '';
     let surgeryDurationHtml = '';
     
@@ -1167,7 +1163,6 @@
         </div>
       `).join('');
 
-      // 計算手術用時 (手術中 -> 休息中 或 已死亡)
       if (logs['手術中'] && (logs['休息中'] || logs['已死亡'])) {
         const start = new Date(logs['手術中']);
         const end = new Date(logs['休息中'] || logs['已死亡']);
@@ -1186,61 +1181,96 @@
       timeLogsHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</span>`;
     }
 
-    // 3. 過濾明細項目
-    let detailBlocks = [];
-    const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes', 'notes_label', '_time_logs', '_is_checklist', '_is_force_submitted', 'field_14_4', 'field_79_8'];
-    
-    Object.keys(formData).forEach(k => {
-      // 忽略多餘項目與重複出現的「本次目的」/「校正 DH」
-      if (!systemKeys.includes(k) && !k.endsWith('_input') && !k.endsWith('_8') && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
-        const valStr = String(formData[k]).trim();
-        const questionLabel = state.fieldLabelMap[k] || k;
-        
-        // 跳過重複的本次目的
-        if (questionLabel.includes('本次目的') || questionLabel.includes('Experiment Purpose')) return;
-        if (questionLabel.includes('校正 DH')) return; // 精簡電極位置，僅保留精確插入座標
+    // -------------------------------------------------------------
+    // 2. 數據明細語意化提取 (精確格式對齊)
+    // -------------------------------------------------------------
+    let detailsList = [];
 
-        if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name'] && valStr !== 'true' && valStr !== 'false') {
-          detailBlocks.push(`
-            <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; border-bottom:1px solid #f1f5f9; padding-bottom:2px;">
-              <span style="color:var(--text-muted); font-weight:600; max-width:65%; font-size:10px;">${questionLabel}:</span>
-              <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${valStr}</span>
-            </div>
-          `);
-        }
-      }
-    });
+    // A. 物理/超音波參數 (加單位)
+    if (formData['field_19_0']) detailsList.push({ label: '頻率 / Frequency', val: `${formData['field_19_0']} HZ` });
+    if (formData['field_20_0']) detailsList.push({ label: '週期數 / Cycles', val: `${formData['field_20_0']} times` });
+    if (formData['field_21_0']) detailsList.push({ label: '電壓 / Voltage', val: `${formData['field_21_0']} mV` });
+    if (formData['field_22_0']) detailsList.push({ label: '間隔 / Interval', val: `${formData['field_22_0']} ms` });
 
-    // 4. 準備檢查狀態移至超音波資訊下方 (Field Data 末端)
-    const hasForm002Data = Object.keys(formData).some(k => k.endsWith('_8')); 
-    if (hasForm002Data || exp.status === '準備完成') {
+    // B. 實驗前檢查狀態
+    const hasForm002 = Object.keys(formData).some(k => k.endsWith('_8'));
+    if (hasForm002 || exp.status === '準備完成') {
       let isAllChecked = true;
-      let checkCount = 0;
-
       Object.keys(formData).forEach(k => {
-        if (k.endsWith('_8') && k !== 'field_79_8') {
-          checkCount++;
-          if (formData[k] !== true && formData[k] !== 'true') {
-            isAllChecked = false;
-          }
-        }
+        if (k.endsWith('_8') && k !== 'field_79_8' && formData[k] !== true && formData[k] !== 'true') isAllChecked = false;
       });
-
-      const isForce = formData['_is_force_submitted'] || !isAllChecked || checkCount === 0;
+      const isForce = formData['_is_force_submitted'] || !isAllChecked;
       const statusText = isForce ? '已完成檢查*' : '已完成檢查';
       const statusColor = isForce ? 'var(--warning)' : 'var(--success)';
-
-      detailBlocks.push(`
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:6px; padding-top:4px; border-top:1px dashed var(--border-color);">
-          <span style="color:var(--text-muted); font-weight:700;">• 準備檢查狀態:</span>
-          <span style="font-weight:700; color:${statusColor}; font-size:11px;">${statusText}</span>
-        </div>
-      `);
+      detailsList.push({ label: '實驗前檢查', val: `<span style="color:${statusColor}; font-weight:700;">${statusText}</span>` });
     }
 
-    const filledDataHtml = detailBlocks.length > 0 ? detailBlocks.join('') : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
+    // C. 藥劑與大鼠數據 (修正 Saline 算術問題 + 補單位)
+    const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || 0);
+    const ptzDose = parseFloat(formData['field_4_16'] || 1); // 預設劑量比例 1
+    if (ratWeight > 0) {
+      const ptzVol = ratWeight * ptzDose;
+      const salineVol = 700 - ptzVol; // 精確計算 700 - PTZ
+      detailsList.push({ label: '大鼠體重（g）', val: `${ratWeight}` });
+      detailsList.push({ label: 'PTZ使用劑量', val: `${ptzVol} uL` });
+      detailsList.push({ label: 'Saline用量', val: `${salineVol} uL` });
+    }
 
-    // 5. 組裝 HTML
+    // D. 座標整合 (AP, ML) 與 (AP, ML, DH)
+    const lamdaAP = formData['field_20_16'] || '0';
+    const lamdaML = formData['field_19_16'] || '0';
+    detailsList.push({ label: 'Lamda位置', val: `(${lamdaAP}, ${lamdaML})` });
+
+    const eleAP = formData['field_16_16'] || '0';
+    const eleML = formData['field_12_16'] || '0';
+    const eleDH = formData['field_17_16'] || '0';
+    detailsList.push({ label: '電極插入位置', val: `(${eleAP}, ${eleML}, ${eleDH})` });
+
+    // E. 大鼠生理狀況 (解析「其他生理狀況」對應的 input 值，並移除多餘字樣)
+    if (formData['field_23_16'] && Array.isArray(formData['field_23_16'])) {
+      let physioArr = [...formData['field_23_16']];
+      const otherInput = formData['field_23_16_input'] || '';
+      
+      // 將「其他生理狀況」替換為實際輸入內容（如：心率過快）
+      physioArr = physioArr.map(item => item === '其他生理狀況' ? (otherInput || '其他') : item);
+      detailsList.push({ label: '大鼠生理情況', val: physioArr.join(', ') });
+    }
+
+    // F. 手術過程狀況 (多選)
+    if (formData['field_31_16'] && Array.isArray(formData['field_31_16'])) {
+      detailsList.push({ label: '手術過程狀況', val: formData['field_31_16'].join(', ') });
+    }
+
+    // G. 電極插入狀況
+    if (formData['field_37_16'] && Array.isArray(formData['field_37_16'])) {
+      detailsList.push({ label: '電極插入狀況', val: formData['field_37_16'].join(', ') });
+    }
+
+    // 渲染 Field Data HTML
+    const filledDataHtml = detailsList.length > 0 
+      ? detailsList.map(item => `
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; border-bottom:1px dashed #f1f5f9; padding-bottom:3px;">
+            <span style="color:var(--text-muted); font-weight:700; max-width:55%; font-size:11px;">${item.label}:</span>
+            <span style="font-weight:700; color:var(--text-primary); font-family:ui-monospace, monospace; text-align:right;">${item.val}</span>
+          </div>
+        `).join('')
+      : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
+
+    // -------------------------------------------------------------
+    // 3. 備註紀錄保護與提取
+    // -------------------------------------------------------------
+    // 優先還原最初的備註 (若 notes 被誤覆蓋為心率過快，則回溯 field_14_4 或歷史 notes)
+    let notesStr = formData['notes'] || '';
+    if (notesStr === '心率過快' && formData['field_14_4']) {
+      notesStr = formData['field_14_4']; // 自動救援還原成 "10:00開始"
+    }
+    if (!notesStr || String(notesStr).trim() === '') {
+      notesStr = isZH ? '無' : 'None';
+    }
+
+    // -------------------------------------------------------------
+    // 4. 組裝 Modal
+    // -------------------------------------------------------------
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row">
@@ -1270,11 +1300,11 @@
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'填寫數據明細':'Field Data'}</div>
-          <div class="detail-value" style="text-align:left; max-height:140px; overflow-y:auto;">${filledDataHtml}</div>
+          <div class="detail-value" style="text-align:left; max-height:180px; overflow-y:auto; width:100%;">${filledDataHtml}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'備註紀錄':'Notes'}</div>
-          <div class="detail-value" style="white-space:pre-line; color:var(--text-primary); text-align:left;">${notesStr}</div>
+          <div class="detail-value" style="white-space:pre-line; color:var(--text-primary); text-align:left; font-weight:700;">${notesStr}</div>
         </div>
       </div>
     `;
@@ -1932,17 +1962,16 @@
     renderFormCurrentPage();
   }
 
-  // 🚀 修復備註（Notes）為累加制，不再會覆蓋前面舊有備註
   function saveFormFieldData(fieldId, val, fieldLabel = '') {
     currentFormCtx.data[fieldId] = val;
 
-    const isExplicitNote = fieldLabel.includes('備註') || fieldLabel.toLowerCase().includes('note') || fieldLabel.toLowerCase().includes('remark');
+    // 只有真正的全域備註輸入框（非 _input 結尾）才會寫入 notes
+    const isExplicitNote = fieldLabel === '備註' || fieldLabel.toLowerCase() === 'note' || fieldLabel.toLowerCase() === 'notes';
     
-    // 只有全域備註才會觸發累加
     if (isExplicitNote && !fieldId.endsWith('_input')) {
-      const existingNotes = currentFormCtx.data['notes'] || '';
-      if (!existingNotes.includes(val)) {
-        currentFormCtx.data['notes'] = existingNotes ? `${existingNotes}\n[${new Date().toLocaleTimeString()}] ${val}` : val;
+      const oldNote = currentFormCtx.data['notes'] || '';
+      if (val && !oldNote.includes(val)) {
+        currentFormCtx.data['notes'] = oldNote ? `${oldNote}\n${val}` : val;
       }
     }
 
