@@ -2217,6 +2217,7 @@
     renderTimeline();
   }
 
+  // 🚀 關鍵修復：檢查時直接從畫面 DOM 抓取最新的 checkbox.checked 狀態
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
     const targetForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
@@ -2231,16 +2232,28 @@
 
     currentFormCtx.pages.forEach(page => {
       page.fields.forEach(f => {
-        // 🚀 自動跳過：若該欄位屬於已經被停用的群組，免檢查！
-        if (f.belongGroup && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[f.belongGroup]) {
-          return;
+        // 1. 自動跳過已停用（被暗掉）的群組
+        if (f.belongGroup && currentFormCtx.disabledGroups) {
+          const cleanBelongTag = String(f.belongGroup).trim().toLowerCase();
+          if (currentFormCtx.disabledGroups[cleanBelongTag]) return; // 免檢查跳過
         }
 
+        // 2. 備註、公式、區塊標題跳過檢查
         const isNoteField = f.label && (f.label.includes('備註') || f.label.toLowerCase().includes('note'));
         if (isNoteField || f.type === 'formula' || f.type === 'section') return; 
 
-        if (f.type === 'text' || f.type === 'number') {
-          const domEl = document.getElementById(f.id);
+        // 🚀 3. 關鍵修復：優先從 DOM 抓取真實畫面上的勾選狀態，同步更新回 data
+        const domEl = document.getElementById(f.id);
+
+        if (f.type === 'checkbox') {
+          const isChecked = domEl ? domEl.checked : !!currentFormCtx.data[f.id];
+          currentFormCtx.data[f.id] = isChecked; // 同步最新狀態
+
+          if (!isChecked) {
+            uncompletedFields.push(f.label);
+          }
+        }
+        else if (f.type === 'text' || f.type === 'number') {
           const val = domEl ? domEl.value : currentFormCtx.data[f.id];
           if (!val || String(val).trim() === '') {
             uncompletedFields.push(f.label);
@@ -2253,11 +2266,6 @@
         } 
         else if (f.type === 'checkbox_group') {
           if (!currentFormCtx.data[f.id] || currentFormCtx.data[f.id].length === 0) {
-            uncompletedFields.push(f.label);
-          }
-        }
-        else if (f.type === 'checkbox') {
-          if (!currentFormCtx.data[f.id] || currentFormCtx.data[f.id] !== true) {
             uncompletedFields.push(f.label);
           }
         }
@@ -2278,7 +2286,7 @@
         }
       });
     } else {
-      currentFormCtx.data['_is_force_submitted'] = false;
+      currentFormCtx.data['_is_force_submitted'] = false; // 100% 完整勾選
       submitFormFinal();
     }
   }
