@@ -2597,30 +2597,28 @@
     }
   }
 
-  // 🚀 重構實驗編號生成邏輯：對應負責人識別簡碼 + 流水號（自動防重複加一）
   function generateExperimentId(dateStr) {
-    const outlineCode = currentFormCtx.data['outline_code'] || 'B';
-    const purposeCode = currentFormCtx.data['purpose_code'] || '01';
-    
-    // 取得當前負責人的識別簡碼 (例如 GDC)
-    const activeUserName = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
-    const userObj = state.membersList.find(m => m.name === activeUserName);
-    const userCode = (userObj && userObj.userCode) ? userObj.userCode : "GDC";
+  const outlineCode = currentFormCtx.data['outline_code'] || 'B';
+  const purposeCode = currentFormCtx.data['purpose_code'] || '01';
+  
+  const activeUserName = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+  const userObj = state.membersList.find(m => m.name === activeUserName);
+  const userCode = (userObj && userObj.userCode) ? userObj.userCode : "GDC";
 
-    const cleanDate = dateStr.replace(/-/g, '');
-    const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : '260726';
+  const cleanDate = dateStr.replace(/-/g, '');
+  const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : '260726';
 
-    let sequence = 1;
-    let generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
+  let sequence = 1;
+  let generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
 
-    // 檢查資料庫是否已存在此編號，若存在則流水號加 1
-    while (state.dataCenter.some(d => d.expId === generatedId)) {
-      sequence++;
-      generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
-    }
-
-    return generatedId;
+  // 只要資料庫裡有重複編號，最後一碼流水號就一直 +1
+  while (state.dataCenter.some(d => d.expId === generatedId)) {
+    sequence++;
+    generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
   }
+
+  return generatedId;
+}
 
   async function submitFormFinal() {
     if (state.isSubmitting) return;
@@ -2658,17 +2656,23 @@
       }
     });
 
-    let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
-    let finalExpId = "";
-    let isUpdateMode = false;
+    // 請找到 submitFormFinal() 中的這一段進行替換：
 
-    if (selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
-      finalExpId = selectedExpSelectVal;
-      isUpdateMode = true;
-    } else {
-      finalExpId = generateExperimentId(submitDate);
-      isUpdateMode = false;
-    }
+  let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
+  let finalExpId = "";
+  let isUpdateMode = false;
+  
+  // 🚀 關鍵修復：如果是實驗預約 (FORM_001_2) 或 新建專案，絕對不可走 Update 模式！
+  const isReservation = currentFormCtx.formId === "FORM_001_2";
+  
+  if (!isReservation && selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
+    finalExpId = selectedExpSelectVal;
+    isUpdateMode = true;
+  } else {
+    // 強制重新生成編號（如有重複，最後一碼自動加 1）
+    finalExpId = generateExperimentId(submitDate);
+    isUpdateMode = false;
+  }
 
     const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
     if (!currentFormCtx.data['_time_logs']) {
