@@ -688,6 +688,215 @@
     }
   }
 
+  async function fetchAndParseFormsFromSheet() {
+    try {
+      const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+
+      if (rows.length < 2) return;
+
+      const headerRow = rows[0];
+      const formBlocks = [];
+
+      for (let colIdx = 0; colIdx < headerRow.length; colIdx++) {
+        const cellVal = (headerRow[colIdx] || "").trim();
+        if (cellVal.startsWith("FORM_")) {
+          formBlocks.push({ formId: cellVal, startCol: colIdx });
+        }
+      }
+
+      const parsedForms = {};
+      state.fieldLabelMap = {};
+
+      formBlocks.forEach(block => {
+        const formId = block.formId;
+        const col = block.startCol;
+        
+        const pages = [];
+        let currentPage = null;
+        let lastParentField = null;
+
+        for (let r = 2; r < rows.length; r++) {
+          const rawLabel = (rows[r][col] || "").trim();
+          const rawType = (rows[r][col + 1] || "").trim();
+          const rawOption = (rows[r][col + 2] || "").trim();
+          const rawDesc = (rows[r][col + 3] || "").trim();
+
+          if (!rawLabel && !rawType) continue;
+
+          if (rawLabel.includes("【") && rawLabel.includes("】")) {
+            const pageTitle = cleanDisplayLabel(rawLabel.replace(/【|】/g, ""));
+            currentPage = { title: pageTitle, fields: [] };
+            pages.push(currentPage);
+            lastParentField = null;
+            continue;
+          }
+
+          if (!currentPage) {
+            currentPage = { title: "Page 1 基本資訊", fields: [] };
+            pages.push(currentPage);
+          }
+
+          if (rawType.includes("[#]")) {
+            currentPage.fields.push({ type: "section", label: cleanDisplayLabel(rawLabel) });
+            lastParentField = null;
+            continue;
+          }
+
+          let disableGroup = null;
+          if (rawType.includes("[disable_group:")) {
+            const match = rawType.match(/\[disable_group:\s*([^\]]+)\]/i);
+            if (match) disableGroup = match[1].trim();
+          }
+
+          let belongGroup = null;
+          if (rawType.includes("[group:")) {
+            const match = rawType.match(/\[group:\s*([^\]]+)\]/i);
+            if (match) belongGroup = match[1].trim();
+          }
+
+          let dependsOn = null;
+          if (rawType.includes("[depends_on:")) {
+            const match = rawType.match(/\[depends_on:\s*([^\]]+)\]/i);
+            if (match) dependsOn = match[1].trim();
+          }
+
+          let formulaExpr = null;
+          let formulaUnit = '';
+          
+          if (rawType.includes("[formula]") || (rawType.includes("{") && (rawType.includes("*") || rawType.includes("-")))) {
+            const fMatch = rawType.match(/\[formula:\s*([^\]]+)\]/i);
+            if (fMatch) {
+              formulaExpr = fMatch[1].trim();
+            } else {
+              formulaExpr = rawType.replace(/\[number\]|\[text\]/gi, '').trim();
+            }
+            
+            const uMatch = rawType.match(/\[unit:\s*([^\]]+)\]/i);
+            if (uMatch) formulaUnit = uMatch[1].trim();
+          }
+
+          const fieldId = `field_${r}_${col}`;
+          const cleanLbl = cleanDisplayLabel(rawLabel);
+
+          if (cleanLbl) {
+            state.fieldLabelMap[fieldId] = cleanLbl;
+          }
+
+          if (formulaExpr) {
+            currentPage.fields.push({
+              id: fieldId,
+              label: cleanLbl,
+              type: "formula",
+              formula: formulaExpr,
+              unit: formulaUnit,
+              belongGroup: belongGroup,
+              desc: rawDesc
+            });
+            lastParentField = null;
+            continue;
+          }
+
+          if (rawType.includes("[v]") && rawLabel.includes("實驗大綱")) {
+            lastParentField = { id: fieldId, label: cleanLbl, type: "outline_select", options: [], belongGroup: belongGroup };
+            currentPage.fields.push(lastParentField);
+          }
+          else if (rawType.includes("[radio]")) {
+            lastParentField = { id: fieldId, label: cleanLbl, type: "radio", dependsOn: dependsOn, options: [], disableGroup: disableGroup, belongGroup: belongGroup };
+            currentPage.fields.push(lastParentField);
+          } 
+          else if (rawType.includes("[checkbox_group]")) {
+            lastParentField = { id: fieldId, label: cleanLbl, type: "checkbox_group", dependsOn: dependsOn, options: [], disableGroup: disableGroup, belongGroup: belongGroup };
+            currentPage.fields.push(lastParentField);
+          }
+          else if ((rawType.includes("[option]") || rawType.includes("[option_input]")) && lastParentField) {
+            const optName = cleanDisplayLabel(rawLabel.replace(/^-\s*/, ''));
+            const hasInput = rawType.includes("[option_input]");
+            
+            let action = null;
+            if (rawType.includes("[goto:")) {
+              const match = rawType.match(/\[goto:\s*(Page\s*\d+)\]/i);
+              if (match) action = { type: "goto", target: match[1] };
+            } else if (rawType.includes("[submit]")) {
+              action = { type: "submit" };
+            }
+
+            let statusTag = null;
+            if (rawType.includes("[status:")) {
+              const match = rawType.match(/\[status:\s*([^\]]+)\]/i);
+              if (match) statusTag = match[1];
+            }
+
+            lastParentField.options.push({
+              name: optName,
+              hasInput: hasInput,
+              action: action,
+              statusTag: statusTag,
+              disableGroup: disableGroup,
+              belongGroup: belongGroup,
+              placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "請說明..."
+            });
+          } 
+          else if (rawType.includes("[c]") || rawType.includes("[checkbox]")) {
+            currentPage.fields.push({
+              id: fieldId,
+              label: cleanDisplayLabel(rawLabel.replace(/^-\s*/, '')),
+              type: "checkbox",
+              disableGroup: disableGroup,
+              belongGroup: belongGroup,
+              desc: rawDesc
+            });
+            lastParentField = null;
+          } 
+          else if (rawType.includes("[v]")) {
+            const isExpSelect = rawType.includes("資料中心");
+            currentPage.fields.push({
+              id: fieldId,
+              label: cleanLbl,
+              type: isExpSelect ? "exp_select" : "user_select",
+              belongGroup: belongGroup,
+              default: state.currentUser ? state.currentUser.name : "Daniel"
+            });
+            lastParentField = null;
+          }
+          else if (rawType.includes("[datetime]")) {
+            currentPage.fields.push({
+              id: fieldId,
+              label: cleanLbl,
+              type: "date",
+              default: state.simulatedDate,
+              belongGroup: belongGroup,
+              desc: rawDesc
+            });
+            lastParentField = null;
+          }
+          else if (rawType.includes("[number]") || rawType.includes("[text]") || rawType.includes("[note]")) {
+            const isNoteTag = rawType.includes("[note]");
+            currentPage.fields.push({
+              id: fieldId,
+              label: cleanLbl,
+              type: isNoteTag ? "note" : (rawType.includes("[number]") ? "number" : "text"),
+              default: rawType.match(/\[default:\s*([^\]]+)\]/)?.[1] || "",
+              unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || "",
+              placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "",
+              belongGroup: belongGroup,
+              desc: rawDesc,
+              isNoteTag: isNoteTag
+            });
+            lastParentField = null;
+          }
+        }
+
+        parsedForms[formId] = pages;
+      });
+
+      state.dynamicForms = parsedForms;
+    } catch (err) {
+      console.error("動態解析表單失敗:", err);
+    }
+  }
+
   async function refreshDashboard(showBlur = true) {
     const btnRef = document.getElementById('btnRefresh');
     const blurOverlay = document.getElementById('blurOverlay');
@@ -1206,15 +1415,50 @@
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
 
     // -------------------------------------------------------------
-    // 4. 備註紀錄
+    // 4. 備註紀錄（動態解析 [note] 標籤與自訂說明）
     // -------------------------------------------------------------
-    let notesStr = formData['notes'] || '';
-    if (notesStr === '心率過快' && formData['field_14_4']) {
-      notesStr = formData['field_14_4'];
+    let notesArr = [];
+
+    // A. 優先讀取傳統全域 notes 欄位
+    if (formData['notes'] && String(formData['notes']).trim() !== '') {
+      notesArr.push(String(formData['notes']).trim());
     }
-    if (!notesStr || String(notesStr).trim() === '') {
-      notesStr = isZH ? '無' : 'None';
+
+    // B. 動態搜尋所有帶有 [note] 標籤的欄位值
+    if (state.dynamicForms) {
+      Object.keys(state.dynamicForms).forEach(fId => {
+        const pages = state.dynamicForms[fId];
+        if (Array.isArray(pages)) {
+          pages.forEach(p => {
+            if (p.fields && Array.isArray(p.fields)) {
+              p.fields.forEach(f => {
+                if (f.type === 'note' || f.isNoteTag) {
+                  const noteVal = formData[f.id];
+                  if (noteVal && String(noteVal).trim() !== '') {
+                    const cleanVal = String(noteVal).trim();
+                    if (!notesArr.includes(cleanVal)) {
+                      notesArr.push(cleanVal);
+                    }
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
     }
+
+    // C. 自動掃描選項延伸說明框 (_input 結尾)
+    Object.keys(formData).forEach(key => {
+      if (key.endsWith('_input') && formData[key] && String(formData[key]).trim() !== '') {
+        const val = String(formData[key]).trim();
+        if (!notesArr.includes(val)) {
+          notesArr.push(val);
+        }
+      }
+    });
+
+    let notesStr = notesArr.length > 0 ? notesArr.join('\n') : (isZH ? '無' : 'None');
 
     // -------------------------------------------------------------
     // 5. 組裝彈窗
@@ -1833,7 +2077,16 @@
               ${renderFieldDescription(field.desc)}
             </div>
           `;
-        } else {
+        } 
+        else if (field.type === "note") {
+        html += `
+          <div class="form-group" style="${disabledStyle}">
+            <label>${field.label}</label>
+            <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
+            ${renderFieldDescription(field.desc)}
+          </div>
+        `;
+      }else {
           html += `
             <div class="form-group" style="${disabledStyle}">
               <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
