@@ -1992,31 +1992,34 @@
       }
       // 尋找此段落：
     else if (field.type === "checkbox_group") {
-      html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
-      
-      field.options.forEach((opt, idx) => {
-        const optName = typeof opt === 'string' ? opt : opt.name;
-        const cleanOptName = cleanDisplayLabel(optName);
-        const displayOptName = formatBilingualText(optName, state.currentLang);
-        const isChecked = currentFormCtx.data[field.id] && currentFormCtx.data[field.id].includes(cleanOptName);
+        html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
         
-        const optBelongTag = opt.belongGroup ? String(opt.belongGroup).trim().toLowerCase() : '';
-        const isOptDisabled = isGroupDisabled || (optBelongTag && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[optBelongTag]);
-        
-        const optDisabledAttr = isOptDisabled ? 'disabled' : '';
-        const optDisabledStyle = isOptDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
-        const disGroupTag = opt.disableGroup || field.disableGroup || '';
-    
-        html += `
-          <div class="option-card ${isChecked ? 'selected' : ''}" style="${optDisabledStyle}" onclick="if(!${isOptDisabled}) toggleCheckboxGroupOption('${field.id}', '${cleanOptName}', '${disGroupTag}')">
-            <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${optDisabledAttr} onclick="event.stopPropagation(); if(!${isOptDisabled}) toggleCheckboxGroupOption('${field.id}', '${cleanOptName}', '${disGroupTag}');">
-            <label for="${field.id}_${idx}">${displayOptName}</label>
-          </div>
-          ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
-        `;
-      });
-      html += `</div>`;
-    }
+        field.options.forEach((opt, idx) => {
+          const optName = typeof opt === 'string' ? opt : opt.name;
+          const cleanOptName = cleanDisplayLabel(optName);
+          const displayOptName = formatBilingualText(optName, state.currentLang);
+          const isChecked = currentFormCtx.data[field.id] && currentFormCtx.data[field.id].includes(cleanOptName);
+          
+          const optBelongTag = opt.belongGroup ? String(opt.belongGroup).trim().toLowerCase() : '';
+          const isOptDisabled = isGroupDisabled || (optBelongTag && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[optBelongTag]);
+          
+          const optDisabledAttr = isOptDisabled ? 'disabled' : '';
+          const optDisabledStyle = isOptDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
+          const disGroupTag = opt.disableGroup || field.disableGroup || '';
+
+          // 避免在 onclick 字串內寫 if 判斷，改用三元運算子帶入
+          const clickAction = isOptDisabled ? '' : `toggleCheckboxGroupOption('${field.id}', '${cleanOptName}', '${disGroupTag}')`;
+
+          html += `
+            <div class="option-card ${isChecked ? 'selected' : ''}" style="${optDisabledStyle}" onclick="${clickAction}">
+              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${optDisabledAttr} onclick="event.stopPropagation(); ${clickAction};">
+              <label for="${field.id}_${idx}">${displayOptName}</label>
+            </div>
+            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+          `;
+        });
+        html += `</div>`;
+      }
     });
 
     container.innerHTML = html;
