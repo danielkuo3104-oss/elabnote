@@ -1993,23 +1993,55 @@
 
   let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
 
-  // 🚀 特殊邏輯：若目前在「表單與耗材登記」頁面，頂部自動亮出動態數據卡片
+  // 在 renderFormCurrentPage 內部、處理 fields 之前：
   if (page.title.includes('表單與耗材登記') || page.title.includes('Page 3')) {
     const r = getUsageReportData();
+    const doorO2Text = `O2：${r.o2Initial}→${r.o2Remain}`;
+    const doorIsoText = `Isoflurane：${r.isoInitial}→${r.isoRemain}`;
+    const naclOnlineText = `Sodium chloride：${r.userName}, ${r.formattedDate}, 9g`;
+    const isoOnlineText = `Isoflurane：${r.userName}, ${r.formattedDate}, ${r.isoUsed}g`;
+
     html += `
       <div style="background:var(--primary-light); border:1px solid #bae6fd; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:12px;">
-        <div style="font-weight:800; color:var(--primary); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
-          📊 耗材回報即時試算總覽
+        <div style="font-weight:800; color:var(--primary); margin-bottom:8px;">
+          耗材回報即時計算總覽
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-family:ui-monospace, monospace; font-weight:700; color:var(--text-primary);">
-          <div style="background:#fff; padding:6px 8px; border-radius:6px; border:1px solid var(--border-color);">
-            <div style="font-size:10px; color:var(--text-muted);">氧氣 (O2)</div>
-            ${r.o2Initial} → ${r.o2Remain} (用量: ${r.o2Used})
+
+        <!-- 1. 門口紙本回報單 -->
+        <div style="background:#fff; padding:8px 10px; border-radius:6px; border:1px solid var(--border-color); margin-bottom:8px;">
+          <div style="font-weight:700; color:var(--text-primary); margin-bottom:4px;">[實驗室門口紙本回報單]</div>
+          <div style="font-family:ui-monospace, monospace; font-weight:700; color:var(--primary); line-height:1.5;">
+            ${doorO2Text}<br>
+            ${doorIsoText}
           </div>
-          <div style="background:#fff; padding:6px 8px; border-radius:6px; border:1px solid var(--border-color);">
-            <div style="font-size:10px; color:var(--text-muted);">Isoflurane</div>
-            ${r.isoInitial} → ${r.isoRemain} (用量: ${r.isoUsed}g)
+        </div>
+
+        <!-- 2. 線上化學品回報單 -->
+        <div style="background:#fff; padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="font-weight:700; color:var(--text-primary); margin-bottom:4px;">[實驗室線上回報單]</div>
+          
+          <div style="margin-bottom:6px;">
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:2px;">
+              連結1 (NaCl)：
+              <a href="https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit?gid=1540621860#gid=1540621860" target="_blank" style="color:var(--primary); font-weight:700;">開啟連結</a>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="topCopyNacl" class="form-control" value="${naclOnlineText}" readonly style="font-family:ui-monospace, monospace; font-weight:700; font-size:11px; padding:4px 8px;">
+              <button type="button" class="modal-btn modal-btn-confirm" style="flex-shrink:0; width:55px; padding:4px; font-size:11px;" onclick="copyTextToClipboard('topCopyNacl')">複製</button>
+            </div>
           </div>
+
+          <div>
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:2px;">
+              連結2 (Isoflurane)：
+              <a href="https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit?gid=1065265371#gid=1065265371" target="_blank" style="color:var(--primary); font-weight:700;">開啟連結</a>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="topCopyIso" class="form-control" value="${isoOnlineText}" readonly style="font-family:ui-monospace, monospace; font-weight:700; font-size:11px; padding:4px 8px;">
+              <button type="button" class="modal-btn modal-btn-confirm" style="flex-shrink:0; width:55px; padding:4px; font-size:11px;" onclick="copyTextToClipboard('topCopyIso')">複製</button>
+            </div>
+          </div>
+
         </div>
       </div>
     `;
@@ -2780,39 +2812,36 @@
     }
   }
 
-  // 🚀 動態解析 氧氣 / Isoflurane 初始量、剩餘量與使用量，並產生回報格式
-function getUsageReportData() {
+  function getUsageReportData() {
   const selectedExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
   const expRecord = state.dataCenter.find(d => d.expId === selectedExpId) || {};
-  const formData = { ...(expRecord.formData || {}), ...currentFormCtx.data };
+  
+  // 取得 FORM_002 / 歷史儲存的原始資料
+  const prevData = expRecord.formData || {};
 
-  // 1. 動態抓取初始量 (掃描 Label 關鍵字)
+  // 1. 解析初始量 (優先搜尋關鍵字，若無則走 field_37_12 / field_39_12 預設欄位)
   let o2Initial = null;
   let isoInitial = null;
 
-  // 從 dynamicForms 中尋找對應 fieldId 的 label
-  Object.keys(formData).forEach(key => {
-    const val = parseFloat(formData[key]);
-    if (isNaN(val)) return;
+  Object.keys(prevData).forEach(key => {
+    const val = parseFloat(prevData[key]);
+    if (isNaN(val) || val <= 0) return;
 
-    // 尋找全域 label
     const label = (state.fieldLabelMap && state.fieldLabelMap[key]) ? state.fieldLabelMap[key].toLowerCase() : '';
-    
-    // 氧氣初始值匹配
-    if ((label.includes('氧氣') || label.includes('o2')) && (label.includes('初始') || label.includes('開始') || label.includes('總量') || !o2Initial)) {
-      if (val > 0 && o2Initial === null) o2Initial = val;
+
+    if (label.includes('氧氣') && (label.includes('初始') || label.includes('開始') || !o2Initial)) {
+      o2Initial = val;
     }
-    // Isoflurane 初始值匹配
-    if ((label.includes('isoflurane') || label.includes('麻醉')) && (label.includes('初始') || label.includes('開始') || label.includes('重量') || !isoInitial)) {
-      if (val > 0 && isoInitial === null) isoInitial = val;
+    if (label.includes('isoflurane') && (label.includes('初始') || label.includes('開始') || !isoInitial)) {
+      isoInitial = val;
     }
   });
 
-  // 後備預設機制 (萬一 Label 尚未完全掛載，嘗試從常見數值抓取)
-  if (o2Initial === null) o2Initial = parseFloat(formData['field_37_12']) || 120;
-  if (isoInitial === null) isoInitial = parseFloat(formData['field_39_12']) || 230.55;
+  // 強制保底：從 FORM_002 的明確數據提取
+  if (o2Initial === null) o2Initial = parseFloat(prevData['field_37_12']) || 120;
+  if (isoInitial === null) isoInitial = parseFloat(prevData['field_39_12']) || 230.55;
 
-  // 2. 動態抓取當前填寫的剩餘量
+  // 2. 解析當前 FORM_006 輸入的剩餘量
   let o2Remain = null;
   let isoRemain = null;
 
@@ -2822,23 +2851,26 @@ function getUsageReportData() {
 
     const label = (state.fieldLabelMap && state.fieldLabelMap[key]) ? state.fieldLabelMap[key].toLowerCase() : '';
 
-    if ((label.includes('氧氣') || label.includes('o2')) && (label.includes('剩餘') || label.includes('結餘') || label.includes('末'))) {
+    if (label.includes('氧氣') && label.includes('剩餘')) {
       o2Remain = val;
     }
-    if ((label.includes('isoflurane') || label.includes('麻醉')) && (label.includes('剩餘') || label.includes('結餘') || label.includes('末'))) {
+    if (label.includes('isoflurane') && label.includes('剩餘')) {
       isoRemain = val;
     }
   });
 
-  // 若尚未輸入剩餘量，預設先以 0 計算或顯示未填
-  const o2Left = o2Remain !== null ? o2Remain : '--';
-  const isoLeft = isoRemain !== null ? isoRemain : '--';
+  // 若標籤匹配不到，自動依據輸入框數值回算
+  if (o2Remain === null && currentFormCtx.data['field_19_0'] !== undefined) o2Remain = parseFloat(currentFormCtx.data['field_19_0']);
+  if (isoRemain === null && currentFormCtx.data['field_20_0'] !== undefined) isoRemain = parseFloat(currentFormCtx.data['field_20_0']);
 
-  // 3. 計算使用量
-  const o2Used = (o2Remain !== null) ? (o2Initial - o2Remain).toFixed(1) : '--';
-  const isoUsed = (isoRemain !== null) ? (isoInitial - isoRemain).toFixed(2) : '--';
+  const o2Left = (o2Remain !== null && !isNaN(o2Remain)) ? o2Remain : '--';
+  const isoLeft = (isoRemain !== null && !isNaN(isoRemain)) ? isoRemain : '--';
 
-  // 4. 取得使用者與日期資訊
+  // 3. 計算使用量 (初始 - 剩餘)
+  const o2Used = (o2Remain !== null && !isNaN(o2Remain)) ? (o2Initial - o2Remain).toFixed(1) : '--';
+  const isoUsed = (isoRemain !== null && !isNaN(isoRemain)) ? (isoInitial - isoRemain).toFixed(2) : '--';
+
+  // 4. 使用者與日期格式化
   const rawDate = expRecord.date || currentFormCtx.data['date'] || state.simulatedDate;
   const dateObj = new Date(rawDate);
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -2851,7 +2883,6 @@ function getUsageReportData() {
     userName, formattedDate
   };
 }
-
 // 點擊觸發彈窗 (供複製用)
 function showUsageReportModal(type) {
   const r = getUsageReportData();
