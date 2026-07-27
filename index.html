@@ -886,6 +886,16 @@
             });
             lastParentField = null;
           }
+          else if (rawType.includes("[dynamic_stages]")) {
+          currentPage.fields.push({
+            id: fieldId,
+            label: cleanLbl || "腦訊號搜集階段",
+            type: "dynamic_stages",
+            belongGroup: belongGroup,
+            desc: rawDesc
+          });
+          lastParentField = null;
+        }
         }
 
         parsedForms[formId] = pages;
@@ -2049,6 +2059,37 @@
         });
         html += `</div>`;
       }
+      // A. 在 renderFormCurrentPage 內新增分支：
+      else if (field.type === "dynamic_stages") {
+        // 若尚未初始化，預設帶入常用的 4 個階段
+        if (!currentFormCtx.data[field.id] || !Array.isArray(currentFormCtx.data[field.id])) {
+          currentFormCtx.data[field.id] = [
+            { name: "Base line", time: "" },
+            { name: "PTZ", time: "" },
+            { name: "Stimulate", time: "" },
+            { name: "After", time: "" }
+          ];
+        }
+
+        const stageList = currentFormCtx.data[field.id];
+        let stagesHtml = stageList.map((st, sIdx) => `
+          <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+            <input type="text" class="form-control" style="flex:1.3; font-weight:600;" placeholder="區段名稱" value="${st.name}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'name', this.value)">
+            <input type="number" class="form-control" style="flex:0.8;" placeholder="時間" value="${st.time}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'time', this.value)">
+            <span style="font-size:12px; color:var(--text-muted); font-weight:700;">min</span>
+            <button type="button" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; border-radius:6px; width:28px; height:28px; font-weight:bold; cursor:pointer;" onclick="removeDynamicStageItem('${field.id}', ${sIdx})">✕</button>
+          </div>
+        `).join('');
+
+        html += `
+          <div class="form-group" style="${disabledStyle}">
+            <label>${field.label}</label>
+            <div>${stagesHtml}</div>
+            <button type="button" class="btn-action btn-tomorrow" style="width:100%; padding:8px; margin-top:4px; font-size:12px; font-weight:700;" onclick="addDynamicStageItem('${field.id}')">➕ 新增搜集區段</button>
+            ${renderFieldDescription(field.desc)}
+          </div>
+        `;
+      }
     });
 
     container.innerHTML = html;
@@ -2569,6 +2610,27 @@
     const isFormOpen = document.getElementById('formPageContainer').style.display === 'flex';
     if (!isFormOpen) {
       await refreshDashboard(false);
+    }
+  }
+
+  // B. 動態區段操控函式
+  function addDynamicStageItem(fieldId) {
+    if (!currentFormCtx.data[fieldId]) currentFormCtx.data[fieldId] = [];
+    currentFormCtx.data[fieldId].push({ name: "", time: "" });
+    renderFormCurrentPage();
+  }
+
+  function removeDynamicStageItem(fieldId, index) {
+    if (currentFormCtx.data[fieldId]) {
+      currentFormCtx.data[fieldId].splice(index, 1);
+      renderFormCurrentPage();
+    }
+  }
+
+  function updateDynamicStageItem(fieldId, index, key, value) {
+    if (currentFormCtx.data[fieldId] && currentFormCtx.data[fieldId][index]) {
+      currentFormCtx.data[fieldId][index][key] = value;
+      state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
     }
   }
 </script>
