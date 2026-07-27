@@ -2110,7 +2110,7 @@
   
   const cleanOptName = cleanDisplayLabel(optName);
   const idx = currentFormCtx.data[fieldId].indexOf(cleanOptName);
-  const isSelected = idx === -1; // 判斷本次點擊後是「勾選」還是「取消」
+  const isSelected = idx === -1; 
 
   if (!isSelected) {
     currentFormCtx.data[fieldId].splice(idx, 1);
@@ -2118,22 +2118,29 @@
     currentFormCtx.data[fieldId].push(cleanOptName);
   }
 
-  // 🚀 關鍵修復：當勾選/取消的選項帶有 disableGroupTag 時，更新全域控制狀態
   if (disableGroupTag && String(disableGroupTag).trim() !== '') {
     const cleanTag = String(disableGroupTag).trim().toLowerCase();
     if (!currentFormCtx.disabledGroups) currentFormCtx.disabledGroups = {};
     
-    // 紀錄該群組是否被停用 (isSelected = true 代表勾選了「無需插入電極」)
     currentFormCtx.disabledGroups[cleanTag] = isSelected;
 
-    // 若勾選停用，自動清空該群組已填寫的舊數據
-    if (isSelected) {
-      clearDisabledGroupData(cleanTag);
+    // 若勾選停用，自動清空該群組已填寫的舊數據（替代原先缺失的函式）
+    if (isSelected && currentFormCtx.pages) {
+      currentFormCtx.pages.forEach(p => {
+        if (p.fields) {
+          p.fields.forEach(f => {
+            if (f.belongGroup && String(f.belongGroup).trim().toLowerCase() === cleanTag) {
+              delete currentFormCtx.data[f.id];
+              delete currentFormCtx.data[f.id + '_input'];
+            }
+          });
+        }
+      });
     }
   }
 
   state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
-  renderFormCurrentPage(); // 重新渲染畫面使變灰生效
+  renderFormCurrentPage(); 
 }
 
   function saveFormFieldData(fieldId, val, fieldLabel = '') {
