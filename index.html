@@ -1241,50 +1241,48 @@
     }
 
     // -------------------------------------------------------------
-    // F. FORM_004 腦訊號蒐集時間軸與狀況解析 (重點新增)
+    // F. FORM_004 腦訊號蒐集時間軸與狀況解析 (修正判斷邏輯)
     // -------------------------------------------------------------
-    const isNoSignalCollect = formData['field_3_20'] === 'on' || formData['field_3_20'] === true || formData['field_3_20'] === 'true';
+    const baseMin = parseFloat(formData['field_4_20'] || 0);
+    const ptzMin = parseFloat(formData['field_5_20'] || 0);
+    const stimMin = parseFloat(formData['field_6_20'] || 0);
+    const afterMin = parseFloat(formData['field_7_20'] || 0);
+    const totalMin = baseMin + ptzMin + stimMin + afterMin;
 
-    if (isNoSignalCollect) {
+    // 只有當總分鐘數等於 0，且確實勾選了不蒐集時，才顯示「本次實驗不蒐集訊號」
+    const isExplicitlyNoCollect = (formData['field_3_20'] === true || formData['field_3_20'] === 'true') && totalMin === 0;
+
+    if (isExplicitlyNoCollect) {
       detailsList.push({ label: '腦訊號蒐集', val: '本次實驗不蒐集訊號', isBlock: true, isCondition: false });
-    } else {
-      const baseMin = parseFloat(formData['field_4_20'] || 0);
-      const ptzMin = parseFloat(formData['field_5_20'] || 0);
-      const stimMin = parseFloat(formData['field_6_20'] || 0);
-      const afterMin = parseFloat(formData['field_7_20'] || 0);
-      const totalMin = baseMin + ptzMin + stimMin + afterMin;
+    } else if (totalMin > 0) {
+      // 有時間數據，強制繪製時間軸
+      const pBase = ((baseMin / totalMin) * 100).toFixed(1);
+      const pPtz = ((ptzMin / totalMin) * 100).toFixed(1);
+      const pStim = ((stimMin / totalMin) * 100).toFixed(1);
+      const pAfter = ((afterMin / totalMin) * 100).toFixed(1);
 
-      if (totalMin > 0) {
-        // 計算各階段%比例
-        const pBase = ((baseMin / totalMin) * 100).toFixed(1);
-        const pPtz = ((ptzMin / totalMin) * 100).toFixed(1);
-        const pStim = ((stimMin / totalMin) * 100).toFixed(1);
-        const pAfter = ((afterMin / totalMin) * 100).toFixed(1);
-
-        // 畫出比例時間軸 HTML Bar
-        const timelineBarHtml = `
-          <div style="margin-top:6px; margin-bottom:8px;">
-            <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-bottom:3px; font-weight:700;">
-              <span>訊號蒐集總長度: ${totalMin} min</span>
-            </div>
-            <!-- 彩色比例條 -->
-            <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#f1f5f9;">
-              ${baseMin > 0 ? `<div style="width:${pBase}%; background:#3b82f6;" title="Baseline: ${baseMin}m"></div>` : ''}
-              ${ptzMin > 0 ? `<div style="width:${pPtz}%; background:#ef4444;" title="PTZ: ${ptzMin}m"></div>` : ''}
-              ${stimMin > 0 ? `<div style="width:${pStim}%; background:#10b981;" title="Stimulate: ${stimMin}m"></div>` : ''}
-              ${afterMin > 0 ? `<div style="width:${pAfter}%; background:#8b5cf6;" title="After: ${afterMin}m"></div>` : ''}
-            </div>
-            <!-- 階段圖例與時間標註 -->
-            <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-top:5px; font-weight:600;">
-              ${baseMin > 0 ? `<span style="color:#2563eb;">■ Base: ${baseMin}m</span>` : ''}
-              ${ptzMin > 0 ? `<span style="color:#dc2626;">■ PTZ: ${ptzMin}m</span>` : ''}
-              ${stimMin > 0 ? `<span style="color:#059669;">■ Stim: ${stimMin}m</span>` : ''}
-              ${afterMin > 0 ? `<span style="color:#7c3aed;">■ After: ${afterMin}m</span>` : ''}
-            </div>
+      const timelineBarHtml = `
+        <div style="margin-top:4px; margin-bottom:6px;">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-bottom:3px; font-weight:700;">
+            <span>訊號蒐集總長度: ${totalMin} min</span>
           </div>
-        `;
-        detailsList.push({ label: '訊號蒐集時間軸', val: timelineBarHtml, isBlock: true, isCustomHtml: true });
-      }
+          <!-- 彩色比例條 -->
+          <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#f1f5f9;">
+            ${baseMin > 0 ? `<div style="width:${pBase}%; background:#3b82f6;" title="Baseline: ${baseMin}m"></div>` : ''}
+            ${ptzMin > 0 ? `<div style="width:${pPtz}%; background:#ef4444;" title="PTZ: ${ptzMin}m"></div>` : ''}
+            ${stimMin > 0 ? `<div style="width:${pStim}%; background:#10b981;" title="Stimulate: ${stimMin}m"></div>` : ''}
+            ${afterMin > 0 ? `<div style="width:${pAfter}%; background:#8b5cf6;" title="After: ${afterMin}m"></div>` : ''}
+          </div>
+          <!-- 階段圖例 -->
+          <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-top:5px; font-weight:600;">
+            ${baseMin > 0 ? `<span style="color:#2563eb;">■ Base: ${baseMin}m</span>` : ''}
+            ${ptzMin > 0 ? `<span style="color:#dc2626;">■ PTZ: ${ptzMin}m</span>` : ''}
+            ${stimMin > 0 ? `<span style="color:#059669;">■ Stim: ${stimMin}m</span>` : ''}
+            ${afterMin > 0 ? `<span style="color:#7c3aed;">■ After: ${afterMin}m</span>` : ''}
+          </div>
+        </div>
+      `;
+      detailsList.push({ label: '訊號蒐集時間軸', val: timelineBarHtml, isBlock: true, isCustomHtml: true });
     }
 
     // G. 搜集訊號情況 (多選 + 其他)
