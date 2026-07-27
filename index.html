@@ -1211,7 +1211,7 @@
     return { val: null, id: null };
   }
 
-  // 🚀 完全動態化 + 全雙語支援 (ZH/EN) + 訊號時間軸修正解析引擎
+  // 🚀 完全動態化 + 全雙語 (ZH/EN) + 四大狀況預設灰色無特殊情況解析引擎
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1259,7 +1259,7 @@
     }
 
     // -------------------------------------------------------------
-    // 2. 數據明細動態提取（支援雙語對照）
+    // 2. 數據明細動態提取
     // -------------------------------------------------------------
     let detailsList = [];
 
@@ -1300,38 +1300,58 @@
     const eleDH = formData['field_17_16'] || '0';
     detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})` });
 
-    // D. 生理、手術與電極狀況 (動態比對標題，並雙語轉換選項)
-    const physioObj = getDynamicFieldValue(formData, ['生理']);
-    if (physioObj.val && Array.isArray(physioObj.val)) {
-      let physioArr = [...physioObj.val];
-      const otherInput = formData[`${physioObj.id}_input`] || '';
-      physioArr = physioArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-      detailsList.push({ label: isZH ? '大鼠生理情況' : 'Rat Physiological State', val: physioArr.join(', '), isBlock: true, isCondition: true });
-    }
+    // D. 四大特殊狀況設定（生理、手術、電極、訊號）
+    const conditionConfigs = [
+      { zh: '大鼠生理情況', en: 'Rat Physiological State', kw: ['生理', 'physiological'] },
+      { zh: '手術過程狀況', en: 'Surgical Conditions', kw: ['手術', 'surgical', 'surgery'] },
+      { zh: '電極插入狀況', en: 'Electrode Insertion State', kw: ['電極', 'electrode'] },
+      { zh: '訊號蒐集情況', en: 'Signal Collection Conditions', kw: ['訊號', 'signal'] }
+    ];
 
-    const surgObj = getDynamicFieldValue(formData, ['手術']);
-    if (surgObj.val && Array.isArray(surgObj.val)) {
-      let surgArr = [...surgObj.val];
-      const otherInput = formData[`${surgObj.id}_input`] || '';
-      surgArr = surgArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-      detailsList.push({ label: isZH ? '手術過程狀況' : 'Surgical Conditions', val: surgArr.join(', '), isBlock: true, isCondition: true });
-    }
+    conditionConfigs.forEach(cfg => {
+      let fieldObj = getDynamicFieldValue(formData, cfg.kw);
+      
+      // 容錯備用：若動態比對未命中，為訊號蒐集提供相容檢測
+      if (!fieldObj.val && cfg.kw.includes('訊號')) {
+        if (formData['field_7_20']) fieldObj = { val: formData['field_7_20'], id: 'field_7_20' };
+        else if (formData['field_9_20']) fieldObj = { val: formData['field_9_20'], id: 'field_9_20' };
+      }
 
-    const electObj = getDynamicFieldValue(formData, ['電極']);
-    if (electObj.val && Array.isArray(electObj.val)) {
-      let electArr = [...electObj.val];
-      const otherInput = formData[`${electObj.id}_input`] || '';
-      electArr = electArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-      detailsList.push({ label: isZH ? '電極插入狀況' : 'Electrode Insertion State', val: electArr.join(', '), isBlock: true, isCondition: true });
-    }
+      let itemArr = [];
+
+      if (fieldObj.val && Array.isArray(fieldObj.val) && fieldObj.val.length > 0) {
+        itemArr = [...fieldObj.val];
+        const otherInput = formData[`${fieldObj.id}_input`] || '';
+        itemArr = itemArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
+      } else if (fieldObj.val && typeof fieldObj.val === 'string' && fieldObj.val.trim() !== '') {
+        itemArr = [formatBilingualText(fieldObj.val, state.currentLang)];
+      }
+
+      if (itemArr.length > 0) {
+        detailsList.push({
+          label: isZH ? cfg.zh : cfg.en,
+          val: itemArr.join(', '),
+          isBlock: true,
+          isCondition: true
+        });
+      } else {
+        // 🚀 未勾選時：呈現灰色「無特殊情況 / No special conditions」
+        const noCondText = isZH ? '無特殊情況' : 'No special conditions';
+        detailsList.push({
+          label: isZH ? cfg.zh : cfg.en,
+          val: `<span style="color:var(--text-muted); font-weight:500;">${noCondText}</span>`,
+          isBlock: true,
+          isCondition: false
+        });
+      }
+    });
 
     // -------------------------------------------------------------
-    // E. 腦訊號蒐集動態時間軸繪製 (解決強覆蓋與渲染)
+    // E. 腦訊號蒐集動態時間軸繪製
     // -------------------------------------------------------------
     let validStages = [];
     let totalMin = 0;
 
-    // 1. 動態掃描 JSON 內包含 Array 的區段欄位 (例如 field_4_20)
     Object.keys(formData).forEach(k => {
       if (Array.isArray(formData[k]) && formData[k].length > 0) {
         formData[k].forEach(st => {
@@ -1346,7 +1366,6 @@
       }
     });
 
-    // 2. 舊欄位相容備用機制
     if (validStages.length === 0) {
       const baseMin = parseFloat(formData['field_4_20'] || 0);
       const ptzMin = parseFloat(formData['field_5_20'] || 0);
