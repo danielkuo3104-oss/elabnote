@@ -838,17 +838,25 @@
               placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "請說明..."
             });
           } 
+          // 尋找 fetchAndParseFormsFromSheet 裡的此段並替換：
           else if (rawType.includes("[c]") || rawType.includes("[checkbox]")) {
+            let fetchDetailType = null;
+            if (rawType.includes("[fetch_detail:")) {
+              const match = rawType.match(/\[fetch_detail:\s*([^\]]+)\]/i);
+              if (match) fetchDetailType = match[1].trim();
+            }
+          
             currentPage.fields.push({
               id: fieldId,
               label: cleanDisplayLabel(rawLabel.replace(/^-\s*/, '')),
               type: "checkbox",
               disableGroup: disableGroup,
               belongGroup: belongGroup,
+              fetchDetailType: fetchDetailType, // 👈 紀錄彈窗類型
               desc: rawDesc
             });
             lastParentField = null;
-          } 
+          }
           else if (rawType.includes("[v]")) {
             const isExpSelect = rawType.includes("資料中心");
             currentPage.fields.push({
@@ -1980,259 +1988,287 @@
   }
 
   function renderFormCurrentPage() {
-    const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
-    const container = document.getElementById('formContent');
+  const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
+  const container = document.getElementById('formContent');
 
-    let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
+  let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
 
-    page.fields.forEach(field => {
-      if (field.dependsOn) {
-        const selectedOutline = currentFormCtx.data['outline_select_val'];
-        if (selectedOutline !== field.dependsOn) return;
-      }
-
-      let isGroupDisabled = false;
-      if (field.belongGroup && currentFormCtx.disabledGroups) {
-        const cleanBelongTag = String(field.belongGroup).trim().toLowerCase();
-        isGroupDisabled = !!currentFormCtx.disabledGroups[cleanBelongTag];
-      }
-
-      const disabledAttr = isGroupDisabled ? 'disabled' : '';
-      const disabledStyle = isGroupDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
-
-      if (field.type === "formula") {
-        let calculatedVal = currentFormCtx.data[field.id] || 0;
-
-        html += `
-          <div class="form-group" style="${disabledStyle}">
-            <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-            <input type="text" id="${field.id}" class="form-control formula-field" readonly style="background:#e2e8f0; font-weight:700; color:var(--primary);" value="${calculatedVal}">
-            ${renderFieldDescription(field.desc)}
+  // 🚀 特殊邏輯：若目前在「表單與耗材登記」頁面，頂部自動亮出動態數據卡片
+  if (page.title.includes('表單與耗材登記') || page.title.includes('Page 3')) {
+    const r = getUsageReportData();
+    html += `
+      <div style="background:var(--primary-light); border:1px solid #bae6fd; border-radius:var(--radius-md); padding:12px; margin-bottom:16px; font-size:12px;">
+        <div style="font-weight:800; color:var(--primary); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+          📊 耗材回報即時試算總覽
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-family:ui-monospace, monospace; font-weight:700; color:var(--text-primary);">
+          <div style="background:#fff; padding:6px 8px; border-radius:6px; border:1px solid var(--border-color);">
+            <div style="font-size:10px; color:var(--text-muted);">氧氣 (O2)</div>
+            ${r.o2Initial} → ${r.o2Remain} (用量: ${r.o2Used})
           </div>
-        `;
-        return;
-      }
-
-      const val = currentFormCtx.data[field.id] || field.default || "";
-
-      if (field.type === "section") {
-        html += `<div class="section-header">${field.label}</div>`;
-      }
-      else if (field.type === "exp_select") {
-        const isZH = state.currentLang === 'ZH';
-        const newProjText = isZH ? "➕ 新增實驗專案" : "➕ New Experiment Project";
-        const isTodayLogin = currentFormCtx.formId === "FORM_001_1";
-        
-        const activeProjects = state.dataCenter.filter(d => {
-          const notFinished = d.status !== '實驗結束' && d.status !== 'Completed';
-          return isTodayLogin ? (d.date === state.simulatedDate && notFinished) : notFinished;
-        });
-
-        const currentExpValue = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
-
-        html += `
-          <div class="form-group">
-            <label>${field.label}</label>
-            <select class="form-control" onchange="handleExpSelectChange(this.value)">
-              ${!isTodayLogin ? `<option value="NEW_PROJECT">${newProjText}</option>` : ''}
-              ${activeProjects.length === 0 ? `<option value="">-- ${isZH?'無符合之實驗':'No Active Experiment'} --</option>` : ''}
-              ${activeProjects.map(p => {
-                const optText = `[${p.expId}] ${p.date} (${p.user})`;
-                const selected = currentExpValue === p.expId ? 'selected' : '';
-                return `<option value="${p.expId}" ${selected}>${optText}</option>`;
-              }).join('')}
-            </select>
+          <div style="background:#fff; padding:6px 8px; border-radius:6px; border:1px solid var(--border-color);">
+            <div style="font-size:10px; color:var(--text-muted);">Isoflurane</div>
+            ${r.isoInitial} → ${r.isoRemain} (用量: ${r.isoUsed}g)
           </div>
-        `;
-      }
-      else if (field.type === "outline_select") {
-        html += `
-          <div class="form-group">
-            <label>${field.label}</label>
-            <select class="form-control" onchange="onOutlineChange('${field.id}', this.value)">
-              <option value="">${state.currentLang === 'ZH' ? '請選擇實驗大綱...' : 'Select Outline...'}</option>
-              ${field.options.map((opt, idx) => {
-                const optName = typeof opt === 'string' ? opt : opt.name;
-                const displayOptName = formatBilingualText(optName, state.currentLang);
-                const selected = currentFormCtx.data['outline_select_val'] === optName ? 'selected' : '';
-                return `<option value="${optName}" data-idx="${idx}" ${selected}>${displayOptName}</option>`;
-              }).join('')}
-            </select>
-          </div>
-        `;
-      }
-      else if (field.type === "user_select") {
-        const selectedUser = currentFormCtx.data['user_select_val'] || val;
-        html += `
-          <div class="form-group">
-            <label>${field.label}</label>
-            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}'); saveFormFieldData('user_select_val', this.value);">
-              ${state.membersList.map(m => `<option value="${m.name}" ${selectedUser === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
-            </select>
-          </div>
-        `;
-      }
-      else if (field.type === "date") {
-        html += `
-          <div class="form-group">
-            <label>${field.label}</label>
-            <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}')">
-            ${renderFieldDescription(field.desc)}
-          </div>
-        `;
-      }
-      else if (field.type === "note") {
-        html += `
-          <div class="form-group" style="${disabledStyle}">
-            <label>${field.label}</label>
-            <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
-            ${renderFieldDescription(field.desc)}
-          </div>
-        `;
-      }
-      else if (field.type === "text" || field.type === "number") {
-        html += `
-          <div class="form-group" style="${disabledStyle}">
-            <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-            <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" ${disabledAttr} value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
-            ${renderFieldDescription(field.desc)}
-          </div>
-        `;
-      }
-      else if (field.type === "checkbox") {
-        const isSelected = !!currentFormCtx.data[field.id];
-        const disTag = field.disableGroup ? field.disableGroup.trim() : '';
-        const chkClick = isGroupDisabled ? '' : `toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}')`;
-        
-        html += `
-          <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="${chkClick}">
-            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${chkClick};">
-            <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
-          </div>
-          ${renderFieldDescription(field.desc)}
-        `;
-      }
-      else if (field.type === "radio") {
-        html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
-        
-        const currentRadioVal = cleanDisplayLabel(currentFormCtx.data[field.id] || currentFormCtx.data['selected_purpose_name'] || field.default || "");
-
-        field.options.forEach((opt, idx) => {
-          const optName = typeof opt === 'string' ? opt : opt.name;
-          const cleanOptName = cleanDisplayLabel(optName);
-          const displayOptName = formatBilingualText(optName, state.currentLang);
-          
-          const isSelected = (currentRadioVal === cleanOptName) || (currentRadioVal === optName);
-          const optId = `${field.id}_opt_${idx}`;
-          const radioClick = `selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})`;
-          
-          html += `
-            <div class="option-card ${isSelected ? 'selected' : ''}" onclick="${radioClick}">
-              <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${radioClick};">
-              <label for="${optId}">${displayOptName}</label>
-            </div>
-            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
-          `;
-        });
-        html += `</div>`;
-      }
-      else if (field.type === "checkbox_group") {
-        html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
-        
-        field.options.forEach((opt, idx) => {
-          const optName = typeof opt === 'string' ? opt : opt.name;
-          const cleanOptName = cleanDisplayLabel(optName);
-          const displayOptName = formatBilingualText(optName, state.currentLang);
-          const isChecked = currentFormCtx.data[field.id] && currentFormCtx.data[field.id].includes(cleanOptName);
-          
-          const optBelongTag = opt.belongGroup ? String(opt.belongGroup).trim().toLowerCase() : '';
-          const isOptDisabled = isGroupDisabled || (optBelongTag && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[optBelongTag]);
-          
-          const optDisabledAttr = isOptDisabled ? 'disabled' : '';
-          const optDisabledStyle = isOptDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
-          const disGroupTag = opt.disableGroup || field.disableGroup || '';
-
-          const clickAction = isOptDisabled ? '' : `toggleCheckboxGroupOption('${field.id}', '${cleanOptName}', '${disGroupTag}')`;
-
-          html += `
-            <div class="option-card ${isChecked ? 'selected' : ''}" style="${optDisabledStyle}" onclick="${clickAction}">
-              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${optDisabledAttr} onclick="event.stopPropagation(); ${clickAction};">
-              <label for="${field.id}_${idx}">${displayOptName}</label>
-            </div>
-            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
-          `;
-        });
-        html += `</div>`;
-      }
-      // A. 在 renderFormCurrentPage 內新增分支：
-      else if (field.type === "dynamic_stages") {
-        // 若尚未初始化，預設帶入常用的 4 個階段
-        if (!currentFormCtx.data[field.id] || !Array.isArray(currentFormCtx.data[field.id])) {
-          currentFormCtx.data[field.id] = [
-            { name: "Base line", time: "" },
-            { name: "PTZ", time: "" },
-            { name: "Stimulate", time: "" },
-            { name: "After", time: "" }
-          ];
-        }
-
-        const stageList = currentFormCtx.data[field.id];
-        let stagesHtml = stageList.map((st, sIdx) => `
-          <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-            <input type="text" class="form-control" style="flex:1.3; font-weight:600;" placeholder="區段名稱" value="${st.name}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'name', this.value)">
-            <input type="number" class="form-control" style="flex:0.8;" placeholder="時間" value="${st.time}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'time', this.value)">
-            <span style="font-size:12px; color:var(--text-muted); font-weight:700;">min</span>
-            <button type="button" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; border-radius:6px; width:28px; height:28px; font-weight:bold; cursor:pointer;" onclick="removeDynamicStageItem('${field.id}', ${sIdx})">✕</button>
-          </div>
-        `).join('');
-
-        html += `
-          <div class="form-group" style="${disabledStyle}">
-            <label>${field.label}</label>
-            <div>${stagesHtml}</div>
-            <button type="button" class="btn-action btn-tomorrow" style="width:100%; padding:8px; margin-top:4px; font-size:12px; font-weight:700;" onclick="addDynamicStageItem('${field.id}')">➕ 新增搜集區段</button>
-            ${renderFieldDescription(field.desc)}
-          </div>
-        `;
-      }
-    });
-
-    container.innerHTML = html;
-
-    const allFormInputs = container.querySelectorAll('input, textarea');
-    allFormInputs.forEach(input => {
-      if (!input.dataset.bound) {
-        input.dataset.bound = 'true';
-        input.addEventListener('input', (e) => {
-          const fId = e.target.getAttribute('id') || e.target.getAttribute('data-field-id');
-          const fLabel = e.target.getAttribute('data-label') || '';
-          saveFormFieldData(fId, e.target.value, fLabel);
-          triggerRealtimeFormulaCalculation();
-        });
-      }
-    });
-
-    triggerRealtimeFormulaCalculation();
-
-    // ✅ 修改後的完整邏輯：
-    // 1. 上一頁按鈕 (處理語言與顯示隱藏)
-    const btnPrev = document.getElementById('btnFormPrev');
-    btnPrev.innerText = state.currentLang === 'ZH' ? '上一頁' : 'Previous';
-    btnPrev.style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
-    
-    // 2. 下一頁 / 提交按鈕 (處理語言與狀態)
-    const specialForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
-    const btnNext = document.getElementById('btnFormNext');
-    
-    if (specialForms.includes(currentFormCtx.formId)) {
-      btnNext.innerText = state.currentLang === 'ZH' ? '提交與檢查' : 'Submit & Verify';
-    } else {
-      const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-      const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
-      btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
-    }
-    btnNext.disabled = state.isSubmitting;
+        </div>
+      </div>
+    `;
   }
+
+  page.fields.forEach(field => {
+    if (field.dependsOn) {
+      const selectedOutline = currentFormCtx.data['outline_select_val'];
+      if (selectedOutline !== field.dependsOn) return;
+    }
+
+    let isGroupDisabled = false;
+    if (field.belongGroup && currentFormCtx.disabledGroups) {
+      const cleanBelongTag = String(field.belongGroup).trim().toLowerCase();
+      isGroupDisabled = !!currentFormCtx.disabledGroups[cleanBelongTag];
+    }
+
+    const disabledAttr = isGroupDisabled ? 'disabled' : '';
+    const disabledStyle = isGroupDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
+
+    if (field.type === "formula") {
+      let calculatedVal = currentFormCtx.data[field.id] || 0;
+
+      html += `
+        <div class="form-group" style="${disabledStyle}">
+          <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+          <input type="text" id="${field.id}" class="form-control formula-field" readonly style="background:#e2e8f0; font-weight:700; color:var(--primary);" value="${calculatedVal}">
+          ${renderFieldDescription(field.desc)}
+        </div>
+      `;
+      return;
+    }
+
+    const val = currentFormCtx.data[field.id] || field.default || "";
+
+    if (field.type === "section") {
+      html += `<div class="section-header">${field.label}</div>`;
+    }
+    else if (field.type === "exp_select") {
+      const isZH = state.currentLang === 'ZH';
+      const newProjText = isZH ? "➕ 新增實驗專案" : "➕ New Experiment Project";
+      const isTodayLogin = currentFormCtx.formId === "FORM_001_1";
+      
+      const activeProjects = state.dataCenter.filter(d => {
+        const notFinished = d.status !== '實驗結束' && d.status !== 'Completed';
+        return isTodayLogin ? (d.date === state.simulatedDate && notFinished) : notFinished;
+      });
+
+      const currentExpValue = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
+
+      html += `
+        <div class="form-group">
+          <label>${field.label}</label>
+          <select class="form-control" onchange="handleExpSelectChange(this.value)">
+            ${!isTodayLogin ? `<option value="NEW_PROJECT">${newProjText}</option>` : ''}
+            ${activeProjects.length === 0 ? `<option value="">-- ${isZH?'無符合之實驗':'No Active Experiment'} --</option>` : ''}
+            ${activeProjects.map(p => {
+              const optText = `[${p.expId}] ${p.date} (${p.user})`;
+              const selected = currentExpValue === p.expId ? 'selected' : '';
+              return `<option value="${p.expId}" ${selected}>${optText}</option>`;
+            }).join('')}
+          </select>
+        </div>
+      `;
+    }
+    else if (field.type === "outline_select") {
+      html += `
+        <div class="form-group">
+          <label>${field.label}</label>
+          <select class="form-control" onchange="onOutlineChange('${field.id}', this.value)">
+            <option value="">${state.currentLang === 'ZH' ? '請選擇實驗大綱...' : 'Select Outline...'}</option>
+            ${field.options.map((opt, idx) => {
+              const optName = typeof opt === 'string' ? opt : opt.name;
+              const displayOptName = formatBilingualText(optName, state.currentLang);
+              const selected = currentFormCtx.data['outline_select_val'] === optName ? 'selected' : '';
+              return `<option value="${optName}" data-idx="${idx}" ${selected}>${displayOptName}</option>`;
+            }).join('')}
+          </select>
+        </div>
+      `;
+    }
+    else if (field.type === "user_select") {
+      const selectedUser = currentFormCtx.data['user_select_val'] || val;
+      html += `
+        <div class="form-group">
+          <label>${field.label}</label>
+          <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}'); saveFormFieldData('user_select_val', this.value);">
+            ${state.membersList.map(m => `<option value="${m.name}" ${selectedUser === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+    else if (field.type === "date") {
+      html += `
+        <div class="form-group">
+          <label>${field.label}</label>
+          <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}')">
+          ${renderFieldDescription(field.desc)}
+        </div>
+      `;
+    }
+    else if (field.type === "note") {
+      html += `
+        <div class="form-group" style="${disabledStyle}">
+          <label>${field.label}</label>
+          <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
+          ${renderFieldDescription(field.desc)}
+        </div>
+      `;
+    }
+    else if (field.type === "text" || field.type === "number") {
+      html += `
+        <div class="form-group" style="${disabledStyle}">
+          <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+          <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" ${disabledAttr} value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
+          ${renderFieldDescription(field.desc)}
+        </div>
+      `;
+    }
+    else if (field.type === "checkbox") {
+      const isSelected = !!currentFormCtx.data[field.id];
+      const disTag = field.disableGroup ? field.disableGroup.trim() : '';
+      const chkClick = isGroupDisabled ? '' : `toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}')`;
+      
+      // 🚀 檢查是否有依賴數據彈窗標籤 (如 [fetch_detail: O2_and_Isoflurane_usage])
+      let fetchBtnHtml = '';
+      if (field.fetchDetailType) {
+        fetchBtnHtml = `
+          <button type="button" class="btn-action btn-tomorrow" style="padding:4px 8px; font-size:11px; margin-left:auto; font-weight:700; flex-shrink:0;" onclick="event.stopPropagation(); showUsageReportModal('${field.fetchDetailType}')">
+            📋 填寫格式
+          </button>
+        `;
+      }
+
+      html += `
+        <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="${chkClick}">
+          <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${chkClick};">
+          <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
+          ${fetchBtnHtml}
+        </div>
+        ${renderFieldDescription(field.desc)}
+      `;
+    }
+    else if (field.type === "radio") {
+      html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
+      
+      const currentRadioVal = cleanDisplayLabel(currentFormCtx.data[field.id] || currentFormCtx.data['selected_purpose_name'] || field.default || "");
+
+      field.options.forEach((opt, idx) => {
+        const optName = typeof opt === 'string' ? opt : opt.name;
+        const cleanOptName = cleanDisplayLabel(optName);
+        const displayOptName = formatBilingualText(optName, state.currentLang);
+        
+        const isSelected = (currentRadioVal === cleanOptName) || (currentRadioVal === optName);
+        const optId = `${field.id}_opt_${idx}`;
+        const radioClick = `selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})`;
+        
+        html += `
+          <div class="option-card ${isSelected ? 'selected' : ''}" onclick="${radioClick}">
+            <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${radioClick};">
+            <label for="${optId}">${displayOptName}</label>
+          </div>
+          ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+        `;
+      });
+      html += `</div>`;
+    }
+    else if (field.type === "checkbox_group") {
+      html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
+      
+      field.options.forEach((opt, idx) => {
+        const optName = typeof opt === 'string' ? opt : opt.name;
+        const cleanOptName = cleanDisplayLabel(optName);
+        const displayOptName = formatBilingualText(optName, state.currentLang);
+        const isChecked = currentFormCtx.data[field.id] && currentFormCtx.data[field.id].includes(cleanOptName);
+        
+        const optBelongTag = opt.belongGroup ? String(opt.belongGroup).trim().toLowerCase() : '';
+        const isOptDisabled = isGroupDisabled || (optBelongTag && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[optBelongTag]);
+        
+        const optDisabledAttr = isOptDisabled ? 'disabled' : '';
+        const optDisabledStyle = isOptDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
+        const disGroupTag = opt.disableGroup || field.disableGroup || '';
+
+        const clickAction = isOptDisabled ? '' : `toggleCheckboxGroupOption('${field.id}', '${cleanOptName}', '${disGroupTag}')`;
+
+        html += `
+          <div class="option-card ${isChecked ? 'selected' : ''}" style="${optDisabledStyle}" onclick="${clickAction}">
+            <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${optDisabledAttr} onclick="event.stopPropagation(); ${clickAction};">
+            <label for="${field.id}_${idx}">${displayOptName}</label>
+          </div>
+          ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+        `;
+      });
+      html += `</div>`;
+    }
+    else if (field.type === "dynamic_stages") {
+      if (!currentFormCtx.data[field.id] || !Array.isArray(currentFormCtx.data[field.id])) {
+        currentFormCtx.data[field.id] = [
+          { name: "Base line", time: "" },
+          { name: "PTZ", time: "" },
+          { name: "Stimulate", time: "" },
+          { name: "After", time: "" }
+        ];
+      }
+
+      const stageList = currentFormCtx.data[field.id];
+      let stagesHtml = stageList.map((st, sIdx) => `
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+          <input type="text" class="form-control" style="flex:1.3; font-weight:600;" placeholder="區段名稱" value="${st.name}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'name', this.value)">
+          <input type="number" class="form-control" style="flex:0.8;" placeholder="時間" value="${st.time}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'time', this.value)">
+          <span style="font-size:12px; color:var(--text-muted); font-weight:700;">min</span>
+          <button type="button" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; border-radius:6px; width:28px; height:28px; font-weight:bold; cursor:pointer;" onclick="removeDynamicStageItem('${field.id}', ${sIdx})">✕</button>
+        </div>
+      `).join('');
+
+      html += `
+        <div class="form-group" style="${disabledStyle}">
+          <label>${field.label}</label>
+          <div>${stagesHtml}</div>
+          <button type="button" class="btn-action btn-tomorrow" style="width:100%; padding:8px; margin-top:4px; font-size:12px; font-weight:700;" onclick="addDynamicStageItem('${field.id}')">➕ 新增搜集區段</button>
+          ${renderFieldDescription(field.desc)}
+        </div>
+      `;
+    }
+  });
+
+  container.innerHTML = html;
+
+  const allFormInputs = container.querySelectorAll('input, textarea');
+  allFormInputs.forEach(input => {
+    if (!input.dataset.bound) {
+      input.dataset.bound = 'true';
+      input.addEventListener('input', (e) => {
+        const fId = e.target.getAttribute('id') || e.target.getAttribute('data-field-id');
+        const fLabel = e.target.getAttribute('data-label') || '';
+        saveFormFieldData(fId, e.target.value, fLabel);
+        triggerRealtimeFormulaCalculation();
+      });
+    }
+  });
+
+  triggerRealtimeFormulaCalculation();
+
+  const btnPrev = document.getElementById('btnFormPrev');
+  btnPrev.innerText = state.currentLang === 'ZH' ? '上一頁' : 'Previous';
+  btnPrev.style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
+  
+  const specialForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
+  const btnNext = document.getElementById('btnFormNext');
+  
+  if (specialForms.includes(currentFormCtx.formId)) {
+    btnNext.innerText = state.currentLang === 'ZH' ? '提交與檢查' : 'Submit & Verify';
+  } else {
+    const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
+    const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
+    btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+  }
+  btnNext.disabled = state.isSubmitting;
+}
   
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
@@ -2743,6 +2779,150 @@
       state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
     }
   }
+
+  // 🚀 動態解析 氧氣 / Isoflurane 初始量、剩餘量與使用量，並產生回報格式
+function getUsageReportData() {
+  const selectedExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
+  const expRecord = state.dataCenter.find(d => d.expId === selectedExpId) || {};
+  const formData = { ...(expRecord.formData || {}), ...currentFormCtx.data };
+
+  // 1. 動態抓取初始量 (掃描 Label 關鍵字)
+  let o2Initial = null;
+  let isoInitial = null;
+
+  // 從 dynamicForms 中尋找對應 fieldId 的 label
+  Object.keys(formData).forEach(key => {
+    const val = parseFloat(formData[key]);
+    if (isNaN(val)) return;
+
+    // 尋找全域 label
+    const label = (state.fieldLabelMap && state.fieldLabelMap[key]) ? state.fieldLabelMap[key].toLowerCase() : '';
+    
+    // 氧氣初始值匹配
+    if ((label.includes('氧氣') || label.includes('o2')) && (label.includes('初始') || label.includes('開始') || label.includes('總量') || !o2Initial)) {
+      if (val > 0 && o2Initial === null) o2Initial = val;
+    }
+    // Isoflurane 初始值匹配
+    if ((label.includes('isoflurane') || label.includes('麻醉')) && (label.includes('初始') || label.includes('開始') || label.includes('重量') || !isoInitial)) {
+      if (val > 0 && isoInitial === null) isoInitial = val;
+    }
+  });
+
+  // 後備預設機制 (萬一 Label 尚未完全掛載，嘗試從常見數值抓取)
+  if (o2Initial === null) o2Initial = parseFloat(formData['field_37_12']) || 120;
+  if (isoInitial === null) isoInitial = parseFloat(formData['field_39_12']) || 230.55;
+
+  // 2. 動態抓取當前填寫的剩餘量
+  let o2Remain = null;
+  let isoRemain = null;
+
+  Object.keys(currentFormCtx.data).forEach(key => {
+    const val = parseFloat(currentFormCtx.data[key]);
+    if (isNaN(val)) return;
+
+    const label = (state.fieldLabelMap && state.fieldLabelMap[key]) ? state.fieldLabelMap[key].toLowerCase() : '';
+
+    if ((label.includes('氧氣') || label.includes('o2')) && (label.includes('剩餘') || label.includes('結餘') || label.includes('末'))) {
+      o2Remain = val;
+    }
+    if ((label.includes('isoflurane') || label.includes('麻醉')) && (label.includes('剩餘') || label.includes('結餘') || label.includes('末'))) {
+      isoRemain = val;
+    }
+  });
+
+  // 若尚未輸入剩餘量，預設先以 0 計算或顯示未填
+  const o2Left = o2Remain !== null ? o2Remain : '--';
+  const isoLeft = isoRemain !== null ? isoRemain : '--';
+
+  // 3. 計算使用量
+  const o2Used = (o2Remain !== null) ? (o2Initial - o2Remain).toFixed(1) : '--';
+  const isoUsed = (isoRemain !== null) ? (isoInitial - isoRemain).toFixed(2) : '--';
+
+  // 4. 取得使用者與日期資訊
+  const rawDate = expRecord.date || currentFormCtx.data['date'] || state.simulatedDate;
+  const dateObj = new Date(rawDate);
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const formattedDate = `${monthNames[dateObj.getMonth()]} ${dateObj.getDate()}`;
+  const userName = currentFormCtx.data['user_select_val'] || expRecord.user || (state.currentUser ? state.currentUser.name : 'Daniel');
+
+  return {
+    o2Initial, o2Remain: o2Left, o2Used,
+    isoInitial, isoRemain: isoLeft, isoUsed,
+    userName, formattedDate
+  };
+}
+
+// 點擊觸發彈窗 (供複製用)
+function showUsageReportModal(type) {
+  const r = getUsageReportData();
+
+  let title = "";
+  let contentHtml = "";
+
+  if (type === 'O2_and_Isoflurane_usage') {
+    title = "🚪 實驗室門口紙本回報單";
+    const doorText = `O2：${r.o2Initial}→${r.o2Remain}\nIsoflurane：${r.isoInitial}→${r.isoRemain}`;
+    
+    contentHtml = `
+      <div style="text-align:left; font-size:13px;">
+        <label style="font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">請複製下方文字填寫至門口紙本：</label>
+        <textarea id="copyAreaDoor" class="form-control" rows="3" readonly style="font-family:ui-monospace, monospace; font-weight:700; background:#f8fafc; color:var(--primary);">${doorText}</textarea>
+        <button class="btn-action btn-tomorrow" style="width:100%; margin-top:8px; padding:6px; font-size:12px;" onclick="copyTextToClipboard('copyAreaDoor')">📋 一鍵複製文字</button>
+      </div>
+    `;
+  } else if (type === 'NaCl_and_Isoflurane_usage') {
+    title = "💻 實驗室線上化學品用量回報";
+    const naclText = `${r.userName}, ${r.formattedDate}, 9g`;
+    const isoText = `${r.userName}, ${r.formattedDate}, ${r.isoUsed}g`;
+
+    contentHtml = `
+      <div style="text-align:left; font-size:12px; display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <strong style="color:var(--primary);">1. Sodium chloride (NaCl) 表單</strong>
+            <a href="https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit?gid=1540621860#gid=1540621860" target="_blank" style="color:var(--primary); font-size:11px; font-weight:700;">🔗 開啟試算表</a>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="copyNacl" class="form-control" value="${naclText}" readonly style="font-family:ui-monospace, monospace; font-weight:700;">
+            <button class="modal-btn modal-btn-confirm" style="flex-shrink:0; width:70px;" onclick="copyTextToClipboard('copyNacl')">複製</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <strong style="color:var(--primary);">2. Isoflurane 表單</strong>
+            <a href="https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit?gid=1065265371#gid=1065265371" target="_blank" style="color:var(--primary); font-size:11px; font-weight:700;">🔗 開啟試算表</a>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="copyIso" class="form-control" value="${isoText}" readonly style="font-family:ui-monospace, monospace; font-weight:700;">
+            <button class="modal-btn modal-btn-confirm" style="flex-shrink:0; width:70px;" onclick="copyTextToClipboard('copyIso')">複製</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  document.getElementById('modalTitle').innerText = title;
+  document.getElementById('modalMessage').innerHTML = contentHtml;
+  document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">關閉</button>`;
+  document.getElementById('customModalBackdrop').style.display = 'flex';
+}
+
+// 剪貼簿一鍵複製 Helper
+function copyTextToClipboard(elementId) {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.select();
+    el.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(el.value).then(() => {
+      showCustomAlert("成功", "已成功複製到剪貼簿！");
+    }).catch(() => {
+      document.execCommand("copy");
+      showCustomAlert("成功", "已成功複製到剪貼簿！");
+    });
+  }
+}
+  
 </script>
 </body>
 </html>
