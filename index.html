@@ -1173,7 +1173,35 @@
     }
   }
 
-  // 🚀 精準解析明細 + 訊號蒐集時間軸可視化引擎
+  // 🚀 1. 新增：通用動態欄位尋找器（避免寫死列號欄位名）
+  function getDynamicFieldValue(formData, labelKeywords) {
+    if (!state.dynamicForms) return { val: null, id: null };
+    
+    const kwArr = Array.isArray(labelKeywords) ? labelKeywords : [labelKeywords];
+    
+    for (const formId in state.dynamicForms) {
+      const pages = state.dynamicForms[formId];
+      if (!Array.isArray(pages)) continue;
+      
+      for (const p of pages) {
+        if (!p.fields || !Array.isArray(p.fields)) continue;
+        
+        for (const f of p.fields) {
+          if (f.label) {
+            const cleanLabel = f.label.toLowerCase();
+            const isMatch = kwArr.some(kw => cleanLabel.includes(kw.toLowerCase()));
+            
+            if (isMatch && formData[f.id] !== undefined) {
+              return { val: formData[f.id], id: f.id };
+            }
+          }
+        }
+      }
+    }
+    return { val: null, id: null };
+  }
+
+  // 🚀 2. 替換：完全動態化的詳情彈窗解析引擎
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1218,32 +1246,29 @@
     }
 
     // -------------------------------------------------------------
-    // 2. 數據明細結構化提取
+    // 2. 數據明細動態提取
     // -------------------------------------------------------------
     let detailsList = [];
 
     // A. 超音波/物理參數
-    if (formData['field_19_0']) detailsList.push({ label: '頻率 / Frequency', val: `${formData['field_19_0']} HZ` });
-    if (formData['field_20_0']) detailsList.push({ label: '週期數 / Cycles', val: `${formData['field_20_0']} times` });
-    if (formData['field_21_0']) detailsList.push({ label: '電壓 / Voltage', val: `${formData['field_21_0']} mV` });
-    if (formData['field_22_0']) detailsList.push({ label: '間隔 / Interval', val: `${formData['field_22_0']} ms` });
+    const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
+    if (freqObj.val) detailsList.push({ label: '頻率 / Frequency', val: `${freqObj.val} HZ` });
 
-    // B. 實驗前檢查
-    const hasForm002 = Object.keys(formData).some(k => k.endsWith('_8'));
-    if (hasForm002 || exp.status === '準備完成') {
-      let isAllChecked = true;
-      Object.keys(formData).forEach(k => {
-        if (k.endsWith('_8') && k !== 'field_79_8' && formData[k] !== true && formData[k] !== 'true') isAllChecked = false;
-      });
-      const isForce = formData['_is_force_submitted'] || !isAllChecked;
-      const statusText = isForce ? '已完成檢查*' : '已完成檢查';
-      const statusColor = isForce ? 'var(--warning)' : 'var(--success)';
-      detailsList.push({ label: '實驗前檢查', val: `<span style="color:${statusColor}; font-weight:700;">${statusText}</span>` });
-    }
+    const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
+    if (cycleObj.val) detailsList.push({ label: '週期數 / Cycles', val: `${cycleObj.val} times` });
 
-    // C. 大鼠體重、PTZ、Saline
-    const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || 0);
-    const ptzDose = parseFloat(formData['field_4_16'] || 1);
+    const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
+    if (voltObj.val) detailsList.push({ label: '電壓 / Voltage', val: `${voltObj.val} mV` });
+
+    const interObj = getDynamicFieldValue(formData, ['間隔', 'interval']);
+    if (interObj.val) detailsList.push({ label: '間隔 / Interval', val: `${interObj.val} ms` });
+
+    // B. 大鼠體重、PTZ、Saline 計算
+    const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
+    const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
+    const ratWeight = parseFloat(weightObj.val || 0);
+    const ptzDose = parseFloat(doseObj.val || 1);
+
     if (ratWeight > 0) {
       const ptzVol = ratWeight * ptzDose;
       const salineVol = 700 - ptzVol;
@@ -1252,81 +1277,29 @@
       detailsList.push({ label: 'Saline用量', val: `${salineVol} uL` });
     }
 
-    // D. 座標
-    const lamdaAP = formData['field_20_16'] || '0';
-    const lamdaML = formData['field_19_16'] || '0';
-    detailsList.push({ label: 'Lamda位置', val: `(${lamdaAP}, ${lamdaML})` });
-
-    const eleAP = formData['field_16_16'] || '0';
-    const eleML = formData['field_12_16'] || '0';
-    const eleDH = formData['field_17_16'] || '0';
-    detailsList.push({ label: '電極插入位置', val: `(${eleAP}, ${eleML}, ${eleDH})` });
-
-    // E. 生理與手術狀況
-    if (formData['field_23_16'] && Array.isArray(formData['field_23_16'])) {
-      let physioArr = [...formData['field_23_16']];
-      const otherInput = formData['field_23_16_input'] || '';
-      physioArr = physioArr.map(item => item === '其他生理狀況' ? (otherInput || '其他') : item);
+    // C. 生理、手術與電極狀況 (動態比對標題，並將「其他」替換為輸入文字)
+    const physioObj = getDynamicFieldValue(formData, ['生理']);
+    if (physioObj.val && Array.isArray(physioObj.val)) {
+      let physioArr = [...physioObj.val];
+      const otherInput = formData[`${physioObj.id}_input`] || '';
+      physioArr = physioArr.map(item => item.includes('其他') ? (otherInput || '其他') : item);
       detailsList.push({ label: '大鼠生理情況', val: physioArr.join(', '), isBlock: true, isCondition: true });
     }
-    if (formData['field_31_16'] && Array.isArray(formData['field_31_16'])) {
-      detailsList.push({ label: '手術過程狀況', val: formData['field_31_16'].join(', '), isBlock: true, isCondition: true });
-    }
-    if (formData['field_37_16'] && Array.isArray(formData['field_37_16'])) {
-      detailsList.push({ label: '電極插入狀況', val: formData['field_37_16'].join(', '), isBlock: true, isCondition: true });
-    }
 
-    // -------------------------------------------------------------
-    // F. FORM_004 腦訊號蒐集時間軸與狀況解析 (修正判斷邏輯)
-    // -------------------------------------------------------------
-    const baseMin = parseFloat(formData['field_4_20'] || 0);
-    const ptzMin = parseFloat(formData['field_5_20'] || 0);
-    const stimMin = parseFloat(formData['field_6_20'] || 0);
-    const afterMin = parseFloat(formData['field_7_20'] || 0);
-    const totalMin = baseMin + ptzMin + stimMin + afterMin;
-
-    // 只有當總分鐘數等於 0，且確實勾選了不蒐集時，才顯示「本次實驗不蒐集訊號」
-    const isExplicitlyNoCollect = (formData['field_3_20'] === true || formData['field_3_20'] === 'true') && totalMin === 0;
-
-    if (isExplicitlyNoCollect) {
-      detailsList.push({ label: '腦訊號蒐集', val: '本次實驗不蒐集訊號', isBlock: true, isCondition: false });
-    } else if (totalMin > 0) {
-      // 有時間數據，強制繪製時間軸
-      const pBase = ((baseMin / totalMin) * 100).toFixed(1);
-      const pPtz = ((ptzMin / totalMin) * 100).toFixed(1);
-      const pStim = ((stimMin / totalMin) * 100).toFixed(1);
-      const pAfter = ((afterMin / totalMin) * 100).toFixed(1);
-
-      const timelineBarHtml = `
-        <div style="margin-top:4px; margin-bottom:6px;">
-          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-bottom:3px; font-weight:700;">
-            <span>訊號蒐集總長度: ${totalMin} min</span>
-          </div>
-          <!-- 彩色比例條 -->
-          <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#f1f5f9;">
-            ${baseMin > 0 ? `<div style="width:${pBase}%; background:#3b82f6;" title="Baseline: ${baseMin}m"></div>` : ''}
-            ${ptzMin > 0 ? `<div style="width:${pPtz}%; background:#ef4444;" title="PTZ: ${ptzMin}m"></div>` : ''}
-            ${stimMin > 0 ? `<div style="width:${pStim}%; background:#10b981;" title="Stimulate: ${stimMin}m"></div>` : ''}
-            ${afterMin > 0 ? `<div style="width:${pAfter}%; background:#8b5cf6;" title="After: ${afterMin}m"></div>` : ''}
-          </div>
-          <!-- 階段圖例 -->
-          <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-top:5px; font-weight:600;">
-            ${baseMin > 0 ? `<span style="color:#2563eb;">■ Base: ${baseMin}m</span>` : ''}
-            ${ptzMin > 0 ? `<span style="color:#dc2626;">■ PTZ: ${ptzMin}m</span>` : ''}
-            ${stimMin > 0 ? `<span style="color:#059669;">■ Stim: ${stimMin}m</span>` : ''}
-            ${afterMin > 0 ? `<span style="color:#7c3aed;">■ After: ${afterMin}m</span>` : ''}
-          </div>
-        </div>
-      `;
-      detailsList.push({ label: '訊號蒐集時間軸', val: timelineBarHtml, isBlock: true, isCustomHtml: true });
+    const surgObj = getDynamicFieldValue(formData, ['手術']);
+    if (surgObj.val && Array.isArray(surgObj.val)) {
+      let surgArr = [...surgObj.val];
+      const otherInput = formData[`${surgObj.id}_input`] || '';
+      surgArr = surgArr.map(item => item.includes('其他') ? (otherInput || '其他') : item);
+      detailsList.push({ label: '手術過程狀況', val: surgArr.join(', '), isBlock: true, isCondition: true });
     }
 
-    // G. 搜集訊號情況 (多選 + 其他)
-    if (formData['field_9_20'] && Array.isArray(formData['field_9_20'])) {
-      let signalArr = [...formData['field_9_20']];
-      const otherSignalInput = formData['field_9_20_input'] || '';
-      signalArr = signalArr.map(item => item === '其他訊號狀況' ? (otherSignalInput || '其他') : item);
-      detailsList.push({ label: '搜集訊號情況', val: signalArr.join(', '), isBlock: true, isCondition: true });
+    const electObj = getDynamicFieldValue(formData, ['電極']);
+    if (electObj.val && Array.isArray(electObj.val)) {
+      let electArr = [...electObj.val];
+      const otherInput = formData[`${electObj.id}_input`] || '';
+      electArr = electArr.map(item => item.includes('其他') ? (otherInput || '其他') : item);
+      detailsList.push({ label: '電極插入狀況', val: electArr.join(', '), isBlock: true, isCondition: true });
     }
 
     // -------------------------------------------------------------
@@ -1354,16 +1327,14 @@
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
 
     // -------------------------------------------------------------
-    // 4. 備註紀錄（動態解析 [note] 標籤與自訂說明）
+    // 4. 備註紀錄（動態解析 [note] 標籤與全域 notes）
     // -------------------------------------------------------------
     let notesArr = [];
 
-    // A. 優先讀取傳統全域 notes 欄位
     if (formData['notes'] && String(formData['notes']).trim() !== '') {
       notesArr.push(String(formData['notes']).trim());
     }
 
-    // B. 動態搜尋所有帶有 [note] 標籤的欄位值
     if (state.dynamicForms) {
       Object.keys(state.dynamicForms).forEach(fId => {
         const pages = state.dynamicForms[fId];
@@ -1386,16 +1357,6 @@
         }
       });
     }
-
-    // C. 自動掃描選項延伸說明框 (_input 結尾)
-    Object.keys(formData).forEach(key => {
-      if (key.endsWith('_input') && formData[key] && String(formData[key]).trim() !== '') {
-        const val = String(formData[key]).trim();
-        if (!notesArr.includes(val)) {
-          notesArr.push(val);
-        }
-      }
-    });
 
     let notesStr = notesArr.length > 0 ? notesArr.join('\n') : (isZH ? '無' : 'None');
 
