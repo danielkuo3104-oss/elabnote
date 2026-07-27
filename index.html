@@ -186,7 +186,7 @@
       backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
     }
     .custom-modal {
-      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 340px;
+      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 360px;
       padding: 16px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); max-height: 85vh; display: flex; flex-direction: column;
     }
     .custom-modal h3 { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
@@ -196,7 +196,7 @@
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
     .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
 
-    .detail-list { text-align: left; overflow-y: auto; max-height: 55vh; font-size: 12px; padding: 2px; }
+    .detail-list { text-align: left; overflow-y: auto; max-height: 60vh; font-size: 12px; padding: 2px; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 35%; flex-shrink: 0; line-height: 1.3; }
@@ -319,6 +319,11 @@
           <label id="lblRegName">會員名稱 (不可重複)</label>
           <input type="text" id="txtRegName" class="form-control" placeholder="例如：Daniel" oninput="checkDuplicateName()">
           <div id="msgDuplicateName" class="error-msg">⚠️ 此名稱已被使用，請更換其他名稱</div>
+        </div>
+        <div class="form-group">
+          <label id="lblRegCode">自訂識別簡碼 (限 3 碼大寫英數字，不可重複)</label>
+          <input type="text" id="txtRegCode" class="form-control" maxlength="3" placeholder="例如：GDC" style="text-transform:uppercase;" oninput="checkDuplicateUserCode()">
+          <div id="msgDuplicateCode" class="error-msg">⚠️ 此識別簡碼已被使用，請更換其他簡碼</div>
         </div>
         <div class="form-group">
           <label id="lblRegEmail">電子信箱</label>
@@ -615,32 +620,14 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  function evaluateFormula() {
-    const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
-    let weight = 0;
-    let dose = 1;
-
-    if (allInputs.length >= 2) {
-      weight = parseFloat(allInputs[0].value) || 0;
-      dose = parseFloat(allInputs[1].value) || 1;
-    }
-
-    try {
-      let result = weight * dose;
-      return isNaN(result) ? '' : Math.round(result * 1000) / 1000;
-    } catch (e) {
-      return '';
-    }
-  }
-  
-  // 🚀 完整即時響應計算引擎（支援 Page 0 劑量與 Page 1 座標）
+  // 🚀 精準修正 PTZ 與 Saline 藥劑計算與座標邏輯
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
 
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
 
-    // 🚀 第一頁：劑量計算 (PageIndex = 0)
+    // PageIndex = 0 (劑量計算)
     if (currentFormCtx.currentPageIdx === 0) {
       let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
       let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
@@ -649,10 +636,10 @@
       page.fields.forEach(f => {
         if (f.type === "formula") {
           let calculatedVal = 0;
-          if (formulaIndex === 1) {
-            calculatedVal = 700 - (weight * dose); // Saline 需要量
+          if (formulaIndex === 0) {
+            calculatedVal = weight * dose;        // PTZ 用量
           } else {
-            calculatedVal = weight * dose;        // PTZ 需要量
+            calculatedVal = 700 - (weight * dose); // Saline 用量 (用總量700扣除)
           }
 
           currentFormCtx.data[f.id] = calculatedVal;
@@ -666,7 +653,7 @@
       return;
     }
 
-    // 🚀 第二頁：座標計算 (PageIndex = 1)
+    // PageIndex = 1 (座標計算)
     if (currentFormCtx.currentPageIdx === 1) {
       const valArr = Array.from(allInputs).map(inp => parseFloat(inp.value) || 0);
       
@@ -731,7 +718,6 @@
 
   async function fetchAndParseFormsFromSheet() {
     try {
-      // 🚀 加破快取隨機數
       const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
       const csvText = await res.text();
       const rows = parseCSV(csvText);
@@ -939,7 +925,8 @@
             color: rows[i][3] ? rows[i][3].trim() : '#f1f5f9',
             role: rows[i][4] ? rows[i][4].trim() : '協作會員',
             password: rows[i][5] ? rows[i][5].trim() : '',
-            lang: rows[i][6] ? rows[i][6].trim() : 'ZH'
+            lang: rows[i][6] ? rows[i][6].trim() : 'ZH',
+            userCode: rows[i][7] ? rows[i][7].trim().toUpperCase() : '' // 抓取自訂識別簡碼
           });
         }
       }
@@ -955,7 +942,25 @@
     const nameInput = document.getElementById('txtRegName').value.trim().toLowerCase();
     const isDuplicate = state.membersList.some(m => m.name.toLowerCase() === nameInput);
     document.getElementById('msgDuplicateName').style.display = isDuplicate ? 'block' : 'none';
-    document.getElementById('btnRegisterSubmit').classList.toggle('btn-disabled', isDuplicate);
+    validateRegisterBtn();
+  }
+
+  function checkDuplicateUserCode() {
+    const codeInput = document.getElementById('txtRegCode').value.trim().toUpperCase();
+    document.getElementById('txtRegCode').value = codeInput; // 自動大寫
+    const isDuplicate = state.membersList.some(m => m.userCode && m.userCode.toUpperCase() === codeInput);
+    document.getElementById('msgDuplicateCode').style.display = isDuplicate ? 'block' : 'none';
+    validateRegisterBtn();
+  }
+
+  function validateRegisterBtn() {
+    const nameInput = document.getElementById('txtRegName').value.trim();
+    const codeInput = document.getElementById('txtRegCode').value.trim();
+    const isNameDup = state.membersList.some(m => m.name.toLowerCase() === nameInput.toLowerCase());
+    const isCodeDup = state.membersList.some(m => m.userCode && m.userCode.toUpperCase() === codeInput.toUpperCase());
+    
+    const disabled = isNameDup || isCodeDup || codeInput.length === 0;
+    document.getElementById('btnRegisterSubmit').classList.toggle('btn-disabled', disabled);
   }
 
   function initColorDropdown() {
@@ -970,7 +975,6 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  // 🚀 關鍵同步修復：加上破快取隨機數，確保手機手動/自動更新時能秒獲取雲端最新狀態！
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
@@ -978,20 +982,10 @@
       const rows = parseCSV(csvText);
 
       const STATUS_RANK = {
-        "已預約": 1,
-        "準備中": 2,
-        "實驗準備": 2,
-        "準備完成": 3,
-        "手術中": 4,
-        "休息中": 5,
-        "訊號蒐集中": 6,
-        "訊號蒐集完成": 7,
-        "已死亡": 8,
-        "犧牲中": 8,
-        "實驗善後": 9,
-        "已完成": 10,
-        "實驗完成": 10,
-        "實驗結束": 10
+        "已預約": 1, "準備中": 2, "實驗準備": 2, "準備完成": 3,
+        "手術中": 4, "休息中": 5, "訊號蒐集中": 6, "訊號蒐集完成": 7,
+        "已死亡": 8, "犧牲中": 8, "實驗善後": 9, "已完成": 10,
+        "實驗完成": 10, "實驗結束": 10
       };
 
       const records = [];
@@ -1044,7 +1038,6 @@
             dynamicInfo = "實驗專案";
           }
 
-          // 防狀態倒退，但若雲端更先進則強制同步雲端！
           const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
           let finalStatus = statusFromSheet;
 
@@ -1055,7 +1048,7 @@
             if (currentRank > sheetRank) {
               finalStatus = existingLocalRecord.status;
             } else {
-              finalStatus = statusFromSheet; // 雲端有新進展，強制覆寫 Local
+              finalStatus = statusFromSheet;
             }
           }
 
@@ -1144,6 +1137,7 @@
     }
   }
 
+  // 🚀 精準修復：過濾重複實驗目的、計算手術用時、排版檢查狀態順序
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1154,37 +1148,58 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 1. 提煉純淨備註
-    let notesStr = formData['notes'] || formData['field_14_4'] || formData['field_79_8'] || '';
+    // 1. 備註欄位
+    let notesStr = formData['notes'] || '';
     if (!notesStr || String(notesStr).trim() === '') {
       notesStr = isZH ? '無' : 'None';
     }
 
-    // 2. 歷程時間軸
+    // 2. 歷程時間軸 & 自動計算手術用時
     let timeLogsHtml = '';
+    let surgeryDurationHtml = '';
+    
     if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
-      timeLogsHtml = Object.entries(formData['_time_logs']).map(([st, time]) => `
+      const logs = formData['_time_logs'];
+      timeLogsHtml = Object.entries(logs).map(([st, time]) => `
         <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px;">
           <span style="color:var(--text-muted); font-weight:700;">• ${st}:</span>
           <span style="font-family:ui-monospace, monospace; color:var(--text-primary);">${time}</span>
         </div>
       `).join('');
+
+      // 計算手術用時 (手術中 -> 休息中 或 已死亡)
+      if (logs['手術中'] && (logs['休息中'] || logs['已死亡'])) {
+        const start = new Date(logs['手術中']);
+        const end = new Date(logs['休息中'] || logs['已死亡']);
+        const diffMs = end - start;
+        if (diffMs > 0) {
+          const diffMins = Math.floor(diffMs / 60000);
+          surgeryDurationHtml = `
+            <div class="detail-row">
+              <div class="detail-label" style="color:var(--danger);">${isZH?'手術用時':'Surgery Duration'}</div>
+              <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH?'分鐘':'mins'}</div>
+            </div>
+          `;
+        }
+      }
     } else {
       timeLogsHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</span>`;
     }
 
-    // 🚀 3. 明細解析：FORM_001 參數 + FORM_002 檢查狀態 雙軌並存！
+    // 3. 過濾明細項目
     let detailBlocks = [];
-
-    // Part A: 提取 FORM_001 超音波等數值數據
     const systemKeys = ['outline_select_val', 'selected_purpose_name', 'outline_code', 'purpose_code', 'exp_select_val', 'user_select_val', 'notes', 'notes_label', '_time_logs', '_is_checklist', '_is_force_submitted', 'field_14_4', 'field_79_8'];
     
     Object.keys(formData).forEach(k => {
-      // 排除系統 key、輸入框 key、FORM_002 的 _8 勾選 key
+      // 忽略多餘項目與重複出現的「本次目的」/「校正 DH」
       if (!systemKeys.includes(k) && !k.endsWith('_input') && !k.endsWith('_8') && formData[k] !== undefined && formData[k] !== null && String(formData[k]).trim() !== '') {
         const valStr = String(formData[k]).trim();
         const questionLabel = state.fieldLabelMap[k] || k;
         
+        // 跳過重複的本次目的
+        if (questionLabel.includes('本次目的') || questionLabel.includes('Experiment Purpose')) return;
+        if (questionLabel.includes('校正 DH')) return; // 精簡電極位置，僅保留精確插入座標
+
         if (valStr !== formData['outline_select_val'] && valStr !== formData['selected_purpose_name'] && valStr !== 'true' && valStr !== 'false') {
           detailBlocks.push(`
             <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; border-bottom:1px solid #f1f5f9; padding-bottom:2px;">
@@ -1196,7 +1211,7 @@
       }
     });
 
-    // Part B: 若有進行 FORM_002 檢查表，補上檢查結果標籤
+    // 4. 準備檢查狀態移至超音波資訊下方 (Field Data 末端)
     const hasForm002Data = Object.keys(formData).some(k => k.endsWith('_8')); 
     if (hasForm002Data || exp.status === '準備完成') {
       let isAllChecked = true;
@@ -1216,7 +1231,7 @@
       const statusColor = isForce ? 'var(--warning)' : 'var(--success)';
 
       detailBlocks.push(`
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px; padding-top:4px; border-top:1px dashed var(--border-color);">
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:6px; padding-top:4px; border-top:1px dashed var(--border-color);">
           <span style="color:var(--text-muted); font-weight:700;">• 準備檢查狀態:</span>
           <span style="font-weight:700; color:${statusColor}; font-size:11px;">${statusText}</span>
         </div>
@@ -1225,7 +1240,7 @@
 
     const filledDataHtml = detailBlocks.length > 0 ? detailBlocks.join('') : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
 
-    // 4. 組裝 HTML
+    // 5. 組裝 HTML
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row">
@@ -1248,17 +1263,18 @@
           <div class="detail-label">${isZH?'實驗日期':'Date'}</div>
           <div class="detail-value">${exp.date}</div>
         </div>
+        ${surgeryDurationHtml}
         <div class="detail-row">
           <div class="detail-label">${isZH?'狀態歷程時間':'Time Logs'}</div>
           <div class="detail-value" style="text-align:left;">${timeLogsHtml}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'填寫數據明細':'Field Data'}</div>
-          <div class="detail-value" style="text-align:left; max-height:120px; overflow-y:auto;">${filledDataHtml}</div>
+          <div class="detail-value" style="text-align:left; max-height:140px; overflow-y:auto;">${filledDataHtml}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'備註紀錄':'Notes'}</div>
-          <div class="detail-value" style="white-space:pre-line; color:var(--text-primary);">${notesStr}</div>
+          <div class="detail-value" style="white-space:pre-line; color:var(--text-primary); text-align:left;">${notesStr}</div>
         </div>
       </div>
     `;
@@ -1387,20 +1403,27 @@
     });
   }
 
+  // 🚀 支援註冊時新增識別簡碼寫入
   async function performRegister() {
     const name = document.getElementById('txtRegName').value.trim();
+    const userCode = document.getElementById('txtRegCode').value.trim().toUpperCase();
     const email = document.getElementById('txtRegEmail').value.trim();
     const role = document.getElementById('selRegRole').value;
     const password = document.getElementById('txtRegPwd').value.trim();
     const color = document.getElementById('selRegColor').value;
     const lang = document.getElementById('selRegLang').value;
 
-    if(!name || !email) { showCustomAlert("錯誤", "請完整填寫姓名與 Email"); return; }
+    if(!name || !email || !userCode) { showCustomAlert("錯誤", "請完整填寫姓名、識別簡碼與 Email"); return; }
+    if(userCode.length !== 3) { showCustomAlert("錯誤", "自訂識別簡碼限制必須為 3 碼英數字"); return; }
+    
     if(state.membersList.some(m => m.name.toLowerCase() === name.toLowerCase())) {
       showCustomAlert("註冊失敗", "會員名稱已存在！"); return;
     }
+    if(state.membersList.some(m => m.userCode && m.userCode.toUpperCase() === userCode)) {
+      showCustomAlert("註冊失敗", "識別簡碼已存在，請更換！"); return;
+    }
 
-    const newUser = { name, email, role, password, color, lang };
+    const newUser = { name, userCode, email, role, password, color, lang };
     state.membersList.push(newUser);
     await syncToGoogleSheet("registerUser", newUser);
 
@@ -1429,6 +1452,16 @@
     document.getElementById('lblPassword').innerText = isZH ? "識別密碼" : "Password";
     document.getElementById('btnLoginSubmit').innerText = isZH ? "登入" : "Login";
     document.getElementById('btnGuestSubmit').innerText = isZH ? "訪客登入 (僅說明)" : "Guest Login (Read Only)";
+
+    // 註冊表單語言對應
+    document.getElementById('lblRegName').innerText = isZH ? "會員名稱 (不可重複)" : "Member Name (Unique)";
+    document.getElementById('lblRegCode').innerText = isZH ? "自訂識別簡碼 (限 3 碼大寫英數字)" : "Custom User Code (3 Uppercase Letters/Nums)";
+    document.getElementById('lblRegEmail').innerText = isZH ? "電子信箱" : "Email Address";
+    document.getElementById('lblRegRole').innerText = isZH ? "身份別" : "Role";
+    document.getElementById('lblRegPwd').innerText = isZH ? "設定識別密碼" : "Password";
+    document.getElementById('lblRegColor').innerText = isZH ? "個人代表色 (不可重複)" : "Member Color (Unique)";
+    document.getElementById('lblRegLang').innerText = isZH ? "預設介面語言" : "Default Language";
+    document.getElementById('btnRegisterSubmit').innerText = isZH ? "註冊新帳號" : "Register Account";
 
     document.getElementById('appTitle').innerText = isZH ? "智慧實驗日誌" : "Smart E-Labnote";
     document.getElementById('btnTodayExp').innerText = isZH ? "今日實驗登錄" : "Today Exp";
@@ -1665,7 +1698,6 @@
     }).join('');
   }
 
-  // 🚀 救回完整即時響應計算與 DOM 渲染！
   function renderFormCurrentPage() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     const container = document.getElementById('formContent');
@@ -1678,9 +1710,7 @@
         if (selectedOutline !== field.dependsOn) return;
       }
 
-      // 🚀 公式欄位動態渲染 (自動計算與代入)
       if (field.type === "formula") {
-        const renderedFormulaCount = container.querySelectorAll('.formula-field').length;
         let calculatedVal = currentFormCtx.data[field.id] || 0;
 
         html += `
@@ -1809,7 +1839,7 @@
               <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
               <label for="${optId}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="備註">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1826,7 +1856,7 @@
               <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
               <label for="${field.id}_${idx}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="備註">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他生理狀況說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1835,7 +1865,6 @@
 
     container.innerHTML = html;
 
-    // 🚀 全面即時事件監聽器（打字瞬間秒運算公式）
     const allFormInputs = container.querySelectorAll('input, textarea');
     allFormInputs.forEach(input => {
       if (!input.dataset.bound) {
@@ -1849,7 +1878,6 @@
       }
     });
 
-    // 🚀 渲染完畢立刻主動運算一次公式
     triggerRealtimeFormulaCalculation();
 
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
@@ -1904,12 +1932,18 @@
     renderFormCurrentPage();
   }
 
+  // 🚀 修復備註（Notes）為累加制，不再會覆蓋前面舊有備註
   function saveFormFieldData(fieldId, val, fieldLabel = '') {
     currentFormCtx.data[fieldId] = val;
 
-    const isNoteField = fieldLabel.includes('備註') || fieldId.endsWith('_input') || fieldLabel.toLowerCase().includes('note') || fieldLabel.toLowerCase().includes('remark');
-    if (isNoteField) {
-      currentFormCtx.data['notes'] = val;
+    const isExplicitNote = fieldLabel.includes('備註') || fieldLabel.toLowerCase().includes('note') || fieldLabel.toLowerCase().includes('remark');
+    
+    // 只有全域備註才會觸發累加
+    if (isExplicitNote && !fieldId.endsWith('_input')) {
+      const existingNotes = currentFormCtx.data['notes'] || '';
+      if (!existingNotes.includes(val)) {
+        currentFormCtx.data['notes'] = existingNotes ? `${existingNotes}\n[${new Date().toLocaleTimeString()}] ${val}` : val;
+      }
     }
 
     state.formDataCache[currentFormCtx.formId] = currentFormCtx.data;
@@ -1933,9 +1967,6 @@
         const el = document.getElementById(f.id);
         if (el && el.value !== undefined) {
           currentFormCtx.data[f.id] = el.value;
-        }
-        if (f.type === 'formula') {
-          currentFormCtx.data[f.id] = evaluateFormula(f.formula);
         }
       });
     }
@@ -2020,7 +2051,6 @@
     renderTimeline();
   }
 
-  // 🚀 必填與強制提交記錄標記
   function checkFormAndSubmit() {
     const formId = currentFormCtx.formId;
     const targetForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
@@ -2030,9 +2060,7 @@
       return;
     }
 
-    // 標記該表單屬於檢查表
     currentFormCtx.data['_is_checklist'] = true;
-
     const uncompletedFields = [];
 
     currentFormCtx.pages.forEach(page => {
@@ -2074,12 +2102,12 @@
 
       showCustomConfirm("填寫未完成警告", msgHtml, "返回填寫", "仍要提交", (confirmed) => {
         if (confirmed) {
-          currentFormCtx.data['_is_force_submitted'] = true; // 🚀 標記為強制提交 (會顯示 已完成檢查*)
+          currentFormCtx.data['_is_force_submitted'] = true;
           submitFormFinal();
         }
       });
     } else {
-      currentFormCtx.data['_is_force_submitted'] = false; // 完整勾選 (顯示 已完成檢查)
+      currentFormCtx.data['_is_force_submitted'] = false;
       submitFormFinal();
     }
   }
@@ -2097,19 +2125,29 @@
     }
   }
 
+  // 🚀 重構實驗編號生成邏輯：對應負責人識別簡碼 + 流水號（自動防重複加一）
   function generateExperimentId(dateStr) {
-    const outlineCode = currentFormCtx.data['outline_code'] || 'A';
+    const outlineCode = currentFormCtx.data['outline_code'] || 'B';
     const purposeCode = currentFormCtx.data['purpose_code'] || '01';
+    
+    // 取得當前負責人的識別簡碼 (例如 GDC)
+    const activeUserName = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+    const userObj = state.membersList.find(m => m.name === activeUserName);
+    const userCode = (userObj && userObj.userCode) ? userObj.userCode : "GDC";
+
     const cleanDate = dateStr.replace(/-/g, '');
     const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : '260726';
-    
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let checksum = '';
-    for (let i = 0; i < 3; i++) {
-      checksum += chars.charAt(Math.floor(Math.random() * chars.length));
+
+    let sequence = 1;
+    let generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
+
+    // 檢查資料庫是否已存在此編號，若存在則流水號加 1
+    while (state.dataCenter.some(d => d.expId === generatedId)) {
+      sequence++;
+      generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
     }
 
-    return `${outlineCode}${purposeCode}${yyMMdd}${checksum}`;
+    return generatedId;
   }
 
   async function submitFormFinal() {
@@ -2261,7 +2299,7 @@
   function openEditProfile() {
     closeFabMenu();
     if(state.currentUser) {
-      showCustomAlert("個人資訊", `會員姓名 : ${state.currentUser.name}\nEmail : ${state.currentUser.email}\n身份 : ${state.currentUser.role}`);
+      showCustomAlert("個人資訊", `會員姓名 : ${state.currentUser.name}\n簡碼 : ${state.currentUser.userCode || '無'}\nEmail : ${state.currentUser.email}\n身份 : ${state.currentUser.role}`);
     }
   }
 
@@ -2272,7 +2310,6 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      console.log("📱 [手機切回前台] 觸發靜默同步...");
       checkAndSilentRefresh();
     }
   });
@@ -2283,7 +2320,6 @@
       await refreshDashboard(false);
     }
   }
-  
 </script>
 </body>
 </html>
