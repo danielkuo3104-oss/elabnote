@@ -1677,6 +1677,18 @@
   function startExpFormByStatus(targetExp) {
     if (!targetExp) return;
     const status = targetExp.status || '已預約';
+    const formData = targetExp.formData || {};
+
+    // 關鍵判斷 1：檢查是否有勾選「本次無需插入電極」
+    const electData = formData['field_37_16'];
+    const isNoElectrode = Array.isArray(electData) 
+      ? electData.includes("本次無需插入電極") 
+      : (typeof electData === 'string' && electData.includes("本次無需插入電極"));
+
+    // 關鍵判斷 2：檢查是否已死亡（含欄位與狀態字串）
+    const isDeceased = status === '已死亡' || 
+      (formData['field_44_16'] && String(formData['field_44_16']).includes("已死亡")) ||
+      (formData['selected_purpose_name'] && String(formData['selected_purpose_name']).includes("已死亡"));
 
     let targetFormId = "FORM_001_1";
 
@@ -1684,12 +1696,22 @@
       targetFormId = "FORM_001_1";
     } else if (status === '準備中' || status === '實驗準備') {
       const isControlGroup = targetExp.info.includes("控制組") || 
-        (targetExp.formData && Object.values(targetExp.formData).some(v => String(v).includes("控制組")));
+        Object.values(formData).some(v => String(v).includes("控制組"));
       targetFormId = isControlGroup ? "FORM_002_2" : "FORM_002_1";
     } else if (status === '準備完成' || status === '手術中') {
-      targetFormId = "FORM_003";
+      // 🚀 新增邏輯：如果無須插入電極或已死亡，跳過 FORM_004，直接開啟 FORM_005
+      if (isNoElectrode || isDeceased) {
+        targetFormId = "FORM_005";
+      } else {
+        targetFormId = "FORM_003";
+      }
     } else if (status === '休息中' || status === '訊號蒐集中') {
-      targetFormId = "FORM_004";
+      // 🚀 若在休息中/訊號蒐集中狀態，但被標註為無需插入電極，同樣轉往 FORM_005
+      if (isNoElectrode || isDeceased) {
+        targetFormId = "FORM_005";
+      } else {
+        targetFormId = "FORM_004";
+      }
     } else if (status === '已死亡' || status === '訊號蒐集完成' || status === '犧牲中') {
       targetFormId = "FORM_005";
     } else if (status === '實驗善後') {
