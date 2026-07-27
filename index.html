@@ -1392,19 +1392,41 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
+  // 🚀 實現 3 (未來) + N (今日全顯示) + 3 (過去) 時間軸配置
   function renderTimeline() {
     const isZH = state.currentLang === 'ZH';
     const container = document.getElementById('timelineContainer');
     let html = `<div class="timeline-line"></div>`;
-    const sorted = [...state.dataCenter].sort((a,b) => new Date(b.date) - new Date(a.date));
-    
-    if(sorted.length === 0) {
+
+    const todayStr = state.simulatedDate;
+
+    // 1. 分分類：未來的實驗（日期 > 今日）-> 按日期升冪（越靠近今天的越前面）
+    const futureExps = state.dataCenter
+      .filter(d => new Date(d.date) > new Date(todayStr))
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(0, 3); // 限制未來最多 3 筆
+
+    // 2. 今日的實驗（日期 == 今日）-> 全數保留 (N筆)
+    const todayExps = state.dataCenter
+      .filter(d => d.date === todayStr);
+
+    // 3. 過去的實驗（日期 < 今日）-> 按日期降冪（越靠近今天的越前面）
+    const pastExps = state.dataCenter
+      .filter(d => new Date(d.date) < new Date(todayStr))
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 3); // 限制過去最多 3 筆
+
+    // 4. 組合最終時間軸列表：【未來 3 筆】 + 【今日 N 筆】 + 【過去 3 筆】
+    // (畫面由上到下，最頂端是未來的實驗，中間是今日，底下是過去)
+    const displayList = [...futureExps, ...todayExps, ...pastExps];
+
+    if (displayList.length === 0) {
       container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">${isZH?'無歷史實驗紀錄':'No history records'}</div>`;
       return;
     }
 
-    sorted.forEach(item => {
-      const isToday = item.date === state.simulatedDate;
+    displayList.forEach(item => {
+      const isToday = item.date === todayStr;
       const userObj = state.membersList.find(m => m.name === item.user);
       const userColor = userObj ? userObj.color : '#f1f5f9';
       
@@ -1820,7 +1842,7 @@
       // 🚀 判斷是否屬於已關閉群組
       const isGroupDisabled = field.belongGroup && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[field.belongGroup];
       const disabledAttr = isGroupDisabled ? 'disabled' : '';
-      const disabledStyle = isGroupDisabled ? 'opacity: 0.35; pointer-events: none;' : '';
+      const disabledStyle = isGroupDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
 
       if (field.type === "formula") {
         let calculatedVal = currentFormCtx.data[field.id] || 0;
@@ -1925,10 +1947,11 @@
       }
       else if (field.type === "checkbox") {
         const isSelected = !!currentFormCtx.data[field.id];
-        const disGroupArg = field.disableGroup ? `'${field.disableGroup}'` : 'null';
+        const disTag = field.disableGroup ? field.disableGroup : '';
+        
         html += `
-          <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="if(!${isGroupDisabled}) toggleOptionCheckbox('${field.id}', '${field.label}', ${disGroupArg})">
-            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}', ${disGroupArg});">
+          <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}')">
+            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}');">
             <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
           </div>
           ${renderFieldDescription(field.desc)}
@@ -1995,7 +2018,7 @@
 
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
     
-    // 🚀 控制底部按鈕：FORM_002_1, FORM_002_2, FORM_006 固定顯示「提交與檢查」
+    // 🚀 特殊表單固定顯示「提交與檢查」
     const specialForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     const btnNext = document.getElementById('btnFormNext');
 
@@ -2008,7 +2031,6 @@
     }
     btnNext.disabled = state.isSubmitting;
   }
-
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
     const selectedOption = sel.options[sel.selectedIndex];
@@ -2034,20 +2056,21 @@
     renderFormCurrentPage();
   }
   
-  function toggleOptionCheckbox(fieldId, label, disableGroupTag = null) {
+  function toggleOptionCheckbox(fieldId, label, disableGroupTag = '') {
     const currentVal = !currentFormCtx.data[fieldId];
     saveFormFieldData(fieldId, currentVal, label);
 
-    // 🚀 若欄位附帶 disableGroup，開關群組狀態
-    if (disableGroupTag) {
+    // 🚀 若有設定關閉群組標籤
+    if (disableGroupTag && disableGroupTag.trim() !== '') {
+      const tag = disableGroupTag.trim();
       if (!currentFormCtx.disabledGroups) currentFormCtx.disabledGroups = {};
-      currentFormCtx.disabledGroups[disableGroupTag] = currentVal; // true 代表被鎖定
+      currentFormCtx.disabledGroups[tag] = currentVal; // true 代表開啟「停用」
 
-      // 勾選停用時，清空被停用群組內所有已勾選/填寫的數據
+      // 勾選停用時，連動清除屬於該群組的所有已填資料
       if (currentVal) {
         currentFormCtx.pages.forEach(p => {
           p.fields.forEach(f => {
-            if (f.belongGroup === disableGroupTag) {
+            if (f.belongGroup === tag) {
               delete currentFormCtx.data[f.id];
             }
           });
