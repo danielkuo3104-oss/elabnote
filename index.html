@@ -1137,7 +1137,7 @@
     }
   }
 
-  // 🚀 語意化精準解析明細彈窗
+  // 🚀 解決排版擠壓 + 情況藍色高亮 + 上下獨立區塊解析器
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1182,17 +1182,17 @@
     }
 
     // -------------------------------------------------------------
-    // 2. 數據明細語意化提取 (精確格式對齊)
+    // 2. 數據明細結構化提取
     // -------------------------------------------------------------
     let detailsList = [];
 
-    // A. 物理/超音波參數 (加單位)
+    // A. 超音波/物理參數
     if (formData['field_19_0']) detailsList.push({ label: '頻率 / Frequency', val: `${formData['field_19_0']} HZ` });
     if (formData['field_20_0']) detailsList.push({ label: '週期數 / Cycles', val: `${formData['field_20_0']} times` });
     if (formData['field_21_0']) detailsList.push({ label: '電壓 / Voltage', val: `${formData['field_21_0']} mV` });
     if (formData['field_22_0']) detailsList.push({ label: '間隔 / Interval', val: `${formData['field_22_0']} ms` });
 
-    // B. 實驗前檢查狀態
+    // B. 實驗前檢查
     const hasForm002 = Object.keys(formData).some(k => k.endsWith('_8'));
     if (hasForm002 || exp.status === '準備完成') {
       let isAllChecked = true;
@@ -1205,18 +1205,18 @@
       detailsList.push({ label: '實驗前檢查', val: `<span style="color:${statusColor}; font-weight:700;">${statusText}</span>` });
     }
 
-    // C. 藥劑與大鼠數據 (修正 Saline 算術問題 + 補單位)
+    // C. 大鼠體重、PTZ、Saline
     const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || 0);
-    const ptzDose = parseFloat(formData['field_4_16'] || 1); // 預設劑量比例 1
+    const ptzDose = parseFloat(formData['field_4_16'] || 1);
     if (ratWeight > 0) {
       const ptzVol = ratWeight * ptzDose;
-      const salineVol = 700 - ptzVol; // 精確計算 700 - PTZ
+      const salineVol = 700 - ptzVol;
       detailsList.push({ label: '大鼠體重（g）', val: `${ratWeight}` });
       detailsList.push({ label: 'PTZ使用劑量', val: `${ptzVol} uL` });
       detailsList.push({ label: 'Saline用量', val: `${salineVol} uL` });
     }
 
-    // D. 座標整合 (AP, ML) 與 (AP, ML, DH)
+    // D. 座標
     const lamdaAP = formData['field_20_16'] || '0';
     const lamdaML = formData['field_19_16'] || '0';
     detailsList.push({ label: 'Lamda位置', val: `(${lamdaAP}, ${lamdaML})` });
@@ -1226,50 +1226,63 @@
     const eleDH = formData['field_17_16'] || '0';
     detailsList.push({ label: '電極插入位置', val: `(${eleAP}, ${eleML}, ${eleDH})` });
 
-    // E. 大鼠生理狀況 (解析「其他生理狀況」對應的 input 值，並移除多餘字樣)
+    // E. 大鼠生理情況 (標記為 isBlock 且 isCondition)
     if (formData['field_23_16'] && Array.isArray(formData['field_23_16'])) {
       let physioArr = [...formData['field_23_16']];
       const otherInput = formData['field_23_16_input'] || '';
-      
-      // 將「其他生理狀況」替換為實際輸入內容（如：心率過快）
       physioArr = physioArr.map(item => item === '其他生理狀況' ? (otherInput || '其他') : item);
-      detailsList.push({ label: '大鼠生理情況', val: physioArr.join(', ') });
+      detailsList.push({ label: '大鼠生理情況', val: physioArr.join(', '), isBlock: true, isCondition: true });
     }
 
-    // F. 手術過程狀況 (多選)
+    // F. 手術過程狀況 (標記為 isBlock 且 isCondition)
     if (formData['field_31_16'] && Array.isArray(formData['field_31_16'])) {
-      detailsList.push({ label: '手術過程狀況', val: formData['field_31_16'].join(', ') });
+      detailsList.push({ label: '手術過程狀況', val: formData['field_31_16'].join(', '), isBlock: true, isCondition: true });
     }
 
-    // G. 電極插入狀況
+    // G. 電極插入狀況 (標記為 isBlock 且 isCondition)
     if (formData['field_37_16'] && Array.isArray(formData['field_37_16'])) {
-      detailsList.push({ label: '電極插入狀況', val: formData['field_37_16'].join(', ') });
+      detailsList.push({ label: '電極插入狀況', val: formData['field_37_16'].join(', '), isBlock: true, isCondition: true });
     }
 
-    // 渲染 Field Data HTML
+    // -------------------------------------------------------------
+    // 3. 渲染 Field Data HTML（條件判斷：單行 vs 上下排版）
+    // -------------------------------------------------------------
     const filledDataHtml = detailsList.length > 0 
-      ? detailsList.map(item => `
-          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; border-bottom:1px dashed #f1f5f9; padding-bottom:3px;">
-            <span style="color:var(--text-muted); font-weight:700; max-width:55%; font-size:11px;">${item.label}:</span>
-            <span style="font-weight:700; color:var(--text-primary); font-family:ui-monospace, monospace; text-align:right;">${item.val}</span>
-          </div>
-        `).join('')
+      ? detailsList.map(item => {
+          // 若為「情況 / 狀況」，採用獨佔單行 (上下結構)，且內文改為藍色
+          if (item.isBlock) {
+            const textColor = item.isCondition ? 'var(--primary)' : 'var(--text-primary)';
+            return `
+              <div style="margin-bottom:8px; border-bottom:1px dashed #f1f5f9; padding-bottom:5px;">
+                <div style="color:var(--text-muted); font-weight:700; font-size:11px; margin-bottom:2px;">${item.label}:</div>
+                <div style="font-weight:700; color:${textColor}; font-size:12px; line-height:1.4; padding-left:4px;">${item.val}</div>
+              </div>
+            `;
+          } else {
+            // 普通數值維持左右對齊
+            return `
+              <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; border-bottom:1px dashed #f1f5f9; padding-bottom:3px;">
+                <span style="color:var(--text-muted); font-weight:700; max-width:55%; font-size:11px;">${item.label}:</span>
+                <span style="font-weight:700; color:var(--text-primary); font-family:ui-monospace, monospace; text-align:right;">${item.val}</span>
+              </div>
+            `;
+          }
+        }).join('')
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
 
     // -------------------------------------------------------------
-    // 3. 備註紀錄保護與提取
+    // 4. 備註紀錄
     // -------------------------------------------------------------
-    // 優先還原最初的備註 (若 notes 被誤覆蓋為心率過快，則回溯 field_14_4 或歷史 notes)
     let notesStr = formData['notes'] || '';
     if (notesStr === '心率過快' && formData['field_14_4']) {
-      notesStr = formData['field_14_4']; // 自動救援還原成 "10:00開始"
+      notesStr = formData['field_14_4'];
     }
     if (!notesStr || String(notesStr).trim() === '') {
       notesStr = isZH ? '無' : 'None';
     }
 
     // -------------------------------------------------------------
-    // 4. 組裝 Modal
+    // 5. 組裝彈窗
     // -------------------------------------------------------------
     const htmlContent = `
       <div class="detail-list">
@@ -1298,9 +1311,9 @@
           <div class="detail-label">${isZH?'狀態歷程時間':'Time Logs'}</div>
           <div class="detail-value" style="text-align:left;">${timeLogsHtml}</div>
         </div>
-        <div class="detail-row">
-          <div class="detail-label">${isZH?'填寫數據明細':'Field Data'}</div>
-          <div class="detail-value" style="text-align:left; max-height:180px; overflow-y:auto; width:100%;">${filledDataHtml}</div>
+        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+          <div class="detail-label" style="width:100%; margin-bottom:6px;">${isZH?'填寫數據明細':'Field Data'}</div>
+          <div class="detail-value" style="text-align:left; max-height:220px; overflow-y:auto; width:100%; padding:4px 0;">${filledDataHtml}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'備註紀錄':'Notes'}</div>
