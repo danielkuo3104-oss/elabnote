@@ -1183,35 +1183,7 @@
     }
   }
 
-  // 🚀 1. 新增：通用動態欄位尋找器（避免寫死列號欄位名）
-  function getDynamicFieldValue(formData, labelKeywords) {
-    if (!state.dynamicForms) return { val: null, id: null };
-    
-    const kwArr = Array.isArray(labelKeywords) ? labelKeywords : [labelKeywords];
-    
-    for (const formId in state.dynamicForms) {
-      const pages = state.dynamicForms[formId];
-      if (!Array.isArray(pages)) continue;
-      
-      for (const p of pages) {
-        if (!p.fields || !Array.isArray(p.fields)) continue;
-        
-        for (const f of p.fields) {
-          if (f.label) {
-            const cleanLabel = f.label.toLowerCase();
-            const isMatch = kwArr.some(kw => cleanLabel.includes(kw.toLowerCase()));
-            
-            if (isMatch && formData[f.id] !== undefined) {
-              return { val: formData[f.id], id: f.id };
-            }
-          }
-        }
-      }
-    }
-    return { val: null, id: null };
-  }
-
-  // 🚀 完全動態化 + 全雙語 (ZH/EN) + 四大狀況預設灰色無特殊情況解析引擎
+  // 🚀 完全動態化 + 全雙語 (ZH/EN) + 訊號蒐集情況與時間軸精準解析引擎
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1300,23 +1272,15 @@
     const eleDH = formData['field_17_16'] || '0';
     detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})` });
 
-    // D. 四大特殊狀況設定（生理、手術、電極、訊號）
+    // D. 前三大特殊狀況設定（生理、手術、電極）
     const conditionConfigs = [
       { zh: '大鼠生理情況', en: 'Rat Physiological State', kw: ['生理', 'physiological'] },
       { zh: '手術過程狀況', en: 'Surgical Conditions', kw: ['手術', 'surgical', 'surgery'] },
-      { zh: '電極插入狀況', en: 'Electrode Insertion State', kw: ['電極', 'electrode'] },
-      { zh: '訊號蒐集情況', en: 'Signal Collection Conditions', kw: ['訊號', 'signal'] }
+      { zh: '電極插入狀況', en: 'Electrode Insertion State', kw: ['電極', 'electrode'] }
     ];
 
     conditionConfigs.forEach(cfg => {
       let fieldObj = getDynamicFieldValue(formData, cfg.kw);
-      
-      // 容錯備用：若動態比對未命中，為訊號蒐集提供相容檢測
-      if (!fieldObj.val && cfg.kw.includes('訊號')) {
-        if (formData['field_7_20']) fieldObj = { val: formData['field_7_20'], id: 'field_7_20' };
-        else if (formData['field_9_20']) fieldObj = { val: formData['field_9_20'], id: 'field_9_20' };
-      }
-
       let itemArr = [];
 
       if (fieldObj.val && Array.isArray(fieldObj.val) && fieldObj.val.length > 0) {
@@ -1328,26 +1292,55 @@
       }
 
       if (itemArr.length > 0) {
-        detailsList.push({
-          label: isZH ? cfg.zh : cfg.en,
-          val: itemArr.join(', '),
-          isBlock: true,
-          isCondition: true
-        });
+        detailsList.push({ label: isZH ? cfg.zh : cfg.en, val: itemArr.join(', '), isBlock: true, isCondition: true });
       } else {
-        // 🚀 未勾選時：呈現灰色「無特殊情況 / No special conditions」
         const noCondText = isZH ? '無特殊情況' : 'No special conditions';
-        detailsList.push({
-          label: isZH ? cfg.zh : cfg.en,
-          val: `<span style="color:var(--text-muted); font-weight:500;">${noCondText}</span>`,
-          isBlock: true,
-          isCondition: false
-        });
+        detailsList.push({ label: isZH ? cfg.zh : cfg.en, val: `<span style="color:var(--text-muted); font-weight:500;">${noCondText}</span>`, isBlock: true, isCondition: false });
       }
     });
 
+    // 🚀 E. 完全動態解析「訊號蒐集情況」（多選清單 + 自訂說明文字全數自動掃描）
+    let signalItems = [];
+    let usedSignalKeys = new Set(); // 用於記錄已分類的 key，防止誤入底部 Notes
+
+    Object.keys(formData).forEach(k => {
+      // 過濾屬性 FORM_004 (結尾 _20) 且非系統保留與非時間軸欄位
+      if (k.endsWith('_20') && !['field_3_20', 'field_4_20', 'field_5_20', 'field_6_20'].includes(k)) {
+        const val = formData[k];
+        
+        if (Array.isArray(val) && val.length > 0) {
+          val.forEach(item => {
+            const formatted = formatBilingualText(item, state.currentLang);
+            if (!signalItems.includes(formatted)) signalItems.push(formatted);
+          });
+          usedSignalKeys.add(k);
+        } else if (typeof val === 'string' && val.trim() !== '' && !['on', 'true'].includes(val.trim().toLowerCase())) {
+          const formatted = String(val).trim();
+          if (!signalItems.includes(formatted)) signalItems.push(formatted);
+          usedSignalKeys.add(k);
+        }
+      }
+    });
+
+    if (signalItems.length > 0) {
+      detailsList.push({
+        label: isZH ? '訊號蒐集情況' : 'Signal Collection Conditions',
+        val: signalItems.join(', '),
+        isBlock: true,
+        isCondition: true
+      });
+    } else {
+      const noCondText = isZH ? '無特殊情況' : 'No special conditions';
+      detailsList.push({
+        label: isZH ? '訊號蒐集情況' : 'Signal Collection Conditions',
+        val: `<span style="color:var(--text-muted); font-weight:500;">${noCondText}</span>`,
+        isBlock: true,
+        isCondition: false
+      });
+    }
+
     // -------------------------------------------------------------
-    // E. 腦訊號蒐集動態時間軸繪製
+    // F. 腦訊號蒐集動態時間軸繪製
     // -------------------------------------------------------------
     let validStages = [];
     let totalMin = 0;
@@ -1365,18 +1358,6 @@
         });
       }
     });
-
-    if (validStages.length === 0) {
-      const baseMin = parseFloat(formData['field_4_20'] || 0);
-      const ptzMin = parseFloat(formData['field_5_20'] || 0);
-      const stimMin = parseFloat(formData['field_6_20'] || 0);
-      const afterMin = parseFloat(formData['field_7_20'] || 0);
-
-      if (baseMin > 0) { validStages.push({ name: 'Base line', time: baseMin }); totalMin += baseMin; }
-      if (ptzMin > 0) { validStages.push({ name: 'PTZ', time: ptzMin }); totalMin += ptzMin; }
-      if (stimMin > 0) { validStages.push({ name: 'Stimulate', time: stimMin }); totalMin += stimMin; }
-      if (afterMin > 0) { validStages.push({ name: 'After', time: afterMin }); totalMin += afterMin; }
-    }
 
     if (totalMin > 0) {
       const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899'];
@@ -1431,7 +1412,7 @@
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
 
     // -------------------------------------------------------------
-    // 4. 備註紀錄（動態解析 [note] 標籤與全域 notes）
+    // 4. 備註紀錄（純粹動態讀取 [note] 標籤與全域 notes，排除已被歸類至訊號情況的 key）
     // -------------------------------------------------------------
     let notesArr = [];
 
@@ -1446,7 +1427,7 @@
           pages.forEach(p => {
             if (p.fields && Array.isArray(p.fields)) {
               p.fields.forEach(f => {
-                if (f.type === 'note' || f.isNoteTag) {
+                if ((f.type === 'note' || f.isNoteTag) && !usedSignalKeys.has(f.id)) {
                   const noteVal = formData[f.id];
                   if (noteVal && String(noteVal).trim() !== '') {
                     const cleanVal = String(noteVal).trim();
