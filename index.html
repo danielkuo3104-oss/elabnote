@@ -772,6 +772,19 @@
             continue;
           }
 
+          // 🚀 1. 解析群組控制標籤
+          let disableGroup = null;
+          if (rawType.includes("[disable_group:")) {
+            const match = rawType.match(/\[disable_group:\s*([^\]]+)\]/i);
+            if (match) disableGroup = match[1].trim();
+          }
+
+          let belongGroup = null;
+          if (rawType.includes("[group:")) {
+            const match = rawType.match(/\[group:\s*([^\]]+)\]/i);
+            if (match) belongGroup = match[1].trim();
+          }
+
           let dependsOn = null;
           if (rawType.includes("[depends_on:")) {
             const match = rawType.match(/\[depends_on:\s*([^\]]+)\]/i);
@@ -851,11 +864,14 @@
               placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "請說明..."
             });
           } 
+          // 🚀 2. 將 disableGroup / belongGroup 寫入欄位物件
           else if (rawType.includes("[c]") || rawType.includes("[checkbox]")) {
             currentPage.fields.push({
               id: fieldId,
               label: cleanDisplayLabel(rawLabel.replace(/^-\s*/, '')),
               type: "checkbox",
+              disableGroup: disableGroup,
+              belongGroup: belongGroup,
               desc: rawDesc
             });
             lastParentField = null;
@@ -888,6 +904,7 @@
               default: rawType.match(/\[default:\s*([^\]]+)\]/)?.[1] || "",
               unit: rawType.match(/\[unit:\s*([^\]]+)\]/)?.[1] || "",
               placeholder: rawType.match(/\[placeholder:\s*([^\]]+)\]/)?.[1] || "",
+              belongGroup: belongGroup,
               desc: rawDesc
             });
             lastParentField = null;
@@ -1800,11 +1817,16 @@
         if (selectedOutline !== field.dependsOn) return;
       }
 
+      // 🚀 判斷是否屬於已關閉群組
+      const isGroupDisabled = field.belongGroup && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[field.belongGroup];
+      const disabledAttr = isGroupDisabled ? 'disabled' : '';
+      const disabledStyle = isGroupDisabled ? 'opacity: 0.35; pointer-events: none;' : '';
+
       if (field.type === "formula") {
         let calculatedVal = currentFormCtx.data[field.id] || 0;
 
         html += `
-          <div class="form-group">
+          <div class="form-group" style="${disabledStyle}">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
             <input type="text" id="${field.id}" class="form-control formula-field" readonly style="background:#e2e8f0; font-weight:700; color:var(--primary);" value="${calculatedVal}">
             ${renderFieldDescription(field.desc)}
@@ -1885,17 +1907,17 @@
         const isNoteInput = field.label.includes('備註') || field.label.toLowerCase().includes('note');
         if (isNoteInput) {
           html += `
-            <div class="form-group">
+            <div class="form-group" style="${disabledStyle}">
               <label>${field.label}</label>
-              <textarea id="${field.id}" class="form-control dynamic-input" rows="3" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
+              <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
               ${renderFieldDescription(field.desc)}
             </div>
           `;
         } else {
           html += `
-            <div class="form-group">
+            <div class="form-group" style="${disabledStyle}">
               <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-              <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
+              <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" ${disabledAttr} value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
               ${renderFieldDescription(field.desc)}
             </div>
           `;
@@ -1903,16 +1925,17 @@
       }
       else if (field.type === "checkbox") {
         const isSelected = !!currentFormCtx.data[field.id];
+        const disGroupArg = field.disableGroup ? `'${field.disableGroup}'` : 'null';
         html += `
-          <div class="option-card ${isSelected ? 'selected' : ''}" onclick="toggleOptionCheckbox('${field.id}', '${field.label}')">
-            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}');">
+          <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="if(!${isGroupDisabled}) toggleOptionCheckbox('${field.id}', '${field.label}', ${disGroupArg})">
+            <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); toggleOptionCheckbox('${field.id}', '${field.label}', ${disGroupArg});">
             <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
           </div>
           ${renderFieldDescription(field.desc)}
         `;
       }
       else if (field.type === "radio") {
-        html += `<div class="form-group"><label>${field.label}</label>`;
+        html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
         
         const currentRadioVal = cleanDisplayLabel(currentFormCtx.data[field.id] || currentFormCtx.data['selected_purpose_name'] || field.default || "");
 
@@ -1926,16 +1949,16 @@
           
           html += `
             <div class="option-card ${isSelected ? 'selected' : ''}" onclick="selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})">
-              <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
+              <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1});">
               <label for="${optId}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
       }
       else if (field.type === "checkbox_group") {
-        html += `<div class="form-group"><label>${field.label}</label>`;
+        html += `<div class="form-group" style="${disabledStyle}"><label>${field.label}</label>`;
         field.options.forEach((opt, idx) => {
           const optName = typeof opt === 'string' ? opt : opt.name;
           const displayOptName = formatBilingualText(optName, state.currentLang);
@@ -1943,10 +1966,10 @@
           
           html += `
             <div class="option-card ${isChecked ? 'selected' : ''}" onclick="toggleCheckboxGroupOption('${field.id}', '${optName}')">
-              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
+              <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); toggleCheckboxGroupOption('${field.id}', '${optName}');">
               <label for="${field.id}_${idx}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他生理狀況說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他生理狀況說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -1971,11 +1994,18 @@
     triggerRealtimeFormulaCalculation();
 
     document.getElementById('btnFormPrev').style.visibility = currentFormCtx.currentPageIdx === 0 ? 'hidden' : 'visible';
-    const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-    const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
     
+    // 🚀 控制底部按鈕：FORM_002_1, FORM_002_2, FORM_006 固定顯示「提交與檢查」
+    const specialForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     const btnNext = document.getElementById('btnFormNext');
-    btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+
+    if (specialForms.includes(currentFormCtx.formId)) {
+      btnNext.innerText = state.currentLang === 'ZH' ? '提交與檢查' : 'Submit & Verify';
+    } else {
+      const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
+      const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
+      btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
+    }
     btnNext.disabled = state.isSubmitting;
   }
 
@@ -2004,12 +2034,30 @@
     renderFormCurrentPage();
   }
   
-  function toggleOptionCheckbox(fieldId, label) {
+  function toggleOptionCheckbox(fieldId, label, disableGroupTag = null) {
     const currentVal = !currentFormCtx.data[fieldId];
     saveFormFieldData(fieldId, currentVal, label);
+
+    // 🚀 若欄位附帶 disableGroup，開關群組狀態
+    if (disableGroupTag) {
+      if (!currentFormCtx.disabledGroups) currentFormCtx.disabledGroups = {};
+      currentFormCtx.disabledGroups[disableGroupTag] = currentVal; // true 代表被鎖定
+
+      // 勾選停用時，清空被停用群組內所有已勾選/填寫的數據
+      if (currentVal) {
+        currentFormCtx.pages.forEach(p => {
+          p.fields.forEach(f => {
+            if (f.belongGroup === disableGroupTag) {
+              delete currentFormCtx.data[f.id];
+            }
+          });
+        });
+      }
+    }
+
     renderFormCurrentPage();
   }
-
+  
   function toggleCheckboxGroupOption(fieldId, optName) {
     if (!currentFormCtx.data[fieldId]) currentFormCtx.data[fieldId] = [];
     const idx = currentFormCtx.data[fieldId].indexOf(optName);
@@ -2154,6 +2202,11 @@
 
     currentFormCtx.pages.forEach(page => {
       page.fields.forEach(f => {
+        // 🚀 自動跳過：若該欄位屬於已經被停用的群組，免檢查！
+        if (f.belongGroup && currentFormCtx.disabledGroups && currentFormCtx.disabledGroups[f.belongGroup]) {
+          return;
+        }
+
         const isNoteField = f.label && (f.label.includes('備註') || f.label.toLowerCase().includes('note'));
         if (isNoteField || f.type === 'formula' || f.type === 'section') return; 
 
