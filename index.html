@@ -1183,6 +1183,34 @@
     }
   }
 
+  // 🚀 通用動態欄位尋找器（依據 Label 關鍵字自動匹配最新的 Field ID 與資料）
+  function getDynamicFieldValue(formData, labelKeywords) {
+    if (!state.dynamicForms || !formData) return { val: null, id: null };
+    
+    const kwArr = Array.isArray(labelKeywords) ? labelKeywords : [labelKeywords];
+    
+    for (const formId in state.dynamicForms) {
+      const pages = state.dynamicForms[formId];
+      if (!Array.isArray(pages)) continue;
+      
+      for (const p of pages) {
+        if (!p.fields || !Array.isArray(p.fields)) continue;
+        
+        for (const f of p.fields) {
+          if (f.label) {
+            const cleanLabel = f.label.toLowerCase();
+            const isMatch = kwArr.some(kw => cleanLabel.includes(kw.toLowerCase()));
+            
+            if (isMatch && formData[f.id] !== undefined) {
+              return { val: formData[f.id], id: f.id };
+            }
+          }
+        }
+      }
+    }
+    return { val: null, id: null };
+  }
+
   // 🚀 完全動態化 + 全雙語 (ZH/EN) + 訊號蒐集情況與時間軸精準解析引擎
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
