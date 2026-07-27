@@ -2006,22 +2006,21 @@
           </div>
         `;
       }
-      else if (field.type === "text" || field.type === "number") {
-        const isNoteInput = field.label.includes('備註') || field.label.toLowerCase().includes('note');
-        if (isNoteInput) {
-          html += `
-            <div class="form-group" style="${disabledStyle}">
-              <label>${field.label}</label>
-              <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
-              ${renderFieldDescription(field.desc)}
-            </div>
-          `;
-        } 
-        else if (field.type === "note") {
+      // 🚀 正確獨立分開分支判斷：
+      else if (field.type === "note") {
         html += `
           <div class="form-group" style="${disabledStyle}">
             <label>${field.label}</label>
             <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
+            ${renderFieldDescription(field.desc)}
+          </div>
+        `;
+      }
+      else if (field.type === "text" || field.type === "number") {
+        html += `
+          <div class="form-group" style="${disabledStyle}">
+            <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
+            <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" ${disabledAttr} value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
