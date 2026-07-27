@@ -1137,7 +1137,7 @@
     }
   }
 
-  // 🚀 解決排版擠壓 + 情況藍色高亮 + 上下獨立區塊解析器
+  // 🚀 精準解析明細 + 訊號蒐集時間軸可視化引擎
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1226,40 +1226,89 @@
     const eleDH = formData['field_17_16'] || '0';
     detailsList.push({ label: '電極插入位置', val: `(${eleAP}, ${eleML}, ${eleDH})` });
 
-    // E. 大鼠生理情況 (標記為 isBlock 且 isCondition)
+    // E. 生理與手術狀況
     if (formData['field_23_16'] && Array.isArray(formData['field_23_16'])) {
       let physioArr = [...formData['field_23_16']];
       const otherInput = formData['field_23_16_input'] || '';
       physioArr = physioArr.map(item => item === '其他生理狀況' ? (otherInput || '其他') : item);
       detailsList.push({ label: '大鼠生理情況', val: physioArr.join(', '), isBlock: true, isCondition: true });
     }
-
-    // F. 手術過程狀況 (標記為 isBlock 且 isCondition)
     if (formData['field_31_16'] && Array.isArray(formData['field_31_16'])) {
       detailsList.push({ label: '手術過程狀況', val: formData['field_31_16'].join(', '), isBlock: true, isCondition: true });
     }
-
-    // G. 電極插入狀況 (標記為 isBlock 且 isCondition)
     if (formData['field_37_16'] && Array.isArray(formData['field_37_16'])) {
       detailsList.push({ label: '電極插入狀況', val: formData['field_37_16'].join(', '), isBlock: true, isCondition: true });
     }
 
     // -------------------------------------------------------------
-    // 3. 渲染 Field Data HTML（條件判斷：單行 vs 上下排版）
+    // F. FORM_004 腦訊號蒐集時間軸與狀況解析 (重點新增)
+    // -------------------------------------------------------------
+    const isNoSignalCollect = formData['field_3_20'] === 'on' || formData['field_3_20'] === true || formData['field_3_20'] === 'true';
+
+    if (isNoSignalCollect) {
+      detailsList.push({ label: '腦訊號蒐集', val: '本次實驗不蒐集訊號', isBlock: true, isCondition: false });
+    } else {
+      const baseMin = parseFloat(formData['field_4_20'] || 0);
+      const ptzMin = parseFloat(formData['field_5_20'] || 0);
+      const stimMin = parseFloat(formData['field_6_20'] || 0);
+      const afterMin = parseFloat(formData['field_7_20'] || 0);
+      const totalMin = baseMin + ptzMin + stimMin + afterMin;
+
+      if (totalMin > 0) {
+        // 計算各階段%比例
+        const pBase = ((baseMin / totalMin) * 100).toFixed(1);
+        const pPtz = ((ptzMin / totalMin) * 100).toFixed(1);
+        const pStim = ((stimMin / totalMin) * 100).toFixed(1);
+        const pAfter = ((afterMin / totalMin) * 100).toFixed(1);
+
+        // 畫出比例時間軸 HTML Bar
+        const timelineBarHtml = `
+          <div style="margin-top:6px; margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-bottom:3px; font-weight:700;">
+              <span>訊號蒐集總長度: ${totalMin} min</span>
+            </div>
+            <!-- 彩色比例條 -->
+            <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#f1f5f9;">
+              ${baseMin > 0 ? `<div style="width:${pBase}%; background:#3b82f6;" title="Baseline: ${baseMin}m"></div>` : ''}
+              ${ptzMin > 0 ? `<div style="width:${pPtz}%; background:#ef4444;" title="PTZ: ${ptzMin}m"></div>` : ''}
+              ${stimMin > 0 ? `<div style="width:${pStim}%; background:#10b981;" title="Stimulate: ${stimMin}m"></div>` : ''}
+              ${afterMin > 0 ? `<div style="width:${pAfter}%; background:#8b5cf6;" title="After: ${afterMin}m"></div>` : ''}
+            </div>
+            <!-- 階段圖例與時間標註 -->
+            <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-top:5px; font-weight:600;">
+              ${baseMin > 0 ? `<span style="color:#2563eb;">■ Base: ${baseMin}m</span>` : ''}
+              ${ptzMin > 0 ? `<span style="color:#dc2626;">■ PTZ: ${ptzMin}m</span>` : ''}
+              ${stimMin > 0 ? `<span style="color:#059669;">■ Stim: ${stimMin}m</span>` : ''}
+              ${afterMin > 0 ? `<span style="color:#7c3aed;">■ After: ${afterMin}m</span>` : ''}
+            </div>
+          </div>
+        `;
+        detailsList.push({ label: '訊號蒐集時間軸', val: timelineBarHtml, isBlock: true, isCustomHtml: true });
+      }
+    }
+
+    // G. 搜集訊號情況 (多選 + 其他)
+    if (formData['field_9_20'] && Array.isArray(formData['field_9_20'])) {
+      let signalArr = [...formData['field_9_20']];
+      const otherSignalInput = formData['field_9_20_input'] || '';
+      signalArr = signalArr.map(item => item === '其他訊號狀況' ? (otherSignalInput || '其他') : item);
+      detailsList.push({ label: '搜集訊號情況', val: signalArr.join(', '), isBlock: true, isCondition: true });
+    }
+
+    // -------------------------------------------------------------
+    // 3. 渲染 Field Data HTML
     // -------------------------------------------------------------
     const filledDataHtml = detailsList.length > 0 
       ? detailsList.map(item => {
-          // 若為「情況 / 狀況」，採用獨佔單行 (上下結構)，且內文改為藍色
           if (item.isBlock) {
             const textColor = item.isCondition ? 'var(--primary)' : 'var(--text-primary)';
             return `
               <div style="margin-bottom:8px; border-bottom:1px dashed #f1f5f9; padding-bottom:5px;">
                 <div style="color:var(--text-muted); font-weight:700; font-size:11px; margin-bottom:2px;">${item.label}:</div>
-                <div style="font-weight:700; color:${textColor}; font-size:12px; line-height:1.4; padding-left:4px;">${item.val}</div>
+                <div style="font-weight:700; color:${textColor}; font-size:12px; line-height:1.4; padding-left:2px;">${item.val}</div>
               </div>
             `;
           } else {
-            // 普通數值維持左右對齊
             return `
               <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; border-bottom:1px dashed #f1f5f9; padding-bottom:3px;">
                 <span style="color:var(--text-muted); font-weight:700; max-width:55%; font-size:11px;">${item.label}:</span>
@@ -1313,7 +1362,7 @@
         </div>
         <div class="detail-row" style="flex-direction:column; align-items:stretch;">
           <div class="detail-label" style="width:100%; margin-bottom:6px;">${isZH?'填寫數據明細':'Field Data'}</div>
-          <div class="detail-value" style="text-align:left; max-height:220px; overflow-y:auto; width:100%; padding:4px 0;">${filledDataHtml}</div>
+          <div class="detail-value" style="text-align:left; max-height:240px; overflow-y:auto; width:100%; padding:4px 0;">${filledDataHtml}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">${isZH?'備註紀錄':'Notes'}</div>
