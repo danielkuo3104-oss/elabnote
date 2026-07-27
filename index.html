@@ -1211,7 +1211,7 @@
     return { val: null, id: null };
   }
 
-  // 🚀 2. 替換：完全動態化的詳情彈窗解析引擎
+  // 🚀 完全動態化 + 全雙語支援 (ZH/EN) + 訊號時間軸修正解析引擎
   function showActiveExpDetail(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1230,12 +1230,15 @@
     
     if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
       const logs = formData['_time_logs'];
-      timeLogsHtml = Object.entries(logs).map(([st, time]) => `
-        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px;">
-          <span style="color:var(--text-muted); font-weight:700;">• ${st}:</span>
-          <span style="font-family:ui-monospace, monospace; color:var(--text-primary);">${time}</span>
-        </div>
-      `).join('');
+      timeLogsHtml = Object.entries(logs).map(([st, time]) => {
+        const transSt = getStatusText(st, state.currentLang);
+        return `
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px;">
+            <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
+            <span style="font-family:ui-monospace, monospace; color:var(--text-primary);">${time}</span>
+          </div>
+        `;
+      }).join('');
 
       if (logs['手術中'] && (logs['休息中'] || logs['已死亡'])) {
         const start = new Date(logs['手術中']);
@@ -1245,8 +1248,8 @@
           const diffMins = Math.floor(diffMs / 60000);
           surgeryDurationHtml = `
             <div class="detail-row">
-              <div class="detail-label" style="color:var(--danger);">${isZH?'手術用時':'Surgery Duration'}</div>
-              <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH?'分鐘':'mins'}</div>
+              <div class="detail-label" style="color:var(--danger);">${isZH ? '手術用時' : 'Surgery Duration'}</div>
+              <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH ? '分鐘' : 'mins'}</div>
             </div>
           `;
         }
@@ -1256,22 +1259,22 @@
     }
 
     // -------------------------------------------------------------
-    // 2. 數據明細動態提取
+    // 2. 數據明細動態提取（支援雙語對照）
     // -------------------------------------------------------------
     let detailsList = [];
 
     // A. 超音波/物理參數
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
-    if (freqObj.val) detailsList.push({ label: '頻率 / Frequency', val: `${freqObj.val} HZ` });
+    if (freqObj.val) detailsList.push({ label: isZH ? '頻率 / Frequency' : 'Frequency', val: `${freqObj.val} HZ` });
 
     const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
-    if (cycleObj.val) detailsList.push({ label: '週期數 / Cycles', val: `${cycleObj.val} times` });
+    if (cycleObj.val) detailsList.push({ label: isZH ? '週期數 / Cycles' : 'Cycles', val: `${cycleObj.val} times` });
 
     const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
-    if (voltObj.val) detailsList.push({ label: '電壓 / Voltage', val: `${voltObj.val} mV` });
+    if (voltObj.val) detailsList.push({ label: isZH ? '電壓 / Voltage' : 'Voltage', val: `${voltObj.val} mV` });
 
     const interObj = getDynamicFieldValue(formData, ['間隔', 'interval']);
-    if (interObj.val) detailsList.push({ label: '間隔 / Interval', val: `${interObj.val} ms` });
+    if (interObj.val) detailsList.push({ label: isZH ? '間隔 / Interval' : 'Interval', val: `${interObj.val} ms` });
 
     // B. 大鼠體重、PTZ、Saline 計算
     const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
@@ -1282,34 +1285,106 @@
     if (ratWeight > 0) {
       const ptzVol = ratWeight * ptzDose;
       const salineVol = 700 - ptzVol;
-      detailsList.push({ label: '大鼠體重（g）', val: `${ratWeight}` });
-      detailsList.push({ label: 'PTZ使用劑量', val: `${ptzVol} uL` });
-      detailsList.push({ label: 'Saline用量', val: `${salineVol} uL` });
+      detailsList.push({ label: isZH ? '大鼠體重（g）' : 'Rat Weight (g)', val: `${ratWeight}` });
+      detailsList.push({ label: isZH ? 'PTZ使用劑量' : 'PTZ Dosage', val: `${ptzVol} uL` });
+      detailsList.push({ label: isZH ? 'Saline用量' : 'Saline Volume', val: `${salineVol} uL` });
     }
 
-    // C. 生理、手術與電極狀況 (動態比對標題，並將「其他」替換為輸入文字)
+    // C. 座標位置 (Lamda & 電極)
+    const lamdaAP = formData['field_20_16'] || '0';
+    const lamdaML = formData['field_19_16'] || '0';
+    detailsList.push({ label: isZH ? 'Lamda位置' : 'Lamda Position', val: `(${lamdaAP}, ${lamdaML})` });
+
+    const eleAP = formData['field_16_16'] || '0';
+    const eleML = formData['field_12_16'] || '0';
+    const eleDH = formData['field_17_16'] || '0';
+    detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})` });
+
+    // D. 生理、手術與電極狀況 (動態比對標題，並雙語轉換選項)
     const physioObj = getDynamicFieldValue(formData, ['生理']);
     if (physioObj.val && Array.isArray(physioObj.val)) {
       let physioArr = [...physioObj.val];
       const otherInput = formData[`${physioObj.id}_input`] || '';
-      physioArr = physioArr.map(item => item.includes('其他') ? (otherInput || '其他') : item);
-      detailsList.push({ label: '大鼠生理情況', val: physioArr.join(', '), isBlock: true, isCondition: true });
+      physioArr = physioArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
+      detailsList.push({ label: isZH ? '大鼠生理情況' : 'Rat Physiological State', val: physioArr.join(', '), isBlock: true, isCondition: true });
     }
 
     const surgObj = getDynamicFieldValue(formData, ['手術']);
     if (surgObj.val && Array.isArray(surgObj.val)) {
       let surgArr = [...surgObj.val];
       const otherInput = formData[`${surgObj.id}_input`] || '';
-      surgArr = surgArr.map(item => item.includes('其他') ? (otherInput || '其他') : item);
-      detailsList.push({ label: '手術過程狀況', val: surgArr.join(', '), isBlock: true, isCondition: true });
+      surgArr = surgArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
+      detailsList.push({ label: isZH ? '手術過程狀況' : 'Surgical Conditions', val: surgArr.join(', '), isBlock: true, isCondition: true });
     }
 
     const electObj = getDynamicFieldValue(formData, ['電極']);
     if (electObj.val && Array.isArray(electObj.val)) {
       let electArr = [...electObj.val];
       const otherInput = formData[`${electObj.id}_input`] || '';
-      electArr = electArr.map(item => item.includes('其他') ? (otherInput || '其他') : item);
-      detailsList.push({ label: '電極插入狀況', val: electArr.join(', '), isBlock: true, isCondition: true });
+      electArr = electArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
+      detailsList.push({ label: isZH ? '電極插入狀況' : 'Electrode Insertion State', val: electArr.join(', '), isBlock: true, isCondition: true });
+    }
+
+    // -------------------------------------------------------------
+    // E. 腦訊號蒐集動態時間軸繪製 (解決強覆蓋與渲染)
+    // -------------------------------------------------------------
+    let validStages = [];
+    let totalMin = 0;
+
+    // 1. 動態掃描 JSON 內包含 Array 的區段欄位 (例如 field_4_20)
+    Object.keys(formData).forEach(k => {
+      if (Array.isArray(formData[k]) && formData[k].length > 0) {
+        formData[k].forEach(st => {
+          if (st && st.name && st.time !== undefined) {
+            const t = parseFloat(st.time) || 0;
+            if (t > 0 && String(st.name).trim() !== '') {
+              totalMin += t;
+              validStages.push({ name: String(st.name).trim(), time: t });
+            }
+          }
+        });
+      }
+    });
+
+    // 2. 舊欄位相容備用機制
+    if (validStages.length === 0) {
+      const baseMin = parseFloat(formData['field_4_20'] || 0);
+      const ptzMin = parseFloat(formData['field_5_20'] || 0);
+      const stimMin = parseFloat(formData['field_6_20'] || 0);
+      const afterMin = parseFloat(formData['field_7_20'] || 0);
+
+      if (baseMin > 0) { validStages.push({ name: 'Base line', time: baseMin }); totalMin += baseMin; }
+      if (ptzMin > 0) { validStages.push({ name: 'PTZ', time: ptzMin }); totalMin += ptzMin; }
+      if (stimMin > 0) { validStages.push({ name: 'Stimulate', time: stimMin }); totalMin += stimMin; }
+      if (afterMin > 0) { validStages.push({ name: 'After', time: afterMin }); totalMin += afterMin; }
+    }
+
+    if (totalMin > 0) {
+      const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899'];
+      let barBarsHtml = '';
+      let legendsHtml = '';
+
+      validStages.forEach((st, idx) => {
+        const color = colors[idx % colors.length];
+        const pct = ((st.time / totalMin) * 100).toFixed(1);
+        barBarsHtml += `<div style="width:${pct}%; background:${color};" title="${st.name}: ${st.time}m"></div>`;
+        legendsHtml += `<span style="color:${color};">■ ${st.name}: ${st.time}m</span>`;
+      });
+
+      const timelineBarHtml = `
+        <div style="margin-top:4px; margin-bottom:6px;">
+          <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-bottom:3px; font-weight:700;">
+            <span>${isZH ? '訊號蒐集總長度' : 'Total Collection Duration'}: ${totalMin} min</span>
+          </div>
+          <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#f1f5f9;">
+            ${barBarsHtml}
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-top:5px; font-weight:600;">
+            ${legendsHtml}
+          </div>
+        </div>
+      `;
+      detailsList.push({ label: isZH ? '訊號蒐集時間軸' : 'Signal Collection Timeline', val: timelineBarHtml, isBlock: true, isCustomHtml: true });
     }
 
     // -------------------------------------------------------------
@@ -1376,36 +1451,36 @@
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row">
-          <div class="detail-label">${isZH?'實驗編號':'ID'}</div>
+          <div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div>
           <div class="detail-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'當前狀態':'Status'}</div>
+          <div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div>
           <div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'大綱與目的':'Outline & Purpose'}</div>
+          <div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div>
           <div class="detail-value">${displayInfo}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'負責人':'Owner'}</div>
+          <div class="detail-label">${isZH ? '負責人' : 'Owner'}</div>
           <div class="detail-value">${exp.user}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'實驗日期':'Date'}</div>
+          <div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div>
           <div class="detail-value">${exp.date}</div>
         </div>
         ${surgeryDurationHtml}
         <div class="detail-row">
-          <div class="detail-label">${isZH?'狀態歷程時間':'Time Logs'}</div>
+          <div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div>
           <div class="detail-value" style="text-align:left;">${timeLogsHtml}</div>
         </div>
         <div class="detail-row" style="flex-direction:column; align-items:stretch;">
-          <div class="detail-label" style="width:100%; margin-bottom:6px;">${isZH?'填寫數據明細':'Field Data'}</div>
+          <div class="detail-label" style="width:100%; margin-bottom:6px;">${isZH ? '填寫數據明細' : 'Field Data'}</div>
           <div class="detail-value" style="text-align:left; max-height:240px; overflow-y:auto; width:100%; padding:4px 0;">${filledDataHtml}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">${isZH?'備註紀錄':'Notes'}</div>
+          <div class="detail-label">${isZH ? '備註紀錄' : 'Notes'}</div>
           <div class="detail-value" style="white-space:pre-line; color:var(--text-primary); text-align:left; font-weight:700;">${notesStr}</div>
         </div>
       </div>
@@ -1413,7 +1488,7 @@
 
     document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
     document.getElementById('modalMessage').innerHTML = htmlContent;
-    document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">關閉</button>`;
+    document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>`;
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
