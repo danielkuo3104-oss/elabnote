@@ -1420,79 +1420,82 @@
     }, 100);
   }
 
-  /* 4. 多檔案讀取與直傳處理 */
-  async function handleDirectFileUpload(files, expId) {
-    const statusElem = document.getElementById('uploadStatusTextEx');
-    if (!files || files.length === 0) return;
+ /* 4. 多檔案讀取與直傳處理 (採用 URL-encoded 確保 Base64 與 CORS 成功穿透) */
+async function handleDirectFileUpload(files, expId) {
+  const statusElem = document.getElementById('uploadStatusTextEx');
+  if (!files || files.length === 0) return;
 
-    const validFiles = [];
-    const allowedExts = ['csv', 'png', 'jpeg', 'jpg'];
+  const validFiles = [];
+  const allowedExts = ['csv', 'png', 'jpeg', 'jpg'];
 
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      const ext = f.name.split('.').pop().toLowerCase();
-      if (allowedExts.includes(ext)) {
-        validFiles.push(f);
-      }
-    }
-
-    if (validFiles.length === 0) {
-      alert("只接受 CSV、PNG 與 JPEG 格式檔案！");
-      return;
-    }
-
-    if (statusElem) {
-      statusElem.innerText = `準備傳送 ${validFiles.length} 個檔案中...`;
-      statusElem.style.color = "var(--primary)";
-    }
-
-    const convertedPayloads = [];
-
-    for (let i = 0; i < validFiles.length; i++) {
-      const file = validFiles[i];
-      const base64 = await readFileAsBase64(file);
-      convertedPayloads.push({
-        fileName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        fileData: base64
-      });
-    }
-
-    if (statusElem) {
-      statusElem.innerText = `上傳中，正在寫入 [${expId}] 資料夾與 W 欄...`;
-    }
-
-    try {
-      await fetch(GAS_API_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "uploadFilesDirect",
-          expId: expId,
-          files: convertedPayloads
-        })
-      });
-
-      if (statusElem) {
-        statusElem.innerText = `✅ 上傳成功！已同步歸檔至雲端硬碟 W 欄。`;
-        statusElem.style.color = "var(--success)";
-      }
-
-      alert(`成功傳送 ${validFiles.length} 個檔案！` + "\n資料已自動存入 Drive 專屬資料夾並寫入試算表 W 欄。");
-      
-      await fetchDataCenterFromSheet();
-      filterRecordCenterList();
-      showFullExpandedView(expId);
-
-    } catch (err) {
-      console.error("上傳失敗:", err);
-      if (statusElem) {
-        statusElem.innerText = "❌ 上傳過程發生錯誤，請重試。";
-        statusElem.style.color = "var(--danger)";
-      }
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const ext = f.name.split('.').pop().toLowerCase();
+    if (allowedExts.includes(ext)) {
+      validFiles.push(f);
     }
   }
+
+  if (validFiles.length === 0) {
+    alert("只接受 CSV、PNG 與 JPEG 格式檔案！");
+    return;
+  }
+
+  if (statusElem) {
+    statusElem.innerText = `準備處理 ${validFiles.length} 個檔案...`;
+    statusElem.style.color = "var(--primary)";
+  }
+
+  const convertedPayloads = [];
+
+  for (let i = 0; i < validFiles.length; i++) {
+    const file = validFiles[i];
+    const base64 = await readFileAsBase64(file);
+    convertedPayloads.push({
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      fileData: base64
+    });
+  }
+
+  if (statusElem) {
+    statusElem.innerText = `正在上傳並建置 [${expId}] 專屬雲端資料夾...`;
+  }
+
+  // 使用 URLSearchParams 以 URL-Encoded 方式傳送，避免無 CORS 模式攔截大型 JSON
+  const formDataParams = new URLSearchParams();
+  formDataParams.append('action', 'uploadFilesDirect');
+  formDataParams.append('expId', expId);
+  formDataParams.append('files', JSON.stringify(convertedPayloads));
+
+  try {
+    await fetch(GAS_API_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
+      body: formDataParams.toString()
+    });
+
+    if (statusElem) {
+      statusElem.innerText = `✅ 上傳完成！已同步歸檔至母資料夾與試算表 W 欄。`;
+      statusElem.style.color = "var(--success)";
+    }
+
+    alert(`成功傳送 ${validFiles.length} 個檔案！\n已存入雲端硬碟 [${expId}] 資料夾，並同步連結至試算表 W 欄。`);
+    
+    // 重新撈取最新試算表資料
+    await fetchDataCenterFromSheet();
+    filterRecordCenterList();
+    showFullExpandedView(expId);
+
+  } catch (err) {
+    console.error("上傳失敗:", err);
+    if (statusElem) {
+      statusElem.innerText = "❌ 上傳發生錯誤，請重試。";
+      statusElem.style.color = "var(--danger)";
+    }
+  }
+}
 
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
