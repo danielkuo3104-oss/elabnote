@@ -489,62 +489,77 @@
   }
 
   async function fetchDataCenterFromSheet() {
-    try {
-      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
-      const records = [];
+  try {
+    const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
+    const records = [];
 
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row) continue;
-        if (row[0] || row[1]) {
-          const expId = row[0] ? row[0].trim() : '未編號';
-          const date = row[1] ? row[1].trim() : '';
-          const user = row[2] ? row[2].trim() : '';
-          const status = row[3] ? row[3].trim() : '未知';
-          
-          let parsedFormData = {};
-          const jsonCols = [4, 6, 8, 10, 12];
-          jsonCols.forEach(colIdx => {
-            if (row[colIdx]) {
-              let rawJsonStr = row[colIdx].trim();
-              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
-              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
-                try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
-              }
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
+      if (row[0] || row[1]) {
+        const expId = row[0] ? row[0].trim() : '未編號';
+        const date = row[1] ? row[1].trim() : '';
+        const user = row[2] ? row[2].trim() : '';
+        const status = row[3] ? row[3].trim() : '未知';
+        
+        let parsedFormData = {};
+        const jsonCols = [4, 6, 8, 10, 12];
+        jsonCols.forEach(colIdx => {
+          if (row[colIdx]) {
+            let rawJsonStr = row[colIdx].trim();
+            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+              try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
             }
-          });
-
-          const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
-          
-          let purposeName = parsedFormData['selected_purpose_name'];
-          if (!purposeName || purposeName === '不保存') {
-            purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '';
           }
-          purposeName = cleanDisplayLabel(purposeName);
-          
-          let dynamicInfo = "";
-          if (outlineName && purposeName) {
-            dynamicInfo = `${outlineName} - ${purposeName}`;
-          } else if (outlineName || purposeName) {
-            dynamicInfo = outlineName || purposeName;
-          } else {
-            dynamicInfo = "實驗專案";
-          }
+        });
 
-          const colV = (row.length > 21 && row[21]) ? row[21].trim() : '';
-          const expDataFolder = (row.length > 22 && row[22]) ? row[22].trim() : '';
-
-          records.push({
-            expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder,
-            hasDataUpload: expDataFolder !== '' || (colV !== '' && colV !== '0' && colV !== '-')
-          });
+        // 專案大綱與目的
+        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
+        let purposeName = parsedFormData['selected_purpose_name'];
+        if (!purposeName || purposeName === '不保存') {
+          purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '';
         }
+        purposeName = cleanDisplayLabel(purposeName);
+        
+        let dynamicInfo = "";
+        if (outlineName && purposeName) {
+          dynamicInfo = `${outlineName} - ${purposeName}`;
+        } else if (outlineName || purposeName) {
+          dynamicInfo = outlineName || purposeName;
+        } else {
+          dynamicInfo = "實驗專案";
+        }
+
+        // 🚀 【修復重點】動態尋找包含 "drive.google.com" 的欄位作為資料夾網址
+        let expDataFolder = "";
+        for (let c = 0; c < row.length; c++) {
+          const cellVal = String(row[c] || "").trim();
+          if (cellVal.includes("drive.google.com")) {
+            expDataFolder = cellVal;
+            break;
+          }
+        }
+        
+        // 若上面沒找到，保底取第 23 欄 (W 欄，Index 22)
+        if (!expDataFolder && row.length > 22) {
+          expDataFolder = String(row[22] || "").trim();
+        }
+
+        // 只要 W 欄有 Drive 連結，或 parsedFormData 內標記了上傳，就判定為「已上傳」
+        const isFolderValid = expDataFolder.startsWith("http");
+
+        records.push({
+          expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder,
+          hasDataUpload: isFolderValid
+        });
       }
-      state.dataCenter = records;
-    } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
-  }
+    }
+    state.dataCenter = records;
+  } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
+}
 
   function renderEmptyState(titleText, descText) {
     return `<div class="empty-state-box"><div class="empty-state-title">${titleText}</div><div class="empty-state-desc">${descText}</div></div>`;
