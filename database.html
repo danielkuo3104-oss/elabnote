@@ -620,7 +620,7 @@
     const tagContainer = document.getElementById('quickSearchTags');
     const tagsSet = new Set();
     state.membersList.forEach(m => tagsSet.add(m.name));
-    ["已完成", "手術中", "已預約", "已死亡"].forEach(s => tagsSet.add(getStatusText(s, state.currentLang)));
+    ["實驗完成", "已上傳", "已預約", "已死亡"].forEach(s => tagsSet.add(getStatusText(s, state.currentLang)));
 
     tagContainer.innerHTML = Array.from(tagsSet).slice(0, 10).map(tag => `
       <button type="button" class="tag-btn" onclick="applyQuickSearch('${tag}')">${tag}</button>
