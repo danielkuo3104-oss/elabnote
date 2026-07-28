@@ -409,16 +409,15 @@
 
     <div class="section-divider">實驗歷史紀錄 / HISTORY LOG</div>
 
-    <!-- 歷史紀錄區塊：獨立明細點擊與底部分離按鈕 -->
-<div class="timeline-card-wrapper" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; box-shadow: var(--shadow-sm);">
+  <!-- 白色外框：點擊空白處跳轉資料庫 -->
+<div class="timeline-card-wrapper" onclick="window.location.href='database.html'" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; box-shadow: var(--shadow-sm); cursor: pointer;">
   <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px;" id="txtHistoryHeaderTitle">最近歷史紀錄</div>
   
   <div id="timelineContainer" class="timeline-container">
     <div class="timeline-line"></div>
   </div>
 
-  <!-- 透過顏色差異引導的專屬按鈕，徹底解決事件衝突 -->
-  <button type="button" class="btn-database-link" onclick="window.location.href='database.html'" style="width:100%; margin-top:14px; padding:10px; background:var(--primary-light); color:var(--primary); border:1px solid #bfdbfe; border-radius:var(--radius-sm); font-weight:700; font-size:12px; cursor:pointer; text-align:center; transition:all 0.2s ease;">
+  <button type="button" class="btn-database-link" onclick="event.stopPropagation(); window.location.href='database.html'" style="width:100%; margin-top:14px; padding:10px; background:var(--primary-light); color:var(--primary); border:1px solid #bfdbfe; border-radius:var(--radius-sm); font-weight:700; font-size:12px; cursor:pointer; text-align:center; transition:all 0.2s ease;">
     <span id="txtBtnGoDatabase">點擊前往完整資料庫 ↗</span>
   </button>
 </div>
@@ -527,7 +526,8 @@
     activeSelectedExpId: null
   };
 
-  window.addEventListener('DOMContentLoaded', async () => {
+  / 頁面載入時優先檢查登入記憶
+window.addEventListener('DOMContentLoaded', async () => {
   checkSession();
   applyLanguage();
   await fetchAndParseFormsFromSheet();
@@ -535,17 +535,22 @@
 });
 
 function checkSession() {
-  // 改用 localStorage 解決 file:// 協定重登問題
   const savedUser = localStorage.getItem('elabnote_user');
   if (savedUser) {
-    state.currentUser = JSON.parse(savedUser);
-    state.isGuest = state.currentUser.role === 'Guest';
-    document.getElementById('authPage').style.display = 'none';
-    document.getElementById('fabBtn').style.display = 'flex';
-    
-    const badge = document.getElementById('userBadge');
-    badge.innerText = state.currentUser.name;
-    badge.style.background = state.currentUser.color || '#f1f5f9';
+    try {
+      state.currentUser = JSON.parse(savedUser);
+      state.isGuest = state.currentUser.role === 'Guest';
+      
+      // 自動隱藏登入頁，顯示主畫面
+      document.getElementById('authPage').style.display = 'none';
+      document.getElementById('fabBtn').style.display = 'flex';
+      
+      const badge = document.getElementById('userBadge');
+      badge.innerText = state.currentUser.name;
+      badge.style.background = state.currentUser.color || '#f1f5f9';
+    } catch(e) {
+      localStorage.removeItem('elabnote_user');
+    }
   } else {
     document.getElementById('authPage').style.display = 'flex';
     document.getElementById('fabBtn').style.display = 'none';
@@ -564,7 +569,7 @@ function performLogin() {
   state.isGuest = false;
   state.currentLang = user.lang || "ZH";
 
-  // 寫入 localStorage 確保永遠不重登
+  // 寫入 localStorage 記憶登入狀態
   localStorage.setItem('elabnote_user', JSON.stringify(user));
 
   document.getElementById('authPage').style.display = 'none';
@@ -1652,77 +1657,72 @@ function showActiveExpDetail(expId) {
   document.getElementById('customModalBackdrop').style.display = 'flex';
 }
 
-  // 🚀 修正時間軸排序流向：由遠至近倒序（未來遠 ➔ 未來近 ➔ 今日 ➔ 過去）
   function renderTimeline() {
-    const isZH = state.currentLang === 'ZH';
-    const container = document.getElementById('timelineContainer');
-    let html = `<div class="timeline-line"></div>`;
+  const isZH = state.currentLang === 'ZH';
+  const container = document.getElementById('timelineContainer');
+  let html = `<div class="timeline-line"></div>`;
 
-    const todayStr = state.simulatedDate;
+  const todayStr = state.simulatedDate;
 
-    // 1. 未來的實驗：按日期降冪排序（日期大的在最上面，越接近今天越往下）
-    const futureExps = state.dataCenter
-      .filter(d => new Date(d.date) > new Date(todayStr))
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 3);
+  const futureExps = state.dataCenter
+    .filter(d => new Date(d.date) > new Date(todayStr))
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 3);
 
-    // 2. 今日的實驗
-    const todayExps = state.dataCenter
-      .filter(d => d.date === todayStr);
+  const todayExps = state.dataCenter.filter(d => d.date === todayStr);
 
-    // 3. 過去的實驗：按日期降冪排序（越接近今天的越上面）
-    const pastExps = state.dataCenter
-      .filter(d => new Date(d.date) < new Date(todayStr))
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 3);
+  const pastExps = state.dataCenter
+    .filter(d => new Date(d.date) < new Date(todayStr))
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 3);
 
-    // 組合最終順暢的時間流向：【未來遠➔近】+【今日】+【過去】
-    const displayList = [...futureExps, ...todayExps, ...pastExps];
+  const displayList = [...futureExps, ...todayExps, ...pastExps];
 
-    if (displayList.length === 0) {
-      container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">${isZH?'無歷史實驗紀錄':'No history records'}</div>`;
-      return;
-    }
-
-    displayList.forEach(item => {
-      const isToday = item.date === todayStr;
-      const userObj = state.membersList.find(m => m.name === item.user);
-      const userColor = userObj ? userObj.color : '#f1f5f9';
-      
-      const styleObj = getStatusStyle(item.status);
-      const displayStatus = getStatusText(item.status, state.currentLang);
-      const displayInfo = formatBilingualText(item.info, state.currentLang);
-
-      const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
-      const uploadTagHtml = isCompleted 
-        ? (item.hasDataUpload 
-            ? `<span class="upload-status-tag uploaded">${isZH?'已上傳':'Uploaded'}</span>` 
-            : `<span class="upload-status-tag pending">${isZH?'待上傳':'Pending'}</span>`) 
-        : '';
-
-      html += `
-        <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
-          <div class="timeline-node" style="background:${styleObj.text}"></div>
-          <div class="timeline-card ${isToday ? 'today' : ''}">
-            <div class="timeline-date-head">
-              <div class="timeline-date-title">
-                <span>${item.date}</span>
-                <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
-              </div>
-              <div class="timeline-status-group">
-                <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span>
-                ${uploadTagHtml}
-              </div>
-            </div>
-            <div class="timeline-info-text" title="${displayInfo}">${displayInfo || (isZH?'實驗專案':'Experiment Project')}</div>
-            <div class="timeline-exp-id">${isZH?'編號':'ID'}: ${item.expId}</div>
-          </div>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
+  if (displayList.length === 0) {
+    container.innerHTML = html + `<div style="padding:10px; color:var(--text-muted); font-size:12px;">${isZH?'無歷史實驗紀錄':'No history records'}</div>`;
+    return;
   }
+
+  displayList.forEach(item => {
+    const isToday = item.date === todayStr;
+    const userObj = state.membersList.find(m => m.name === item.user);
+    const userColor = userObj ? userObj.color : '#f1f5f9';
+    
+    const styleObj = getStatusStyle(item.status);
+    const displayStatus = getStatusText(item.status, state.currentLang);
+    const displayInfo = formatBilingualText(item.info, state.currentLang);
+
+    const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
+    const uploadTagHtml = isCompleted 
+      ? (item.hasDataUpload 
+          ? `<span class="upload-status-tag uploaded">${isZH?'已上傳':'Uploaded'}</span>` 
+          : `<span class="upload-status-tag pending">${isZH?'待上傳':'Pending'}</span>`) 
+      : '';
+
+    // 關鍵修正：卡片點擊加上 event.stopPropagation()，阻止點擊冒泡傳到外框
+    html += `
+      <div class="timeline-item" onclick="event.stopPropagation(); showActiveExpDetail('${item.expId}');">
+        <div class="timeline-node" style="background:${styleObj.text}"></div>
+        <div class="timeline-card ${isToday ? 'today' : ''}">
+          <div class="timeline-date-head">
+            <div class="timeline-date-title">
+              <span>${item.date}</span>
+              <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
+            </div>
+            <div class="timeline-status-group">
+              <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span>
+              ${uploadTagHtml}
+            </div>
+          </div>
+          <div class="timeline-info-text" title="${displayInfo}">${displayInfo || (isZH?'實驗專案':'Experiment Project')}</div>
+          <div class="timeline-exp-id">${isZH?'編號':'ID'}: ${item.expId}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
 
   async function syncToGoogleSheet(actionType, payload) {
     try {
@@ -1765,16 +1765,19 @@ function showActiveExpDetail(expId) {
   }
 
   function guestLogin() {
-    state.currentUser = { name: "訪客", role: "Guest", color: "#f1f5f9" };
-    state.isGuest = true;
-    document.getElementById('authPage').style.display = 'none';
-    document.getElementById('userBadge').innerText = "訪客";
-    document.getElementById('fabBtn').style.display = 'flex';
+  const guestObj = { name: "訪客", role: "Guest", color: "#f1f5f9" };
+  state.currentUser = guestObj;
+  state.isGuest = true;
+  
+  localStorage.setItem('elabnote_user', JSON.stringify(guestObj));
 
-    applyLanguage();
-    refreshDashboard(true);
-    showCustomAlert("訪客模式", "已以訪客身份登入，登錄功能已全數受限。");
-  }
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('userBadge').innerText = "訪客";
+  document.getElementById('fabBtn').style.display = 'flex';
+
+  applyLanguage();
+  refreshDashboard(true);
+}
 
 
 
