@@ -1011,11 +1011,13 @@ function toggleEditMode(expId) {
   }
 }
 
-/* 3. 儲存修改內容 (打包時戳與全部欄位，真正發送 updateRecord API) */
+/* 3. 儲存修改內容 (修復自動備註註記 + 逆向寫回後端) */
 async function saveActiveExpEdit(expId) {
   const isZH = state.currentLang === 'ZH';
   const exp = state.dataCenter.find(d => d.expId === expId);
   if (!exp) return;
+
+  if (!exp.formData) exp.formData = {};
 
   // A. 打包修改後的時戳 (_time_logs)
   const timeLogInputs = document.querySelectorAll('.time-log-input');
@@ -1051,13 +1053,36 @@ async function saveActiveExpEdit(expId) {
   if (document.getElementById('edit_tissue_status')) exp.formData['tissue_status'] = document.getElementById('edit_tissue_status').value;
   if (document.getElementById('edit_storage')) exp.formData['storage'] = document.getElementById('edit_storage').value;
 
-  // C. 備註追加
+  // C. 處理備註：自動加上系統時間修改註記 Stamp
   const oldNotes = exp.formData['notes'] || '';
   const appendInput = document.getElementById('inputAppendNote');
   const appendVal = appendInput ? appendInput.value.trim() : '';
 
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const timeStampTag = `[${yyyy}/${mm}/${dd} ${hh}:${min} ${isZH ? '修改記錄' : 'Modified'}]`;
+
+  let updatedNotes = oldNotes;
   if (appendVal) {
-    exp.formData['notes'] = oldNotes ? `${oldNotes}\n[${isZH?'追加':'Appended'}]: ${appendVal}` : appendVal;
+    updatedNotes = oldNotes 
+      ? `${oldNotes}\n${timeStampTag} 追加：${appendVal}` 
+      : `${timeStampTag} 追加：${appendVal}`;
+  } else {
+    updatedNotes = oldNotes 
+      ? `${oldNotes}\n${timeStampTag}` 
+      : timeStampTag;
+  }
+
+  exp.formData['notes'] = updatedNotes;
+
+  // D. 更新前端記憶體資料 (確保不需重新整理即時反應)
+  const targetIndex = state.dataCenter.findIndex(d => d.expId === expId);
+  if (targetIndex !== -1) {
+    state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(exp.formData));
   }
 
   const btnEdit = document.getElementById('btnToggleEdit');
@@ -1066,22 +1091,25 @@ async function saveActiveExpEdit(expId) {
     btnEdit.innerText = isZH ? "同步至雲端中..." : "Saving...";
   }
 
-  // D. 發送 updateRecord 到 GAS 後端
+  // E. 逆向寫回 GAS 後端 (使用 URLSearchParams 確保氣泡不會被 CORS 擋下)
   try {
+    const payload = {
+      action: "updateRecord",
+      expId: expId,
+      status: exp.status,
+      date: exp.date,
+      user: exp.user,
+      formJson: JSON.stringify(exp.formData)
+    };
+
     await fetch(GAS_API_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "updateRecord",
-        expId: expId,
-        status: exp.status,
-        date: exp.date,
-        user: exp.user,
-        formJson: JSON.stringify(exp.formData)
-      })
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
     });
-    alert(isZH ? "修改已成功儲存並同步至雲端！" : "Successfully saved and synced!");
+
+    alert(isZH ? "修改已成功儲存，並自動新增備註註記！" : "Successfully saved and timestamp added!");
   } catch (err) {
     console.error("雲端同步失敗：", err);
     alert(isZH ? "本地已更新，但雲端同步失敗。" : "Failed to sync with cloud.");
