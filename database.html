@@ -91,20 +91,21 @@
     }
     .tag-btn:hover, .tag-btn:active { background: var(--primary-light); color: var(--primary); border-color: var(--border-focus); }
 
-    /* 時間軸列表 */
+    /* 時間軸列表防手機壓疊優化 */
     .timeline-container { position: relative; padding-left: 20px; margin-top: 12px; }
     .timeline-line { position: absolute; left: 5px; top: 12px; bottom: 8px; width: 2px; background: var(--border-color); }
     .timeline-item { position: relative; margin-bottom: 12px; cursor: pointer; }
     .timeline-node { position: absolute; left: -19px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 2px var(--primary); }
     .timeline-card { background: var(--card-bg); border-radius: var(--radius-md); padding: 12px 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); transition: all 0.2s ease; }
+    .timeline-card.reserved-card { background: #f8fafc; border-color: #cbd5e1; }
     .timeline-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
 
-    .timeline-date-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .timeline-date-title { font-size: 13px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
-    .timeline-user-badge { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .timeline-status-group { display: flex; align-items: center; gap: 6px; }
+    .timeline-date-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+    .timeline-date-title { font-size: 13px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 140px; }
+    .timeline-user-badge { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 2px 6px; flex-shrink: 0; white-space: nowrap; }
+    .timeline-status-group { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
     
-    .status-badge-lg { display: inline-flex; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; border: 1px solid transparent; }
+    .status-badge-lg { display: inline-flex; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; border: 1px solid transparent; flex-shrink: 0; }
     .upload-status-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; flex-shrink: 0; white-space: nowrap; }
     .upload-status-tag.uploaded { background: #dcfce7; color: #15803d; }
     .upload-status-tag.pending { background: #fee2e2; color: #b91c1c; }
@@ -125,7 +126,7 @@
     .empty-state-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-top: 4px; }
     .empty-state-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
-    /* Modal Layout */
+    /* Modal 排版修復 - 電腦端限制 760px 提升閱讀體驗 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5);
       backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
@@ -136,7 +137,7 @@
       transition: max-width 0.25s ease;
     }
     .custom-modal.expanded-mode {
-      max-width: 900px;
+      max-width: 760px;
     }
 
     .custom-modal h3 { margin-bottom: 12px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; flex-shrink: 0; }
@@ -177,42 +178,12 @@
     .legend-item { display: inline-flex; align-items: center; gap: 4px; }
     .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-    /* 點與線狀態歷程時間軸 */
-.vertical-time-log {
-  position: relative;
-  padding-left: 16px;
-  margin-top: 8px;
-}
-.vertical-time-line {
-  position: absolute;
-  left: 4px;
-  top: 6px;
-  bottom: 6px;
-  width: 2px;
-  background: var(--border-color);
-}
-.vertical-time-item {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-  margin-bottom: 8px;
-}
-.vertical-time-item:last-child {
-  margin-bottom: 0;
-}
-.vertical-time-dot {
-  position: absolute;
-  left: -16px;
-  top: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--primary);
-  border: 2px solid var(--card-bg);
-  box-shadow: 0 0 0 1px var(--primary);
-}
+    /* 點與線垂直歷程 */
+    .vertical-time-log { position: relative; padding-left: 16px; margin-top: 6px; }
+    .vertical-time-line { position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; background: var(--border-color); }
+    .vertical-time-item { position: relative; display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 6px; }
+    .vertical-time-item:last-child { margin-bottom: 0; }
+    .vertical-time-dot { position: absolute; left: -16px; top: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 1px var(--primary); }
   </style>
 </head>
 <body>
@@ -723,6 +694,7 @@
     return { totalMins, barHtml, miniBarHtml };
   }
 
+  /* 🚀 全動態內容關鍵字搜尋引擎 🚀 */
   function filterRecordCenterList() {
     const kw = document.getElementById('txtRecordSearch').value.trim().toLowerCase();
     const container = document.getElementById('recordCenterList');
@@ -732,10 +704,21 @@
       if (!kw) return true;
       const displayStatus = getStatusText(d.status, state.currentLang).toLowerCase();
       const displayInfo = formatBilingualText(d.info, state.currentLang).toLowerCase();
-      return (d.expId||'').toLowerCase().includes(kw) || 
-             (d.user||'').toLowerCase().includes(kw) || 
-             displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
-             displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw);
+      
+      // 基本欄位匹配
+      const basicMatch = (d.expId||'').toLowerCase().includes(kw) || 
+                         (d.user||'').toLowerCase().includes(kw) || 
+                         displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
+                         displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw);
+      if (basicMatch) return true;
+
+      // JSON 內部全動態數據扁平化匹配 (例如：灌流、抽搐、腦部大血管損傷等)
+      if (d.formData && typeof d.formData === 'object') {
+        const formDataString = JSON.stringify(d.formData).toLowerCase();
+        if (formDataString.includes(kw)) return true;
+      }
+
+      return false;
     }).sort((a,b) => new Date(b.date) - new Date(a.date));
 
     if (filtered.length === 0) {
@@ -750,6 +733,8 @@
       const displayStatus = getStatusText(item.status, state.currentLang);
       const displayInfo = formatBilingualText(item.info, state.currentLang);
 
+      const isReserved = item.status === '已預約' || item.status === 'Reserved';
+
       const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
       const uploadTagHtml = isCompleted 
         ? (item.hasDataUpload 
@@ -759,13 +744,13 @@
 
       const timeLogCalculations = calculateProcessTimeline(item.formData?.['_time_logs'] || {});
       const timeTotalText = timeLogCalculations.totalMins > 0 
-        ? `<span style="font-size:10px; color:var(--text-muted); margin-left:6px; font-weight:600;">(${state.currentLang==='ZH'?'總耗時':'Total'}: ${timeLogCalculations.totalMins}${state.currentLang==='ZH'?'分':'m'})</span>` 
+        ? `<span style="font-size:10px; color:var(--text-muted); font-weight:600;">(${state.currentLang==='ZH'?'總耗時':'Total'}: ${timeLogCalculations.totalMins}${state.currentLang==='ZH'?'分':'m'})</span>` 
         : '';
 
       html += `
         <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
           <div class="timeline-node" style="background:${styleObj.text}"></div>
-          <div class="timeline-card">
+          <div class="timeline-card ${isReserved ? 'reserved-card' : ''}">
             <div class="timeline-date-head">
               <div class="timeline-date-title">
                 <span>${item.date}</span>
@@ -807,7 +792,7 @@
     return { val: null, id: null };
   }
 
-  /* 第一階段：精簡明細彈窗 */
+  /* 第一階段：精簡明細彈窗（「已預約」隱藏專業展開版按鈕） */
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
     const exp = state.dataCenter.find(d => d.expId === expId);
@@ -821,6 +806,8 @@
 
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.remove('expanded-mode');
+
+    const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
     let timeLogsHtml = '';
     let surgeryDurationHtml = '';
@@ -879,13 +866,14 @@
       detailsList.push({ label: isZH ? 'Saline用量' : 'Saline Volume', val: `${salineVol} uL` });
     }
 
-    const lamdaAP = formData['field_20_16'] || '0';
-    const lamdaML = formData['field_19_16'] || '0';
+    // 正確抓取 Lamda 與電極插入位置
+    const lamdaAP = formData['field_9_16'] !== undefined ? formData['field_9_16'] : (formData['field_20_16'] || '0');
+    const lamdaML = formData['field_10_16'] !== undefined ? formData['field_10_16'] : (formData['field_19_16'] || '0');
     detailsList.push({ label: isZH ? 'Lamda位置' : 'Lamda Position', val: `(${lamdaAP}, ${lamdaML})` });
 
-    const eleAP = formData['field_16_16'] || '0';
-    const eleML = formData['field_12_16'] || '0';
-    const eleDH = formData['field_17_16'] || '0';
+    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_16_16'] || '0');
+    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_12_16'] || '0');
+    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_17_16'] || '0');
     detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})` });
 
     const filledDataHtml = detailsList.length > 0 
@@ -943,14 +931,23 @@
 
     document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
     document.getElementById('modalMessage').innerHTML = htmlContent;
-    document.getElementById('modalBtnArea').innerHTML = `
-      <button class="modal-btn-expand" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
-      <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
-    `;
+
+    // 「已預約」狀態下，不提供「檢視完整數據與細節 (專業展開版)」按鈕
+    if (isReserved) {
+      document.getElementById('modalBtnArea').innerHTML = `
+        <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+      `;
+    } else {
+      document.getElementById('modalBtnArea').innerHTML = `
+        <button class="modal-btn-expand" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
+        <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+      `;
+    }
+
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  /* 第二階段：專業展開版 (含點線時間軸 + 完整實驗數據專區) */
+  /* 第二階段：專業展開版（獨立檔案區卡片 + 正確座標與完整詳細數據） */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -964,10 +961,10 @@
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.add('expanded-mode');
 
-    // 1. 全流程耗時計算
+    // 1. 全流程耗時
     const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
-    // 2. 點與線垂直歷程時間軸 (Vertical Dot-Line Time Log)
+    // 點線垂直歷程
     let dotLineLogsHtml = '';
     if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
       const logs = formData['_time_logs'];
@@ -992,16 +989,16 @@
       dotLineLogsHtml = `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</div>`;
     }
 
-    // 3. 超音波刺激參數
+    // 2. 超音波參數
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
     const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
     const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
     const interObj = getDynamicFieldValue(formData, ['間隔', 'interval']);
 
-    const freqVal = parseFloat(freqObj.val || 0);
-    const cycleVal = parseFloat(cycleObj.val || 0);
-    const voltVal = parseFloat(voltObj.val || 0);
-    const interVal = parseFloat(interObj.val || 0);
+    const freqVal = parseFloat(freqObj.val || formData['field_19_0'] || 0);
+    const cycleVal = parseFloat(cycleObj.val || formData['field_20_0'] || 0);
+    const voltVal = parseFloat(voltObj.val || formData['field_21_0'] || 0);
+    const interVal = parseFloat(interObj.val || formData['field_22_0'] || 0);
 
     const hasUltrasoundData = (freqVal > 0 || cycleVal > 0 || voltVal > 0 || interVal > 0);
 
@@ -1018,25 +1015,27 @@
       `;
     }
 
-    // 4. 動物基本參數與生理狀況
+    // 3. 動物基本參數與生理狀況 (含過輕、抽搐、腦部大血管損傷等完整抓取)
     const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
     const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
-    const ratWeight = parseFloat(weightObj.val || 0);
-    const ptzDose = parseFloat(doseObj.val || 1);
+    const ratWeight = parseFloat(weightObj.val || formData['field_5_16'] || formData['field_3_16'] || 0);
+    const ptzDose = parseFloat(doseObj.val || formData['field_4_16'] || 1);
     const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
     const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
 
     let physObj = getDynamicFieldValue(formData, ['生理', 'physiological']);
     let physItems = [];
     if (physObj.val && Array.isArray(physObj.val) && physObj.val.length > 0) {
-      const otherInput = formData[`${physObj.id}_input`] || '';
+      const otherInput = formData[`${physObj.id}_input`] || formData['field_23_16_input'] || '';
       physItems = physObj.val.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-    } else if (physObj.val && typeof physObj.val === 'string' && physObj.val.trim() !== '') {
-      physItems = [formatBilingualText(physObj.val, state.currentLang)];
+    } else if (formData['field_23_16']) {
+      const arr = Array.isArray(formData['field_23_16']) ? formData['field_23_16'] : [formData['field_23_16']];
+      const otherInput = formData['field_23_16_input'] || '';
+      physItems = arr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
     }
     const physText = physItems.length > 0 ? physItems.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
 
-    // 5. 手術情形
+    // 4. 手術情形 (包含腦部血管狀況)
     let surgDurationText = '--';
     if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
       const start = new Date(formData['_time_logs']['手術中']);
@@ -1045,30 +1044,25 @@
       if (diffMs > 0) surgDurationText = `${Math.floor(diffMs / 60000)} ${isZH ? '分鐘' : 'mins'}`;
     }
 
-    let surgCondObj = getDynamicFieldValue(formData, ['手術', 'surgical', 'surgery']);
     let surgCondItems = [];
-    if (surgCondObj.val && Array.isArray(surgCondObj.val) && surgCondObj.val.length > 0) {
-      const otherInput = formData[`${surgCondObj.id}_input`] || '';
-      surgCondItems = surgCondObj.val.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-    } else if (surgCondObj.val && typeof surgCondObj.val === 'string' && surgCondObj.val.trim() !== '') {
-      surgCondItems = [formatBilingualText(surgCondObj.val, state.currentLang)];
+    if (formData['field_31_16']) {
+      const arr = Array.isArray(formData['field_31_16']) ? formData['field_31_16'] : [formData['field_31_16']];
+      surgCondItems = arr.map(item => formatBilingualText(item, state.currentLang));
     }
     const surgCondText = surgCondItems.length > 0 ? surgCondItems.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
 
-    // 6. 電極設置與訊號蒐集
-    const lamdaAP = formData['field_20_16'] || '0';
-    const lamdaML = formData['field_19_16'] || '0';
-    const eleAP = formData['field_16_16'] || '0';
-    const eleML = formData['field_12_16'] || '0';
-    const eleDH = formData['field_17_16'] || '0';
+    // 5. 電極設置與訊號蒐集 (座標修正：Lamda=field_9_16/10_16，電極=field_15_16/16_16/17_16)
+    const lamdaAP = formData['field_9_16'] !== undefined ? formData['field_9_16'] : (formData['field_20_16'] || '0');
+    const lamdaML = formData['field_10_16'] !== undefined ? formData['field_10_16'] : (formData['field_19_16'] || '0');
+    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_16_16'] || '0');
+    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_12_16'] || '0');
+    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_17_16'] || '0');
 
     let eleCondObj = getDynamicFieldValue(formData, ['電極', 'electrode']);
     let eleCondItems = [];
     if (eleCondObj.val && Array.isArray(eleCondObj.val) && eleCondObj.val.length > 0) {
       const otherInput = formData[`${eleCondObj.id}_input`] || '';
       eleCondItems = eleCondObj.val.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-    } else if (eleCondObj.val && typeof eleCondObj.val === 'string' && eleCondObj.val.trim() !== '') {
-      eleCondItems = [formatBilingualText(eleCondObj.val, state.currentLang)];
     }
     const eleCondText = eleCondItems.length > 0 ? eleCondItems.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
 
@@ -1092,19 +1086,18 @@
     // 腦訊號搜集區段時間軸
     let validStages = [];
     let totalBrainMin = 0;
-    Object.keys(formData).forEach(k => {
-      if (Array.isArray(formData[k]) && formData[k].length > 0) {
-        formData[k].forEach(st => {
-          if (st && st.name && st.time !== undefined) {
-            const t = parseFloat(st.time) || 0;
-            if (t > 0 && String(st.name).trim() !== '') {
-              totalBrainMin += t;
-              validStages.push({ name: String(st.name).trim(), time: t });
-            }
+    const stageSource = formData['field_4_20'] || [];
+    if (Array.isArray(stageSource) && stageSource.length > 0) {
+      stageSource.forEach(st => {
+        if (st && st.name && st.time !== undefined) {
+          const t = parseFloat(st.time) || 0;
+          if (t > 0 && String(st.name).trim() !== '') {
+            totalBrainMin += t;
+            validStages.push({ name: String(st.name).trim(), time: t });
           }
-        });
-      }
-    });
+        }
+      });
+    }
 
     let brainTimelineHtml = '';
     if (totalBrainMin > 0) {
@@ -1133,7 +1126,7 @@
       `;
     }
 
-    // 7. 犧牲與組織保存
+    // 6. 犧牲與組織保存
     const getValueByKw = (kwArr, fbKeys) => {
       let fObj = getDynamicFieldValue(formData, kwArr);
       let rawVal = fObj.val;
@@ -1153,13 +1146,14 @@
     const excCond   = getValueByKw(['摘除情況', 'excisionstatus'], ['field_17_24']);
     const presMode  = getValueByKw(['保存方式', 'preservation'], ['field_21_24']);
 
-    // 8. 備註與數據檔案專區
+    // 7. 備註紀錄
     let notesArr = [];
     if (formData['notes'] && String(formData['notes']).trim() !== '') {
       notesArr.push(String(formData['notes']).trim());
     }
     let notesStr = notesArr.length > 0 ? notesArr.join('\n') : (isZH ? '無' : 'None');
 
+    // 8. 獨立雲端檔案專區 (Column W)
     const dataFolderHtml = exp.expDataFolder 
       ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">${isZH?'開啟雲端數據資料夾':'Open Cloud Data Folder'} ↗</a>`
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'未上傳數據資料夾':'No data folder linked'}</span>`;
@@ -1174,7 +1168,7 @@
     const expandedHtml = `
       <div class="detail-list">
         
-        <!-- 區塊 1：基本資訊與執行總覽 (含 12小時進度條 + 點線歷程時間) -->
+        <!-- 區塊 1：基本資訊與執行總覽 -->
         <div class="exp-panel full-width" style="margin-bottom:12px;">
           <div class="exp-panel-title">
             <span>${isZH ? '基本資訊與執行總覽' : 'Basic Information Overview'}</span>
@@ -1187,7 +1181,6 @@
               <div class="detail-row"><div class="detail-label">${isZH?'負責人員':'Experimenter'}</div><div class="detail-value">${exp.user}</div></div>
               <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value">${exp.date}</div></div>
             </div>
-            <!-- 點與線詳細歷程時間 Log -->
             <div style="background:#fff; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px;">
               <div style="font-weight:700; color:var(--text-muted); font-size:11px; margin-bottom:6px;">${isZH?'狀態歷程點線記錄':'Time Log History'}</div>
               ${dotLineLogsHtml}
@@ -1206,7 +1199,7 @@
         <!-- 網格排版區 -->
         <div class="expanded-grid">
           
-          <!-- 超音波刺激參數（如有資料才顯示） -->
+          <!-- 超音波刺激參數 -->
           ${ultrasoundPanelHtml}
 
           <!-- 區塊 2：動物基本參數與生理狀況 -->
@@ -1224,7 +1217,7 @@
             <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgical Status'}</div><div class="detail-value" style="color:${surgCondItems.length>0?'var(--primary)':'var(--text-primary)'};">${surgCondText}</div></div>
           </div>
 
-          <!-- 區塊 4：電極設置與訊號蒐集 (Full Width) -->
+          <!-- 區塊 4：電極設置與訊號蒐集 -->
           <div class="exp-panel full-width">
             <div class="exp-panel-title">${isZH ? '電極設置與訊號蒐集' : 'Electrode Setup & Signal Collection'}</div>
             <div class="expanded-grid" style="margin-top:0;">
@@ -1240,7 +1233,7 @@
             ${brainTimelineHtml}
           </div>
 
-          <!-- 區塊 5：犧牲與組織保存 (Full Width) -->
+          <!-- 區塊 5：犧牲與組織保存 -->
           <div class="exp-panel full-width">
             <div class="exp-panel-title">${isZH ? '犧牲與組織保存' : 'Sacrifice & Tissue Preservation'}</div>
             <div class="expanded-grid" style="margin-top:0;">
@@ -1256,14 +1249,19 @@
             </div>
           </div>
 
-          <!-- 區塊 6：實驗數據與資料專區 (Full Width) -->
+          <!-- 區塊 6：備註紀錄 -->
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">${isZH ? '備註紀錄' : 'Notes'}</div>
+            <div class="detail-value" style="white-space:pre-line; text-align:left; font-weight:600; color:var(--text-primary); padding:2px 0;">${notesStr}</div>
+          </div>
+
+          <!-- 區塊 7：獨立實驗數據檔案專區 (Column W) -->
           <div class="exp-panel full-width">
             <div class="exp-panel-title">
-              <span>${isZH ? '實驗數據與檔案 (Column W)' : 'Experimental Data & Files'}</span>
+              <span>${isZH ? '實驗數據檔案 (Column W)' : 'Experimental Data Files'}</span>
               ${uploadTagHtml}
             </div>
-            <div class="detail-row"><div class="detail-label">${isZH?'備註紀錄':'Notes'}</div><div class="detail-value" style="white-space:pre-line; text-align:left;">${notesStr}</div></div>
-            <div style="padding-top:6px; font-size:12px;">
+            <div style="padding:6px 0; font-size:12px;">
               ${dataFolderHtml}
             </div>
           </div>
