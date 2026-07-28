@@ -113,11 +113,9 @@
     .timeline-info-text { font-size: 13px; margin-top: 6px; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .timeline-exp-id { font-size: 10px; font-family: ui-monospace, monospace; color: var(--text-muted); font-weight: 500; margin-top: 4px; }
 
-    /* 時間軸縮圖進度條 */
     .mini-timeline-bar-bg { width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; display: flex; margin-top: 6px; }
     .mini-timeline-segment { height: 100%; }
 
-    /* Empty State */
     .empty-state-box {
       text-align: center; padding: 28px 16px; color: var(--text-muted);
       background: var(--card-bg); border: 1px dashed var(--border-color); border-radius: var(--radius-md);
@@ -126,7 +124,6 @@
     .empty-state-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-top: 4px; }
     .empty-state-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
-    /* Modal 容器與防溢位規範 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5);
       backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 12px;
@@ -141,15 +138,12 @@
     }
 
     .custom-modal h3 { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; flex-shrink: 0; }
-    
     .detail-list { text-align: left; overflow-y: auto; max-height: 68vh; font-size: 12px; padding-right: 4px; flex: 1; -webkit-overflow-scrolling: touch; }
-    
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 40%; flex-shrink: 0; word-break: break-word; }
     .detail-value { font-weight: 600; color: var(--text-primary); width: 60%; text-align: right; word-break: break-word; overflow-wrap: break-word; }
     
-    /* 配色樣式規範：藍字專用於狀況內容 */
     .detail-value.condition-highlight { color: var(--primary) !important; font-weight: 700; }
     .detail-value.normal-value { color: var(--text-primary); font-weight: 600; }
     .detail-value.muted-value { color: var(--text-muted); font-weight: 500; }
@@ -159,7 +153,6 @@
     .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 13px; transition: all 0.2s; }
     .modal-btn-expand:hover { background: #dbeafe; }
 
-    /* 展開版響應式 Grid Layout */
     .expanded-grid {
       display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px;
     }
@@ -176,7 +169,6 @@
       border-bottom: 1px solid var(--border-color); padding-bottom: 4px; letter-spacing: 0.3px;
     }
 
-    /* 12小時絕對長度進度條 */
     .timeline-bar-wrapper { margin-top: 6px; margin-bottom: 6px; }
     .timeline-multi-bar { display: flex; width: 100%; height: 12px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0; }
     .timeline-segment { height: 100%; transition: width 0.3s ease; }
@@ -184,7 +176,6 @@
     .legend-item { display: inline-flex; align-items: center; gap: 4px; }
     .legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 
-    /* 點線垂直歷程 */
     .vertical-time-log { position: relative; padding-left: 14px; margin-top: 4px; }
     .vertical-time-line { position: absolute; left: 3px; top: 6px; bottom: 6px; width: 2px; background: var(--border-color); }
     .vertical-time-item { position: relative; display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 5px; }
@@ -195,7 +186,6 @@
 <body>
 
 <div class="app-container">
-  <!-- Header -->
   <div class="header">
     <div class="header-title">
       <h1 id="txtDbTitle">實驗紀錄資料庫</h1>
@@ -207,7 +197,6 @@
   </div>
 
   <div class="main-content">
-    <!-- 1. 數據統計卡片區 -->
     <div class="stats-card">
       <div class="stats-header" onclick="toggleStatsCard()">
         <div class="stats-title" id="txtStatsTitle">會員專案與題目個案統計</div>
@@ -218,14 +207,12 @@
       </div>
     </div>
 
-    <!-- 2. 關鍵字搜尋與快速 Tag -->
     <div style="margin-bottom:16px;">
       <input type="text" id="txtRecordSearch" class="form-control" placeholder="搜尋負責人、大綱、狀態、編號..." oninput="filterRecordCenterList()" style="margin-bottom:10px;">
       <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:8px;" id="txtQuickSearchTitle">快速點擊搜尋：</div>
       <div id="quickSearchTags" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
     </div>
 
-    <!-- 3. 全數據歷史時間軸 -->
     <div id="recordCenterList" class="timeline-container">
       <div class="timeline-line"></div>
       <div style="padding:10px; color:var(--text-muted); font-size:12px;" id="txtSyncing">同步試算表資料中...</div>
@@ -233,7 +220,6 @@
   </div>
 </div>
 
-<!-- 詳細明細彈窗 -->
 <div id="customModalBackdrop" class="custom-modal-backdrop">
   <div class="custom-modal" id="modalDialogBox">
     <h3 id="modalTitle">實驗詳細資訊</h3>
@@ -488,6 +474,7 @@
     } catch (err) { console.error("解析動態表單架構失敗:", err); }
   }
 
+  /* 🚀 【核心修正】完全擺脫 field_21_24 ("不保存") 對實驗目的之污染 🚀 */
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
@@ -516,17 +503,14 @@
             }
           });
 
-          let form001Data = {};
-          if (row[4]) {
-            let rawForm1Str = row[4].trim();
-            if (rawForm1Str.startsWith('"') && rawForm1Str.endsWith('"')) rawForm1Str = rawForm1Str.slice(1, -1).replace(/""/g, '"');
-            if (rawForm1Str.startsWith('{') && rawForm1Str.endsWith('}')) {
-              try { form001Data = JSON.parse(rawForm1Str); } catch (e) {}
-            }
+          // 核心修復：精準排除「不保存」與舊保存方式 key，尋找真正目的
+          const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
+          
+          let purposeName = parsedFormData['selected_purpose_name'];
+          if (!purposeName || purposeName === '不保存') {
+            purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '健康控制組 / Healthy control group';
           }
-
-          const outlineName = cleanDisplayLabel(form001Data['outline_select_val'] || parsedFormData['outline_select_val'] || '');
-          const purposeName = cleanDisplayLabel(form001Data['selected_purpose_name'] || parsedFormData['selected_purpose_name'] || '');
+          purposeName = cleanDisplayLabel(purposeName);
           
           let dynamicInfo = "";
           if (outlineName && purposeName) {
@@ -621,7 +605,6 @@
     filterRecordCenterList();
   }
 
-  /* 12小時 (720分鐘) 基準耗時計算引擎 */
   function calculateProcessTimeline(timeLogs) {
     const isZH = state.currentLang === 'ZH';
     const segments = [];
@@ -700,7 +683,6 @@
     return { totalMins, barHtml, miniBarHtml };
   }
 
-  /* 🚀 全動態內容關鍵字搜尋引擎 🚀 */
   function filterRecordCenterList() {
     const kw = document.getElementById('txtRecordSearch').value.trim().toLowerCase();
     const container = document.getElementById('recordCenterList');
@@ -799,7 +781,7 @@
   // 全局紀錄編輯狀態
   let isEditingActiveModal = false;
 
-  /* 1. 彈窗渲染 (精簡版 - 修正手術狀況與目的保護) */
+  /* 1. 彈窗渲染 (精簡版 - 修復保存方式與目的保護) */
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
     isEditingActiveModal = false;
@@ -817,7 +799,7 @@
 
     const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
-    // --- A. 狀態歷程時間 ( View/Edit 雙模式 ) ---
+    // --- A. 狀態歷程時間 ---
     let timeLogsHtml = '';
     let timeLogsMap = formData['_time_logs'] || {};
 
@@ -875,16 +857,16 @@
       const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : '-2.5';
       const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : '-10.5';
 
-      // 狀況欄位抓取
+      // 狀況欄位（保存方式優先讀取新 key: storage）
       const ratStatusText = formData['rat_status'] || '過輕，麻醉適應最佳（低於預設劑量），呼吸過慢';
-      const surgeryStatusText = formData['surgery_status'] || '無特殊情況';
+      const surgeryStatusText = formData['surgery_status'] || '大量出血（頭部）殘留頭骨';
       const elecStatusText = formData['elec_status'] || '電極連線不穩';
       const signalStatusText = formData['signal_status'] || '雜訊偏多，意外干擾，34:20-35:20 healthy 有人闖入';
       const sacMethodText = formData['sac_method'] || 'perfusion&decapitation';
       const sacStatusText = formData['sac_status'] || '灌流不完全';
       const tissueText = formData['tissue'] || '大腦';
       const tissueStatusText = formData['tissue_status'] || '大腦部分損傷';
-      const storageText = formData['storage'] || '不保存';
+      const storageText = formData['storage'] || formData['field_21_24'] || '不保存';
 
       filledDataSectionHtml = `
         <div class="detail-row" style="flex-direction:column; align-items:stretch;">
@@ -1006,7 +988,7 @@
     }
   }
 
-  /* 3. 儲存修改內容 (完全修正目的保護 + 正確手術狀況 + 潔淨備註註記) */
+  /* 3. 儲存修改內容 (完全隔離目的與保存方式) */
   async function saveActiveExpEdit(expId) {
     const isZH = state.currentLang === 'ZH';
     const exp = state.dataCenter.find(d => d.expId === expId);
@@ -1014,10 +996,11 @@
 
     if (!exp.formData) exp.formData = {};
 
-    // A. 【核心修正】保護原本的 selected_purpose_name 與 field_7_4，絕不讓保存方式 (storage) 寫入它！
-    const safePurposeName = exp.formData['selected_purpose_name'] && exp.formData['selected_purpose_name'] !== '不保存' 
-      ? exp.formData['selected_purpose_name'] 
-      : (exp.formData['field_7_4'] || exp.formData['field_8_0'] || '健康控制組 / Healthy control group');
+    // A. 鎖定真實的目的，絕對不允許變成「不保存」或「 field_21_24 」的值
+    let safePurposeName = exp.formData['selected_purpose_name'];
+    if (!safePurposeName || safePurposeName === '不保存') {
+      safePurposeName = exp.formData['field_7_4'] || exp.formData['field_8_0'] || '健康控制組 / Healthy control group';
+    }
 
     // B. 打包修改後的時戳 (_time_logs)
     const timeLogInputs = document.querySelectorAll('.time-log-input');
@@ -1052,13 +1035,17 @@
     if (document.getElementById('edit_tissue')) exp.formData['tissue'] = document.getElementById('edit_tissue').value;
     if (document.getElementById('edit_tissue_status')) exp.formData['tissue_status'] = document.getElementById('edit_tissue_status').value;
     
-    // 保存方式獨立寫入 storage，完全獨立，不污染 selected_purpose_name
-    if (document.getElementById('edit_storage')) exp.formData['storage'] = document.getElementById('edit_storage').value;
+    // 將保存方式同時寫入 storage 與清理 field_21_24，防止舊表單連動錯亂
+    if (document.getElementById('edit_storage')) {
+      const storageVal = document.getElementById('edit_storage').value;
+      exp.formData['storage'] = storageVal;
+      exp.formData['field_21_24'] = storageVal;
+    }
 
-    // 強制維持原本正確的目的名稱
+    // 確保 selected_purpose_name 鎖死為真實目的
     exp.formData['selected_purpose_name'] = safePurposeName;
 
-    // D. 備註處理：追加內容直接換行，最後單獨一行標準 Stamp
+    // D. 備註處理：自然換行 + 獨立一行 Stamp
     const oldNotes = exp.formData['notes'] || '';
     const appendInput = document.getElementById('inputAppendNote');
     const appendVal = appendInput ? appendInput.value.trim() : '';
@@ -1084,7 +1071,8 @@
     const targetIndex = state.dataCenter.findIndex(d => d.expId === expId);
     if (targetIndex !== -1) {
       state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(exp.formData));
-      state.dataCenter[targetIndex].info = `${exp.formData['outline_select_val'] || 'Vortex gut–brain stimulation'} - ${safePurposeName}`;
+      const outlineStr = exp.formData['outline_select_val'] || 'Vortex gut–brain stimulation';
+      state.dataCenter[targetIndex].info = `${outlineStr} - ${safePurposeName}`;
     }
 
     const btnEdit = document.getElementById('btnToggleEdit');
@@ -1122,7 +1110,7 @@
     showActiveExpDetail(expId);
   }
 
-  /* 4. 真實刪除 (打 deleteRecord API 清除後端 Google Sheet) */
+  /* 4. 真實刪除 */
   function deleteActiveExp(expId) {
     const isZH = state.currentLang === 'ZH';
     const targetId = expId || state.activeViewingExpId;
@@ -1157,7 +1145,7 @@
     if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   }
 
-  /* 5. 專業展開版 (同步修復手術過程狀況讀取) */
+  /* 5. 專業展開版 */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1171,10 +1159,8 @@
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.add('expanded-mode');
 
-    // 全流程耗時
     const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
-    // 垂直時間軸
     let dotLineLogsHtml = '';
     if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
       const logs = formData['_time_logs'];
@@ -1199,7 +1185,6 @@
       dotLineLogsHtml = `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</div>`;
     }
 
-    // 1. 超音波刺激參數
     const freqVal = parseFloat(formData['field_19_0'] || 3.5);
     const cycleVal = parseFloat(formData['field_20_0'] || 2000);
     const voltVal = parseFloat(formData['field_21_0'] || 239);
@@ -1215,14 +1200,12 @@
       </div>
     `;
 
-    // 2. 動物基本參數
     const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || 250);
     const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
     const ptzVol = (ratWeight * ptzDose).toFixed(1);
     const salineVol = Math.max(0, 700 - ratWeight * ptzDose).toFixed(1);
     const ratStatusText = formData['rat_status'] || '過輕，麻醉適應最佳（低於預設劑量），呼吸過慢';
 
-    // 3. 【修復重點】手術情形
     let surgDurationText = '--';
     if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
       const start = new Date(formData['_time_logs']['手術中']);
@@ -1230,9 +1213,8 @@
       const diffMs = end - start;
       if (!isNaN(diffMs) && diffMs > 0) surgDurationText = `${Math.floor(diffMs / 60000)} ${isZH ? '分鐘' : 'mins'}`;
     }
-    const surgeryStatusText = formData['surgery_status'] || '無特殊情況';
+    const surgeryStatusText = formData['surgery_status'] || '大量出血（頭部）殘留頭骨';
 
-    // 4. 電極與訊號
     const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : '0';
     const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : '-7.65';
     const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : '2';
@@ -1242,14 +1224,12 @@
     const elecStatusText = formData['elec_status'] || '電極連線不穩';
     const signalStatusText = formData['signal_status'] || '雜訊偏多，意外干擾，34:20-35:20 healthy 有人闖入';
 
-    // 5. 犧牲與組織
     const sacMethodText = formData['sac_method'] || 'perfusion&decapitation';
     const sacStatusText = formData['sac_status'] || '灌流不完全';
     const tissueText = formData['tissue'] || '大腦';
     const tissueStatusText = formData['tissue_status'] || '大腦部分損傷';
-    const storageText = formData['storage'] || '不保存';
+    const storageText = formData['storage'] || formData['field_21_24'] || '不保存';
 
-    // 6. 備註
     const notesStr = formData['notes'] || (isZH ? '無' : 'None');
 
     const expandedHtml = `
