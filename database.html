@@ -128,7 +128,6 @@
       padding: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 88vh; display: flex; flex-direction: column;
       transition: max-width 0.3s ease;
     }
-    /* 當觸發完整展開版時，電腦版自動擴展為寬螢幕 View */
     .custom-modal.expanded-mode {
       max-width: 860px;
     }
@@ -143,7 +142,7 @@
     .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; margin-top: 10px; font-size: 13px; transition: all 0.2s; }
     .modal-btn-expand:hover { background: #dbeafe; }
 
-    /* 🚀 完整展開版 (Professional Expanded View) - 響應式 Layout */
+    /* 展開版 Layout */
     .expanded-grid {
       display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 10px;
     }
@@ -160,7 +159,7 @@
       border-bottom: 1px solid var(--border-color); padding-bottom: 6px;
     }
 
-    /* 多色耗數比例時間軸 */
+    /* 時間軸進度條 */
     .timeline-bar-wrapper { margin-top: 8px; margin-bottom: 10px; }
     .timeline-multi-bar { display: flex; width: 100%; height: 14px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0; }
     .timeline-segment { height: 100%; transition: width 0.3s ease; }
@@ -184,14 +183,14 @@
   </div>
 
   <div class="main-content">
-    <!-- 1. 數據統計卡片區（支援可收合） -->
+    <!-- 1. 數據統計卡片區 -->
     <div class="stats-card">
       <div class="stats-header" onclick="toggleStatsCard()">
         <div class="stats-title" id="txtStatsTitle">會員專案與題目個案統計</div>
         <div id="statsToggleIcon" class="toggle-icon">▼</div>
       </div>
       <div id="statsContent" class="stats-body">
-        <div style="color:var(--text-muted);">載入統計數據中...</div>
+        <div style="color:var(--text-muted);" id="txtLoadingStats">載入統計數據中...</div>
       </div>
     </div>
 
@@ -268,7 +267,6 @@
   };
 
   window.addEventListener('DOMContentLoaded', async () => {
-    // 讀取 LocalStorage 使用者語系預設
     const savedUser = localStorage.getItem('elabnote_user');
     if (savedUser) {
       try {
@@ -303,6 +301,12 @@
     document.getElementById('txtStatsTitle').innerText = isZH ? "會員專案與題目個案統計" : "Member Projects & Cases Statistics";
     document.getElementById('txtQuickSearchTitle').innerText = isZH ? "快速點擊搜尋：" : "Quick Filter Tags:";
     document.getElementById('txtRecordSearch').placeholder = isZH ? "搜尋負責人、大綱、狀態、編號..." : "Search owner, outline, status, ID...";
+    
+    const loadingElem = document.getElementById('txtLoadingStats');
+    if (loadingElem) loadingElem.innerText = isZH ? "載入統計數據中..." : "Loading statistics...";
+    
+    const syncingElem = document.getElementById('txtSyncing');
+    if (syncingElem) syncingElem.innerText = isZH ? "同步試算表資料中..." : "Syncing spreadsheet data...";
   }
 
   function toggleStatsCard() {
@@ -329,7 +333,7 @@
     if (!str) return '';
     if (!str.includes('/')) return str.trim();
     const parts = str.split('/');
-    return lang === 'EN' ? parts[1].trim() : parts[0].trim();
+    return lang === 'EN' ? (parts[1] || parts[0]).trim() : parts[0].trim();
   }
 
   function cleanDisplayLabel(text) {
@@ -366,25 +370,49 @@
     return parseSingleBilingualStr(statusRaw, lang);
   }
 
+  /* 強化的完整 CSV 解析器，正確處理換行與雙引號包覆內容 */
   function parseCSV(text) {
-    const lines = text.split(/\r\n|\n/);
     const result = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.trim()) continue;
-      const row = [];
-      let insideQuote = false, entry = '';
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j], nextChar = line[j + 1];
-        if (char === '"') {
-          if (insideQuote && nextChar === '"') { entry += '"'; j++; }
-          else { insideQuote = !insideQuote; }
-        } else if (char === ',' && !insideQuote) {
-          row.push(entry); entry = '';
-        } else { entry += char; }
+    let row = [];
+    let entry = '';
+    let insideQuote = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (insideQuote && nextChar === '"') {
+          entry += '"';
+          i++;
+        } else {
+          insideQuote = !insideQuote;
+        }
+      } else if (char === ',' && !insideQuote) {
+        row.push(entry);
+        entry = '';
+      } else if ((char === '\r' || char === '\n') && !insideQuote) {
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+        row.push(entry);
+        entry = '';
+        if (row.some(c => c.trim() !== '')) {
+          result.push(row);
+        }
+        row = [];
+      } else {
+        entry += char;
       }
-      row.push(entry); result.push(row);
     }
+
+    if (entry !== '' || row.length > 0) {
+      row.push(entry);
+      if (row.some(c => c.trim() !== '')) {
+        result.push(row);
+      }
+    }
+
     return result;
   }
 
@@ -416,6 +444,7 @@
         const pages = [];
         let currentPage = null;
         for (let r = 2; r < rows.length; r++) {
+          if (!rows[r]) continue;
           const rawLabel = (rows[r][block.startCol] || "").trim();
           const rawType = (rows[r][block.startCol + 1] || "").trim();
           if (!rawLabel && !rawType) continue;
@@ -445,6 +474,7 @@
 
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
+        if (!row) continue;
         if (row[0] || row[1]) {
           const expId = row[0] ? row[0].trim() : '未編號';
           const date = row[1] ? row[1].trim() : '';
@@ -469,8 +499,8 @@
           if (outline && purpose) dynamicInfo = `${outline} - ${purpose}`;
           else dynamicInfo = outline || purpose || '實驗專案';
 
-          // 🚀 預留 Column W (row[22]) 作為實驗數據/資料夾專區
-          const expDataFolder = row[22] ? row[22].trim() : '';
+          // 安全讀取 Column W (row[22])
+          const expDataFolder = (row.length > 22 && row[22]) ? row[22].trim() : '';
 
           records.push({
             expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder
@@ -485,7 +515,7 @@
     return `<div class="empty-state-box"><div class="empty-state-title">${titleText}</div><div class="empty-state-desc">${descText}</div></div>`;
   }
 
-  /* 渲染統計卡片（支援點擊名目觸發快速搜尋） */
+  /* 渲染統計卡片 */
   function renderRecordCenterStats() {
     const isZH = state.currentLang === 'ZH';
     const userStats = {};
@@ -622,7 +652,7 @@
     return { val: null, id: null };
   }
 
-  /* 🚀 核心一：第一階段彈窗 (預設顯示主頁同款精緻明細 + 完整展開按鈕) */
+  /* 第一階段彈窗：摘要明細 */
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
     const exp = state.dataCenter.find(d => d.expId === expId);
@@ -634,14 +664,11 @@
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 重置 Modal 為標準尺寸
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.remove('expanded-mode');
 
-    // 1. 計算多階段精準耗時與時間軸
     const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
-    // 2. 數據明細動態提取
     let detailsList = [];
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
     if (freqObj.val) detailsList.push({ label: isZH ? '頻率' : 'Frequency', val: `${freqObj.val} HZ` });
@@ -687,7 +714,6 @@
           <div class="detail-value">${exp.date}</div>
         </div>
 
-        <!-- 多色流程時間軸展示區 -->
         <div class="detail-row" style="flex-direction:column; align-items:stretch;">
           <div class="detail-label" style="width:100%; margin-bottom:4px;">
             ${isZH ? '實驗總耗時' : 'Total Duration'}: <strong style="color:var(--primary);">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</strong>
@@ -711,20 +737,18 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  /* 🚀 核心二：精準多色流程時間軸計算引擎 */
+  /* 多色流程時間軸計算引擎（包含例外保護與安全校驗） */
   function calculateProcessTimeline(timeLogs) {
     const isZH = state.currentLang === 'ZH';
     
-    // 定義 4 大段落標準
-    // 1. 手術耗時 (手術中 ~ 休息中) -> 🔴 紅色 #ef4444
-    // 2. 休息間隔 (休息中 ~ 訊號蒐集中) -> 🟢 綠色 #10b981
-    // 3. 訊號蒐集耗時 (訊號蒐集中 ~ 訊號蒐集完成) -> 🟠 橘黃 #f59e0b
-    // 4. 犧牲耗時 (犧牲中 ~ 實驗善後/完成) -> 🟣 紫色 #8b5cf6
-
     const segments = [];
     let totalMins = 0;
 
-    const getTime = (key) => timeLogs[key] ? new Date(timeLogs[key]) : null;
+    const getTime = (key) => {
+      if (!timeLogs || !timeLogs[key]) return null;
+      const d = new Date(timeLogs[key]);
+      return isNaN(d.getTime()) ? null : d;
+    };
 
     const tSurgeryStart = getTime('手術中');
     const tBreakStart = getTime('休息中');
@@ -801,7 +825,7 @@
     return { totalMins, barHtml };
   }
 
-  /* 🚀 核心三：第二階段：完整展開版（Professional Expanded View - 支援電腦/手機 Layout） */
+  /* 第二階段：完整展開版 */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -809,30 +833,25 @@
     const isZH = state.currentLang === 'ZH';
     const styleObj = getStatusStyle(exp.status);
     const displayStatus = getStatusText(exp.status, state.currentLang);
-    const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
 
-    // 擴大彈窗寬度
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.add('expanded-mode');
 
     const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
-    // 提取各大區域資料
     const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
     const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
     const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
     const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
 
-    // 座標
     const lamdaAP = formData['field_20_16'] || '0';
     const lamdaML = formData['field_19_16'] || '0';
     const eleAP = formData['field_16_16'] || '0';
     const eleML = formData['field_12_16'] || '0';
     const eleDH = formData['field_17_16'] || '0';
 
-    // 預留 Column W (資料夾/原始數據連結) 區塊
     const dataFolderHtml = exp.expDataFolder 
       ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">📁 ${isZH?'點擊開啟雲端數據資料夾':'Open Raw Data Folder'} ↗</a>`
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'未上傳數據資料夾':'No data folder linked'}</span>`;
@@ -840,7 +859,6 @@
     const expandedHtml = `
       <div class="detail-list" style="max-height:72vh;">
         
-        <!-- Header 資訊列 -->
         <div style="background:#f1f5f9; padding:12px; border-radius:var(--radius-md); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <div>
             <span style="font-size:11px; color:var(--text-muted); font-weight:700;">ID:</span>
@@ -851,7 +869,6 @@
           </div>
         </div>
 
-        <!-- 全流程多色比例時間軸區 -->
         <div class="exp-panel" style="margin-bottom:12px;">
           <div class="exp-panel-title">⏱️ ${isZH?'實驗全流程時間軸與階段耗時':'Experiment Execution Timeline'}</div>
           <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px;">
@@ -860,19 +877,16 @@
           ${timeLogCalculations.barHtml}
         </div>
 
-        <!-- 響應式雙欄/單欄網格區 -->
         <div class="expanded-grid">
           
-          <!-- 面板 1：基本與參數 -->
           <div class="exp-panel">
             <div class="exp-panel-title">🧪 ${isZH?'動物劑量與物理參數':'Animal & Physical Parameters'}</div>
             <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value">${weightObj.val ? weightObj.val + ' g' : '--'}</div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline':'PTZ / Saline'}</div><div class="detail-value">${weightObj.val ? (weightObj.val * (doseObj.val||1)).toFixed(1) + ' / ' + (700 - weightObj.val * (doseObj.val||1)).toFixed(1) + ' uL' : '--'}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline':'PTZ / Saline'}</div><div class="detail-value">${weightObj.val ? (weightObj.val * (doseObj.val||1)).toFixed(1) + ' / ' + Math.max(0, 700 - weightObj.val * (doseObj.val||1)).toFixed(1) + ' uL' : '--'}</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'超音波頻率':'US Frequency'}</div><div class="detail-value">${freqObj.val ? freqObj.val + ' HZ' : '--'}</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'週期 / 電壓':'Cycle / Volt'}</div><div class="detail-value">${cycleObj.val || '--'} / ${voltObj.val || '--'} mV</div></div>
           </div>
 
-          <!-- 面板 2：立體定位座標 -->
           <div class="exp-panel">
             <div class="exp-panel-title">🎯 ${isZH?'立體定位與電極座標':'Stereotaxic Coordinates'}</div>
             <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Pos'}</div><div class="detail-value">(${lamdaAP}, ${lamdaML})</div></div>
@@ -881,7 +895,6 @@
             <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value">${exp.date}</div></div>
           </div>
 
-          <!-- 面板 3： Column W 實驗數據專區 (Full Width) -->
           <div class="exp-panel full-width">
             <div class="exp-panel-title">📊 ${isZH?'實驗數據與原始資料連結 (Column W)':'Experimental Data & Files (Column W)'}</div>
             <div style="padding:6px 0; font-size:12px;">
