@@ -1385,15 +1385,17 @@ function showActiveExpDetail(expId) {
     detailsList.push({ label: isZH ? 'Saline用量' : 'Saline Volume', val: `${salineVol} uL` });
   }
 
-  // C. 座標位置 (Lamda & 電極)
-  const lamdaAP = formData['field_20_16'] || '0';
-  const lamdaML = formData['field_19_16'] || '0';
-  detailsList.push({ label: isZH ? 'Lamda位置' : 'Lamda Position', val: `(${lamdaAP}, ${lamdaML})` });
+  / C. 座標位置 (Lamda & 電極)
+// 優先提取正確的欄位：Lamda (field_9_16, field_10_16)，保底退回 (field_20_16, field_19_16)
+const lamdaAP = formData['field_9_16'] !== undefined ? formData['field_9_16'] : (formData['field_20_16'] || '0');
+const lamdaML = formData['field_10_16'] !== undefined ? formData['field_10_16'] : (formData['field_19_16'] || '0');
+detailsList.push({ label: isZH ? 'Lamda位置' : 'Lamda Position', val: `(${lamdaAP}, ${lamdaML})` });
 
-  const eleAP = formData['field_16_16'] || '0';
-  const eleML = formData['field_12_16'] || '0';
-  const eleDH = formData['field_17_16'] || '0';
-  detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})` });
+// 優先提取正確的欄位：電極 (field_15_16, field_16_16, field_17_16)，保底退回原邏輯
+const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_16_16'] || '0');
+const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_12_16'] || '0');
+const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_17_16'] || '0');
+detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})` });
 
   // D. 前三大特殊狀況設定（生理、手術、電極）
   const conditionConfigs = [
