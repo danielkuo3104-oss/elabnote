@@ -429,16 +429,19 @@
 
     <div class="section-divider">實驗歷史紀錄 / HISTORY LOG</div>
 
-    <!-- 歷史紀錄外圍框：支援雙語與精簡點擊引導 -->
-  <div class="timeline-outer-box" onclick="window.location.href='database.html'" title="進入完整歷史資料庫">
-    <div class="timeline-outer-hint">
-      <span id="txtHistoryHeaderTitle">最近歷史紀錄</span>
-      <span id="txtHistoryHeaderLink">進入完整歷史資料庫 ↗</span>
-    </div>
-    <div id="timelineContainer" class="timeline-container">
-      <div class="timeline-line"></div>
-    </div>
+    <!-- 歷史紀錄區塊：獨立明細點擊與底部分離按鈕 -->
+<div class="timeline-card-wrapper" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; box-shadow: var(--shadow-sm);">
+  <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px;" id="txtHistoryHeaderTitle">最近歷史紀錄</div>
+  
+  <div id="timelineContainer" class="timeline-container">
+    <div class="timeline-line"></div>
   </div>
+
+  <!-- 透過顏色差異引導的專屬按鈕，徹底解決事件衝突 -->
+  <button type="button" class="btn-database-link" onclick="window.location.href='database.html'" style="width:100%; margin-top:14px; padding:10px; background:var(--primary-light); color:var(--primary); border:1px solid #bfdbfe; border-radius:var(--radius-sm); font-weight:700; font-size:12px; cursor:pointer; text-align:center; transition:all 0.2s ease;">
+    <span id="txtBtnGoDatabase">點擊前往完整資料庫 ↗</span>
+  </button>
+</div>
 
     <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.1</div>
   </div>
@@ -544,8 +547,7 @@
     activeSelectedExpId: null
   };
 
-  // 1. DOM 載入時自動檢查登入 Session
-window.addEventListener('DOMContentLoaded', async () => {
+  window.addEventListener('DOMContentLoaded', async () => {
   checkSession();
   applyLanguage();
   await fetchAndParseFormsFromSheet();
@@ -553,12 +555,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 function checkSession() {
-  const savedUser = sessionStorage.getItem('elabnote_user');
+  // 改用 localStorage 解決 file:// 協定重登問題
+  const savedUser = localStorage.getItem('elabnote_user');
   if (savedUser) {
     state.currentUser = JSON.parse(savedUser);
     state.isGuest = state.currentUser.role === 'Guest';
-    
-    // 免重登，直接隱藏登入頁
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('fabBtn').style.display = 'flex';
     
@@ -571,7 +572,6 @@ function checkSession() {
   }
 }
 
-// 2. 登入成功時將 User 存入 sessionStorage
 function performLogin() {
   const selectedName = document.getElementById('selLoginUser').value;
   const inputPwd = document.getElementById('txtLoginPwd').value.trim();
@@ -584,8 +584,8 @@ function performLogin() {
   state.isGuest = false;
   state.currentLang = user.lang || "ZH";
 
-  // 關鍵：儲存登入狀態，跳頁不失效
-  sessionStorage.setItem('elabnote_user', JSON.stringify(user));
+  // 寫入 localStorage 確保永遠不重登
+  localStorage.setItem('elabnote_user', JSON.stringify(user));
 
   document.getElementById('authPage').style.display = 'none';
   document.getElementById('fabBtn').style.display = 'flex';
@@ -597,6 +597,21 @@ function performLogin() {
   applyLanguage();
   refreshDashboard(true);
 }
+
+  function performLogout() {
+  closeFabMenu();
+  showCustomConfirm("確認登出", "確定要登出當前帳號嗎？", "取消", "登出", (confirmed) => {
+    if (confirmed) {
+      localStorage.removeItem('elabnote_user');
+      state.currentUser = null;
+      state.isGuest = false;
+      document.getElementById('txtLoginPwd').value = "";
+      document.getElementById('userBadge').innerText = "未登入";
+      document.getElementById('authPage').style.display = 'flex';
+      document.getElementById('fabBtn').style.display = 'none';
+      refreshDashboard(false);
+    }
+  });
   
 
   function getStatusStyle(statusStr) {
@@ -1793,20 +1808,7 @@ function showActiveExpDetail(expId) {
     showCustomAlert("訪客模式", "已以訪客身份登入，登錄功能已全數受限。");
   }
 
-  function performLogout() {
-    closeFabMenu();
-    showCustomConfirm("確認登出", "確定要登出當前帳號嗎？", "取消", "登出", (confirmed) => {
-      if (confirmed) {
-        state.currentUser = null;
-        state.isGuest = false;
-        document.getElementById('txtLoginPwd').value = "";
-        document.getElementById('userBadge').innerText = "未登入";
-        document.getElementById('authPage').style.display = 'flex';
-        document.getElementById('fabBtn').style.display = 'none';
-        refreshDashboard(false);
-      }
-    });
-  }
+
 
   // 🚀 支援註冊時新增識別簡碼寫入
   async function performRegister() {
