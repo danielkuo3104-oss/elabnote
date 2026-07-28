@@ -269,6 +269,26 @@
     .auth-tab.active { border-bottom: 2px solid var(--primary); color: var(--primary); }
 
     .error-msg { color: var(--danger); font-size: 11px; font-weight: 600; margin-top: 6px; display: none; }
+
+    /* 精簡版微型歷史資料庫引導列 */
+    .timeline-outer-hint {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed var(--border-color);
+      letter-spacing: 0.3px;
+    }
+    
+    #txtHistoryHeaderLink {
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 10px;
+    }
   </style>
 
   <link rel="icon" type="image/png" href="icon-2.0.png?v=2.1">
@@ -524,11 +544,60 @@
     activeSelectedExpId: null
   };
 
-  window.addEventListener('DOMContentLoaded', async () => {
-    applyLanguage();
-    await fetchAndParseFormsFromSheet();
-    await refreshDashboard(false);
-  });
+  // 1. DOM 載入時自動檢查登入 Session
+window.addEventListener('DOMContentLoaded', async () => {
+  checkSession();
+  applyLanguage();
+  await fetchAndParseFormsFromSheet();
+  await refreshDashboard(false);
+});
+
+function checkSession() {
+  const savedUser = sessionStorage.getItem('elabnote_user');
+  if (savedUser) {
+    state.currentUser = JSON.parse(savedUser);
+    state.isGuest = state.currentUser.role === 'Guest';
+    
+    // 免重登，直接隱藏登入頁
+    document.getElementById('authPage').style.display = 'none';
+    document.getElementById('fabBtn').style.display = 'flex';
+    
+    const badge = document.getElementById('userBadge');
+    badge.innerText = state.currentUser.name;
+    badge.style.background = state.currentUser.color || '#f1f5f9';
+  } else {
+    document.getElementById('authPage').style.display = 'flex';
+    document.getElementById('fabBtn').style.display = 'none';
+  }
+}
+
+// 2. 登入成功時將 User 存入 sessionStorage
+function performLogin() {
+  const selectedName = document.getElementById('selLoginUser').value;
+  const inputPwd = document.getElementById('txtLoginPwd').value.trim();
+  const user = state.membersList.find(m => m.name === selectedName);
+
+  if (!user) { showCustomAlert("提示", "請選擇會員帳號"); return; }
+  if (user.password && inputPwd !== user.password) { showCustomAlert("登入失敗", "識別密碼錯誤，請重新輸入！"); return; }
+
+  state.currentUser = user;
+  state.isGuest = false;
+  state.currentLang = user.lang || "ZH";
+
+  // 關鍵：儲存登入狀態，跳頁不失效
+  sessionStorage.setItem('elabnote_user', JSON.stringify(user));
+
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('fabBtn').style.display = 'flex';
+
+  const badge = document.getElementById('userBadge');
+  badge.innerText = user.name;
+  badge.style.background = user.color || '#f1f5f9';
+
+  applyLanguage();
+  refreshDashboard(true);
+}
+  
 
   function getStatusStyle(statusStr) {
     if (!statusStr) return STATUS_STYLES["其他"];
