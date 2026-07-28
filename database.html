@@ -13,8 +13,12 @@
       --text-muted: #94a3b8;
       
       --primary: #2563eb;
+      --primary-hover: #1d4ed8;
       --primary-light: #eff6ff;
       --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --purple: #8b5cf6;
       
       --border-color: #e2e8f0;
       --border-focus: #60a5fa;
@@ -32,21 +36,24 @@
     html, body { width: 100%; height: 100%; background-color: var(--bg-main); color: var(--text-primary); }
 
     .app-container {
-      width: 100%; max-width: 480px; margin: 0 auto; min-height: 100vh;
+      width: 100%; max-width: 600px; margin: 0 auto; min-height: 100vh;
       background: var(--bg-main); display: flex; flex-direction: column; position: relative;
     }
 
     /* Header */
     .header {
-      background: var(--card-bg); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;
+      background: var(--card-bg); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100;
-      padding-top: calc(env(safe-area-inset-top, 0px) + 14px); box-shadow: var(--shadow-sm);
+      padding-top: calc(env(safe-area-inset-top, 0px) + 12px); box-shadow: var(--shadow-sm);
     }
     .header-title h1 { font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
     .header-title h1::before { content: ""; display: inline-block; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; }
+    
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .lang-btn { background: #fff; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
     .btn-back {
       background: #f8fafc; border: 1px solid var(--border-color); color: var(--text-secondary);
-      border-radius: var(--radius-sm); padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none;
+      border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none;
       transition: all 0.2s ease;
     }
     .btn-back:hover { background: #e2e8f0; }
@@ -60,12 +67,23 @@
     }
     .form-control:focus { border-color: var(--border-focus); }
 
-    /* 統計卡片與標籤 */
+    /* 統計卡片與收合機制 */
     .stats-card {
       background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
-      padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow-md);
+      padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--shadow-md); transition: all 0.25s ease;
     }
-    .stats-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
+    .stats-header {
+      display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;
+    }
+    .stats-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .toggle-icon { font-size: 12px; color: var(--text-muted); transition: transform 0.2s ease; }
+    .toggle-icon.collapsed { transform: rotate(-90deg); }
+
+    .stats-body { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 12px; transition: all 0.3s ease; }
+    .stats-body.hidden { display: none; }
+
+    .stat-interactive-item { cursor: pointer; transition: all 0.15s ease; }
+    .stat-interactive-item:hover { transform: translateY(-1px); filter: brightness(0.97); }
 
     .tag-btn {
       background: #f8fafc; border: 1px solid var(--border-color); color: var(--text-secondary);
@@ -91,7 +109,7 @@
     .timeline-info-text { font-size: 13px; margin-top: 6px; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .timeline-exp-id { font-size: 10px; font-family: ui-monospace, monospace; color: var(--text-muted); font-weight: 500; margin-top: 4px; }
 
-    /* 無資料 Empty State 美化樣式 */
+    /* Empty State */
     .empty-state-box {
       text-align: center; padding: 28px 16px; color: var(--text-muted);
       background: var(--card-bg); border: 1px dashed var(--border-color); border-radius: var(--radius-md);
@@ -100,21 +118,55 @@
     .empty-state-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-top: 4px; }
     .empty-state-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
-    /* Modal - 緊湊排版 */
+    /* Modal 通用背景與基本排版 */
     .custom-modal-backdrop {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5);
       backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
     }
     .custom-modal {
-      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 360px;
-      padding: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 85vh; display: flex; flex-direction: column;
+      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 420px;
+      padding: 20px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 88vh; display: flex; flex-direction: column;
+      transition: max-width 0.3s ease;
     }
+    /* 當觸發完整展開版時，電腦版自動擴展為寬螢幕 View */
+    .custom-modal.expanded-mode {
+      max-width: 860px;
+    }
+
     .custom-modal h3 { margin-bottom: 12px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
-    .detail-list { text-align: left; overflow-y: auto; max-height: 60vh; font-size: 12px; padding: 2px; }
+    .detail-list { text-align: left; overflow-y: auto; max-height: 65vh; font-size: 12px; padding: 2px; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 35%; flex-shrink: 0; }
     .detail-value { font-weight: 600; color: var(--text-primary); width: 65%; text-align: right; word-break: break-word; }
-    .modal-btn-confirm { background: var(--primary); color: #fff; border: none; padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 600; width: 100%; cursor: pointer; margin-top: 14px; font-size: 13px; }
+    
+    .modal-btn-confirm { background: var(--primary); color: #fff; border: none; padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 600; width: 100%; cursor: pointer; margin-top: 10px; font-size: 13px; }
+    .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; margin-top: 10px; font-size: 13px; transition: all 0.2s; }
+    .modal-btn-expand:hover { background: #dbeafe; }
+
+    /* 🚀 完整展開版 (Professional Expanded View) - 響應式 Layout */
+    .expanded-grid {
+      display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 10px;
+    }
+    @media (min-width: 640px) {
+      .expanded-grid { grid-template-columns: 1fr 1fr; }
+      .expanded-grid .full-width { grid-column: span 2; }
+    }
+
+    .exp-panel {
+      background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px;
+    }
+    .exp-panel-title {
+      font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid var(--border-color); padding-bottom: 6px;
+    }
+
+    /* 多色耗數比例時間軸 */
+    .timeline-bar-wrapper { margin-top: 8px; margin-bottom: 10px; }
+    .timeline-multi-bar { display: flex; width: 100%; height: 14px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0; }
+    .timeline-segment { height: 100%; transition: width 0.3s ease; }
+    .timeline-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-top: 8px; font-weight: 600; }
+    .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   </style>
 </head>
 <body>
@@ -123,16 +175,22 @@
   <!-- Header -->
   <div class="header">
     <div class="header-title">
-      <h1>實驗紀錄資料庫</h1>
+      <h1 id="txtDbTitle">實驗紀錄資料庫</h1>
     </div>
-    <a href="index.html" class="btn-back">返回主頁</a>
+    <div class="header-right">
+      <button id="langToggleBtn" class="lang-btn" onclick="toggleLanguage()">ZN</button>
+      <a href="index.html" class="btn-back" id="txtBtnBack">返回主頁</a>
+    </div>
   </div>
 
   <div class="main-content">
-    <!-- 1. 數據統計卡片區 -->
+    <!-- 1. 數據統計卡片區（支援可收合） -->
     <div class="stats-card">
-      <div class="stats-title">會員專案與題目個案統計</div>
-      <div id="statsContent" style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
+      <div class="stats-header" onclick="toggleStatsCard()">
+        <div class="stats-title" id="txtStatsTitle">會員專案與題目個案統計</div>
+        <div id="statsToggleIcon" class="toggle-icon">▼</div>
+      </div>
+      <div id="statsContent" class="stats-body">
         <div style="color:var(--text-muted);">載入統計數據中...</div>
       </div>
     </div>
@@ -140,30 +198,33 @@
     <!-- 2. 關鍵字搜尋與快速 Tag -->
     <div style="margin-bottom:16px;">
       <input type="text" id="txtRecordSearch" class="form-control" placeholder="搜尋負責人、大綱、狀態、編號..." oninput="filterRecordCenterList()" style="margin-bottom:10px;">
-      <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">快速點擊搜尋：</div>
+      <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:8px;" id="txtQuickSearchTitle">快速點擊搜尋：</div>
       <div id="quickSearchTags" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
     </div>
 
     <!-- 3. 全數據歷史時間軸 -->
     <div id="recordCenterList" class="timeline-container">
       <div class="timeline-line"></div>
-      <div style="padding:10px; color:var(--text-muted); font-size:12px;">同步試算表資料中...</div>
+      <div style="padding:10px; color:var(--text-muted); font-size:12px;" id="txtSyncing">同步試算表資料中...</div>
     </div>
   </div>
 </div>
 
 <!-- 詳細明細彈窗 -->
 <div id="customModalBackdrop" class="custom-modal-backdrop">
-  <div class="custom-modal">
+  <div class="custom-modal" id="modalDialogBox">
     <h3 id="modalTitle">實驗詳細資訊</h3>
     <div id="modalMessage"></div>
-    <button class="modal-btn-confirm" onclick="closeCustomModal()">關閉</button>
+    <div id="modalBtnArea">
+      <button class="modal-btn-confirm" onclick="closeCustomModal()">關閉</button>
+    </div>
   </div>
 </div>
 
 <script>
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwvsd4fRN4qgWBL2ku7E_r-DekIiVtikpvjyVLRqOiGWPPb1sts3Mj10bMiX9n_zoO1tw/exec";
   const URL_MEMBERS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=280963157&single=true&output=csv";
+  const URL_FORMS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=0&single=true&output=csv";
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
 
   const STATUS_STYLES = {
@@ -178,32 +239,131 @@
     "犧牲中": { bg: "#f3e8ff", text: "#7c3aed", border: "#d8b4fe" },        
     "實驗善後": { bg: "#faf5ff", text: "#a855f7", border: "#e9d5ff" },      
     "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },      
+    "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },      
     "其他": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" }
   };
 
+  const STATUS_TRANS = {
+    "已預約": { ZH: "已預約", EN: "Reserved" },
+    "準備中": { ZH: "準備中", EN: "Preparing" },
+    "準備完成": { ZH: "準備完成", EN: "Prepared" },
+    "手術中": { ZH: "手術中", EN: "Surgery" },
+    "休息中": { ZH: "休息中", EN: "In Break" },
+    "已死亡": { ZH: "已死亡", EN: "Deceased" },
+    "訊號蒐集中": { ZH: "訊號蒐集中", EN: "Recording" },
+    "訊號蒐集完成": { ZH: "訊號蒐集完成", EN: "Signal Done" },
+    "犧牲中": { ZH: "犧牲中", EN: "Sacrificing" },
+    "實驗善後": { ZH: "實驗善後", EN: "Cleaning" },
+    "已完成": { ZH: "已完成", EN: "Completed" },
+    "實驗完成": { ZH: "實驗完成", EN: "Completed" }
+  };
+
   let state = {
+    currentLang: "ZH",
     membersList: [],
-    dataCenter: []
+    dataCenter: [],
+    dynamicForms: {},
+    isStatsCollapsed: false,
+    activeViewingExpId: null
   };
 
   window.addEventListener('DOMContentLoaded', async () => {
-   if (!localStorage.getItem('elabnote_user')) {
-      alert("請先登入！");
-      window.location.href = "index.html"; // 或你的登入頁檔名
-      return;
+    // 讀取 LocalStorage 使用者語系預設
+    const savedUser = localStorage.getItem('elabnote_user');
+    if (savedUser) {
+      try {
+        const usrObj = JSON.parse(savedUser);
+        if (usrObj.lang) state.currentLang = usrObj.lang;
+      } catch(e) {}
     }
 
+    applyLanguage();
     await fetchMembersFromSheet();
+    await fetchAndParseFormsFromSheet();
     await fetchDataCenterFromSheet();
+    
     renderRecordCenterStats();
     renderQuickSearchTags();
     filterRecordCenterList();
   });
 
+  function toggleLanguage() {
+    state.currentLang = state.currentLang === "ZH" ? "EN" : "ZH";
+    applyLanguage();
+    renderRecordCenterStats();
+    renderQuickSearchTags();
+    filterRecordCenterList();
+  }
+
+  function applyLanguage() {
+    const isZH = state.currentLang === 'ZH';
+    document.getElementById('langToggleBtn').innerText = isZH ? "ZN" : "EN";
+    document.getElementById('txtDbTitle').innerText = isZH ? "實驗紀錄資料庫" : "Experiment Database";
+    document.getElementById('txtBtnBack').innerText = isZH ? "返回主頁" : "Back to Home";
+    document.getElementById('txtStatsTitle').innerText = isZH ? "會員專案與題目個案統計" : "Member Projects & Cases Statistics";
+    document.getElementById('txtQuickSearchTitle').innerText = isZH ? "快速點擊搜尋：" : "Quick Filter Tags:";
+    document.getElementById('txtRecordSearch').placeholder = isZH ? "搜尋負責人、大綱、狀態、編號..." : "Search owner, outline, status, ID...";
+  }
+
+  function toggleStatsCard() {
+    state.isStatsCollapsed = !state.isStatsCollapsed;
+    const statsBody = document.getElementById('statsContent');
+    const toggleIcon = document.getElementById('statsToggleIcon');
+    
+    if (state.isStatsCollapsed) {
+      statsBody.classList.add('hidden');
+      toggleIcon.classList.add('collapsed');
+    } else {
+      statsBody.classList.remove('hidden');
+      toggleIcon.classList.remove('collapsed');
+    }
+  }
+
   function getStatusStyle(statusStr) {
     if (!statusStr) return STATUS_STYLES["其他"];
     const key = Object.keys(STATUS_STYLES).find(k => statusStr.includes(k));
     return key ? STATUS_STYLES[key] : STATUS_STYLES["其他"];
+  }
+
+  function parseSingleBilingualStr(str, lang) {
+    if (!str) return '';
+    if (!str.includes('/')) return str.trim();
+    const parts = str.split('/');
+    return lang === 'EN' ? parts[1].trim() : parts[0].trim();
+  }
+
+  function cleanDisplayLabel(text) {
+    if (!text) return '';
+    return text
+      .replace(/\[submit\]/gi, '')
+      .replace(/\[fetch_detail:[^\]]+\]/gi, '')
+      .replace(/\[status:[^\]]+\]/gi, '')
+      .replace(/\[info\]/gi, '')
+      .replace(/\[warning\]/gi, '')
+      .replace(/\[formula:[^\]]+\]/gi, '')
+      .replace(/\[unit:[^\]]+\]/gi, '')
+      .replace(/\[placeholder:[^\]]+\]/gi, '')
+      .replace(/\[default:[^\]]+\]/gi, '')
+      .trim();
+  }
+
+  function formatBilingualText(fullInfoStr, lang) {
+    if (!fullInfoStr) return '';
+    const cleaned = cleanDisplayLabel(fullInfoStr);
+    if (cleaned.includes(' - ')) {
+      const parts = cleaned.split(' - ');
+      const outlineFormatted = parseSingleBilingualStr(parts[0], lang);
+      const purposeFormatted = parseSingleBilingualStr(parts[1], lang);
+      return `${outlineFormatted} - ${purposeFormatted}`;
+    }
+    return parseSingleBilingualStr(cleaned, lang);
+  }
+
+  function getStatusText(statusRaw, lang) {
+    if (STATUS_TRANS[statusRaw]) {
+      return STATUS_TRANS[statusRaw][lang] || statusRaw;
+    }
+    return parseSingleBilingualStr(statusRaw, lang);
   }
 
   function parseCSV(text) {
@@ -234,26 +394,49 @@
       const csvText = await res.text();
       const rows = parseCSV(csvText);
       state.membersList = rows.slice(1).map(r => ({ name: r[0]?.trim(), color: r[3]?.trim() || '#f1f5f9' })).filter(m => m.name);
-    } catch(e) {
-      console.error("讀取會員列表失敗:", e);
-    }
+    } catch(e) { console.error("讀取會員列表失敗:", e); }
   }
 
-  // 核心數據讀取：API + CSV 雙保險機制
-  async function fetchDataCenterFromSheet() {
-    // 1. 優先嘗試 GAS API
+  async function fetchAndParseFormsFromSheet() {
     try {
-      const res = await fetch(`${GAS_API_URL}?action=readData&_t=${Date.now()}`);
-      const result = await res.json();
-      if (result && result.records && result.records.length > 0) { 
-        state.dataCenter = result.records; 
-        return;
-      }
-    } catch (err) {
-      console.warn("GAS API 呼叫失敗，自動降級切換為直接解析 CSV 數據發布連結...", err);
-    }
+      const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      if (rows.length < 2) return;
 
-    // 2. 備用降級機制：直接讀取發布的 CSV URL（解決資料庫顯示空白問題）
+      const headerRow = rows[0];
+      const formBlocks = [];
+      for (let colIdx = 0; colIdx < headerRow.length; colIdx++) {
+        const cellVal = (headerRow[colIdx] || "").trim();
+        if (cellVal.startsWith("FORM_")) formBlocks.push({ formId: cellVal, startCol: colIdx });
+      }
+
+      const parsedForms = {};
+      formBlocks.forEach(block => {
+        const pages = [];
+        let currentPage = null;
+        for (let r = 2; r < rows.length; r++) {
+          const rawLabel = (rows[r][block.startCol] || "").trim();
+          const rawType = (rows[r][block.startCol + 1] || "").trim();
+          if (!rawLabel && !rawType) continue;
+
+          if (rawLabel.includes("【") && rawLabel.includes("】")) {
+            currentPage = { title: cleanDisplayLabel(rawLabel.replace(/【|】/g, "")), fields: [] };
+            pages.push(currentPage);
+            continue;
+          }
+          if (!currentPage) { currentPage = { title: "Page 1", fields: [] }; pages.push(currentPage); }
+          
+          const fieldId = `field_${r}_${block.startCol}`;
+          currentPage.fields.push({ id: fieldId, label: cleanDisplayLabel(rawLabel), type: rawType });
+        }
+        parsedForms[block.formId] = pages;
+      });
+      state.dynamicForms = parsedForms;
+    } catch (err) { console.error("解析動態表單架構失敗:", err); }
+  }
+
+  async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
       const csvText = await res.text();
@@ -268,47 +451,43 @@
           const user = row[2] ? row[2].trim() : '';
           const status = row[3] ? row[3].trim() : '未知';
           
+          let parsedFormData = {};
+          const jsonCols = [4, 6, 8, 10, 12];
+          jsonCols.forEach(colIdx => {
+            if (row[colIdx]) {
+              let rawJsonStr = row[colIdx].trim();
+              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+                try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
+              }
+            }
+          });
+
           let dynamicInfo = '實驗專案';
-          if (row[4]) {
-            try {
-              let jsonStr = row[4].trim();
-              if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) jsonStr = jsonStr.slice(1, -1).replace(/""/g, '"');
-              const formObj = JSON.parse(jsonStr);
-              const outline = formObj['outline_select_val'] || '';
-              const purpose = formObj['selected_purpose_name'] || '';
-              if (outline && purpose) dynamicInfo = `${outline} - ${purpose}`;
-              else dynamicInfo = outline || purpose || '實驗專案';
-            } catch(e) {}
-          }
+          const outline = parsedFormData['outline_select_val'] || '';
+          const purpose = parsedFormData['selected_purpose_name'] || '';
+          if (outline && purpose) dynamicInfo = `${outline} - ${purpose}`;
+          else dynamicInfo = outline || purpose || '實驗專案';
+
+          // 🚀 預留 Column W (row[22]) 作為實驗數據/資料夾專區
+          const expDataFolder = row[22] ? row[22].trim() : '';
 
           records.push({
-            expId: expId,
-            date: date,
-            user: user,
-            status: status,
-            info: dynamicInfo,
-            formData: {}
+            expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder
           });
         }
       }
       state.dataCenter = records;
-    } catch (csvErr) {
-      console.error("降級 CSV 解析亦失敗:", csvErr);
-    }
+    } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
   }
 
-  // 無資料 Empty State 美化渲染器
-  function renderEmptyState(titleText, descText = "請嘗試切換其他搜尋關鍵字") {
-    return `
-      <div class="empty-state-box">
-        <div class="empty-state-title">${titleText}</div>
-        <div class="empty-state-desc">${descText}</div>
-      </div>
-    `;
+  function renderEmptyState(titleText, descText) {
+    return `<div class="empty-state-box"><div class="empty-state-title">${titleText}</div><div class="empty-state-desc">${descText}</div></div>`;
   }
 
-  // 數據統計核心
+  /* 渲染統計卡片（支援點擊名目觸發快速搜尋） */
   function renderRecordCenterStats() {
+    const isZH = state.currentLang === 'ZH';
     const userStats = {};
     const topicStats = {};
 
@@ -318,10 +497,11 @@
       const isReserved = d.status === '已預約' || d.status === 'Reserved';
 
       if (!userStats[user]) userStats[user] = { active: 0, reserved: 0 };
-      if (isReserved) { userStats[user].reserved++; } else { userStats[user].active++; }
+      if (isReserved) userStats[user].reserved++; else userStats[user].active++;
 
-      if (!topicStats[topic]) topicStats[topic] = 0;
-      topicStats[topic]++;
+      const displayTopic = formatBilingualText(topic, state.currentLang);
+      if (!topicStats[displayTopic]) topicStats[displayTopic] = 0;
+      topicStats[displayTopic]++;
     });
 
     let userHtml = Object.entries(userStats).map(([usr, count]) => {
@@ -329,29 +509,29 @@
       const bgCol = userObj ? userObj.color : '#f1f5f9';
       const resText = count.reserved > 0 ? `<span style="color:var(--text-muted); font-size:11px;">(+${count.reserved})</span>` : '';
       return `
-        <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px;">
+        <div class="stat-interactive-item" onclick="applyQuickSearch('${usr}')" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px;">
           <span style="background:${bgCol}; padding:1px 6px; border-radius:4px; font-weight:700;">${usr}</span>
-          <span style="font-weight:700;">${count.active} 件 ${resText}</span>
+          <span style="font-weight:700;">${count.active} ${isZH?'件':'cases'} ${resText}</span>
         </div>
       `;
     }).join('');
 
     let topicHtml = Object.entries(topicStats).map(([tpc, count]) => `
-      <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:flex; justify-content:space-between; align-items:center;">
+      <div class="stat-interactive-item" onclick="applyQuickSearch('${tpc}')" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-weight:600; color:var(--text-secondary); max-width:80%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tpc}</span>
-        <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${count} 個案</span>
+        <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${count} ${isZH?'個案':'cases'}</span>
       </div>
     `).join('');
 
-    const emptyUserHtml = renderEmptyState('無人員專案數據', '目前資料庫尚無已登錄的執行專案');
+    const emptyUserHtml = renderEmptyState(isZH?'無專案數據':'No Data', '');
 
     document.getElementById('statsContent').innerHTML = `
       <div>
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; font-weight:600;">• 人員執行專案（已預約以灰色括號表示）：</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; font-weight:600;">• ${isZH?'人員執行專案（點擊搜尋）：':'Member Executed Projects:'}</div>
         <div style="display:flex; flex-wrap:wrap; gap:6px;">${userHtml || emptyUserHtml}</div>
       </div>
       <div style="margin-top:6px;">
-        <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; font-weight:600;">• 實驗題目個案累積：</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px; font-weight:600;">• ${isZH?'實驗題目個案累積（點擊搜尋）：':'Experiment Topic Cases:'}</div>
         <div style="display:flex; flex-direction:column; gap:6px;">${topicHtml || emptyUserHtml}</div>
       </div>
     `;
@@ -361,8 +541,7 @@
     const tagContainer = document.getElementById('quickSearchTags');
     const tagsSet = new Set();
     state.membersList.forEach(m => tagsSet.add(m.name));
-    ["已完成", "手術中", "已預約", "已死亡"].forEach(s => tagsSet.add(s));
-    state.dataCenter.forEach(d => { if(d.info) tagsSet.add(d.info.split(' - ')[0].trim()); });
+    ["已完成", "手術中", "已預約", "已死亡"].forEach(s => tagsSet.add(getStatusText(s, state.currentLang)));
 
     tagContainer.innerHTML = Array.from(tagsSet).slice(0, 10).map(tag => `
       <button type="button" class="tag-btn" onclick="applyQuickSearch('${tag}')">${tag}</button>
@@ -381,12 +560,16 @@
 
     const filtered = state.dataCenter.filter(d => {
       if (!kw) return true;
-      return (d.expId||'').toLowerCase().includes(kw) || (d.user||'').toLowerCase().includes(kw) || 
-             (d.status||'').toLowerCase().includes(kw) || (d.info||'').toLowerCase().includes(kw) || (d.date||'').toLowerCase().includes(kw);
+      const displayStatus = getStatusText(d.status, state.currentLang).toLowerCase();
+      const displayInfo = formatBilingualText(d.info, state.currentLang).toLowerCase();
+      return (d.expId||'').toLowerCase().includes(kw) || 
+             (d.user||'').toLowerCase().includes(kw) || 
+             displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
+             displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw);
     }).sort((a,b) => new Date(b.date) - new Date(a.date));
 
     if (filtered.length === 0) {
-      container.innerHTML = html + renderEmptyState('無符合條件的實驗紀錄', '找不到與關鍵字相符的資料，請清空或嘗試其他搜尋條件');
+      container.innerHTML = html + renderEmptyState(state.currentLang==='ZH'?'無符合條件的實驗紀錄':'No matching records', '');
       return;
     }
 
@@ -394,9 +577,11 @@
       const userObj = state.membersList.find(m => m.name === item.user);
       const userColor = userObj ? userObj.color : '#f1f5f9';
       const styleObj = getStatusStyle(item.status);
+      const displayStatus = getStatusText(item.status, state.currentLang);
+      const displayInfo = formatBilingualText(item.info, state.currentLang);
 
       html += `
-        <div class="timeline-item" onclick="showDetailModal('${item.expId}')">
+        <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
           <div class="timeline-node" style="background:${styleObj.text}"></div>
           <div class="timeline-card">
             <div class="timeline-date-head">
@@ -405,10 +590,10 @@
                 <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
               </div>
               <div class="timeline-status-group">
-                <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${item.status}</span>
+                <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
               </div>
             </div>
-            <div class="timeline-info-text">${item.info || '實驗專案'}</div>
+            <div class="timeline-info-text">${displayInfo || '實驗專案'}</div>
             <div class="timeline-exp-id">ID: ${item.expId}</div>
           </div>
         </div>
@@ -417,25 +602,309 @@
     container.innerHTML = html;
   }
 
-  function showDetailModal(expId) {
+  function getDynamicFieldValue(formData, labelKeywords) {
+    if (!state.dynamicForms || !formData) return { val: null, id: null };
+    const kwArr = Array.isArray(labelKeywords) ? labelKeywords : [labelKeywords];
+    for (const formId in state.dynamicForms) {
+      const pages = state.dynamicForms[formId];
+      if (!Array.isArray(pages)) continue;
+      for (const p of pages) {
+        if (!p.fields || !Array.isArray(p.fields)) continue;
+        for (const f of p.fields) {
+          if (f.label) {
+            const cleanLabel = f.label.toLowerCase();
+            const isMatch = kwArr.some(kw => cleanLabel.includes(kw.toLowerCase()));
+            if (isMatch && formData[f.id] !== undefined) return { val: formData[f.id], id: f.id };
+          }
+        }
+      }
+    }
+    return { val: null, id: null };
+  }
+
+  /* 🚀 核心一：第一階段彈窗 (預設顯示主頁同款精緻明細 + 完整展開按鈕) */
+  function showActiveExpDetail(expId) {
+    state.activeViewingExpId = expId;
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
 
+    const isZH = state.currentLang === 'ZH';
+    const styleObj = getStatusStyle(exp.status);
+    const displayStatus = getStatusText(exp.status, state.currentLang);
+    const displayInfo = formatBilingualText(exp.info, state.currentLang);
+    const formData = exp.formData || {};
+
+    // 重置 Modal 為標準尺寸
+    const modalDialog = document.getElementById('modalDialogBox');
+    modalDialog.classList.remove('expanded-mode');
+
+    // 1. 計算多階段精準耗時與時間軸
+    const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
+
+    // 2. 數據明細動態提取
+    let detailsList = [];
+    const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
+    if (freqObj.val) detailsList.push({ label: isZH ? '頻率' : 'Frequency', val: `${freqObj.val} HZ` });
+
+    const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
+    const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
+    const ratWeight = parseFloat(weightObj.val || 0);
+    const ptzDose = parseFloat(doseObj.val || 1);
+    if (ratWeight > 0) {
+      detailsList.push({ label: isZH ? '大鼠體重（g）' : 'Rat Weight (g)', val: `${ratWeight}` });
+      detailsList.push({ label: isZH ? 'PTZ使用劑量' : 'PTZ Dosage', val: `${(ratWeight * ptzDose).toFixed(1)} uL` });
+    }
+
+    const filledDataHtml = detailsList.length > 0 
+      ? detailsList.map(item => `
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; border-bottom:1px dashed #f1f5f9; padding-bottom:3px;">
+            <span style="color:var(--text-muted); font-weight:700;">${item.label}:</span>
+            <span style="font-weight:700; color:var(--text-primary); text-align:right;">${item.val}</span>
+          </div>
+        `).join('')
+      : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
+
     const htmlContent = `
       <div class="detail-list">
-        <div class="detail-row"><div class="detail-label">實驗編號</div><div class="detail-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
-        <div class="detail-row"><div class="detail-label">當前狀態</div><div class="detail-value">${exp.status}</div></div>
-        <div class="detail-row"><div class="detail-label">大綱與目的</div><div class="detail-value">${exp.info}</div></div>
-        <div class="detail-row"><div class="detail-label">負責人</div><div class="detail-value">${exp.user}</div></div>
-        <div class="detail-row"><div class="detail-label">實驗日期</div><div class="detail-value">${exp.date}</div></div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div>
+          <div class="detail-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div>
+          <div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div>
+          <div class="detail-value">${displayInfo}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '負責人' : 'Owner'}</div>
+          <div class="detail-value">${exp.user}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div>
+          <div class="detail-value">${exp.date}</div>
+        </div>
+
+        <!-- 多色流程時間軸展示區 -->
+        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+          <div class="detail-label" style="width:100%; margin-bottom:4px;">
+            ${isZH ? '實驗總耗時' : 'Total Duration'}: <strong style="color:var(--primary);">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</strong>
+          </div>
+          ${timeLogCalculations.barHtml}
+        </div>
+
+        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+          <div class="detail-label" style="width:100%; margin-bottom:6px;">${isZH ? '關鍵填寫明細' : 'Key Field Data'}</div>
+          <div class="detail-value" style="text-align:left; max-height:120px; overflow-y:auto; width:100%; padding:2px 0;">${filledDataHtml}</div>
+        </div>
       </div>
     `;
 
+    document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
     document.getElementById('modalMessage').innerHTML = htmlContent;
+    document.getElementById('modalBtnArea').innerHTML = `
+      <button class="modal-btn-expand" onclick="showFullExpandedView('${exp.expId}')">🔎 ${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
+      <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+    `;
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  function closeCustomModal() { document.getElementById('customModalBackdrop').style.display = 'none'; }
+  /* 🚀 核心二：精準多色流程時間軸計算引擎 */
+  function calculateProcessTimeline(timeLogs) {
+    const isZH = state.currentLang === 'ZH';
+    
+    // 定義 4 大段落標準
+    // 1. 手術耗時 (手術中 ~ 休息中) -> 🔴 紅色 #ef4444
+    // 2. 休息間隔 (休息中 ~ 訊號蒐集中) -> 🟢 綠色 #10b981
+    // 3. 訊號蒐集耗時 (訊號蒐集中 ~ 訊號蒐集完成) -> 🟠 橘黃 #f59e0b
+    // 4. 犧牲耗時 (犧牲中 ~ 實驗善後/完成) -> 🟣 紫色 #8b5cf6
+
+    const segments = [];
+    let totalMins = 0;
+
+    const getTime = (key) => timeLogs[key] ? new Date(timeLogs[key]) : null;
+
+    const tSurgeryStart = getTime('手術中');
+    const tBreakStart = getTime('休息中');
+    const tSignalStart = getTime('訊號蒐集中');
+    const tSignalEnd = getTime('訊號蒐集完成');
+    const tSacrificeStart = getTime('犧牲中');
+    const tCleanupEnd = getTime('實驗善後') || getTime('已完成') || getTime('實驗完成');
+
+    // 1. 手術耗時
+    if (tSurgeryStart && (tBreakStart || tSignalStart)) {
+      const end = tBreakStart || tSignalStart;
+      const diff = Math.max(0, Math.floor((end - tSurgeryStart) / 60000));
+      if (diff > 0) {
+        segments.push({ name: isZH ? '手術耗時' : 'Surgery', mins: diff, color: '#ef4444' });
+        totalMins += diff;
+      }
+    }
+
+    // 2. 休息間隔
+    if (tBreakStart && tSignalStart) {
+      const diff = Math.max(0, Math.floor((tSignalStart - tBreakStart) / 60000));
+      if (diff > 0) {
+        segments.push({ name: isZH ? '休息間隔' : 'Rest Interval', mins: diff, color: '#10b981' });
+        totalMins += diff;
+      }
+    }
+
+    // 3. 訊號蒐集耗時
+    if (tSignalStart && tSignalEnd) {
+      const diff = Math.max(0, Math.floor((tSignalEnd - tSignalStart) / 60000));
+      if (diff > 0) {
+        segments.push({ name: isZH ? '訊號蒐集耗時' : 'Signal Duration', mins: diff, color: '#f59e0b' });
+        totalMins += diff;
+      }
+    }
+
+    // 4. 犧牲耗時
+    if (tSacrificeStart && tCleanupEnd) {
+      const diff = Math.max(0, Math.floor((tCleanupEnd - tSacrificeStart) / 60000));
+      if (diff > 0) {
+        segments.push({ name: isZH ? '犧牲耗時' : 'Sacrifice', mins: diff, color: '#8b5cf6' });
+        totalMins += diff;
+      }
+    }
+
+    if (totalMins === 0 || segments.length === 0) {
+      return {
+        totalMins: 0,
+        barHtml: `<div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${isZH?'尚無完整階段時間歷程':'No process timeline data available'}</div>`
+      };
+    }
+
+    let barSegsHtml = '';
+    let legendHtml = '';
+
+    segments.forEach(seg => {
+      const pct = ((seg.mins / totalMins) * 100).toFixed(1);
+      barSegsHtml += `<div class="timeline-segment" style="width:${pct}%; background:${seg.color};" title="${seg.name}: ${seg.mins} min"></div>`;
+      legendHtml += `
+        <span class="legend-item">
+          <span class="legend-dot" style="background:${seg.color};"></span>
+          ${seg.name}: ${seg.mins}${isZH?'分':'m'}
+        </span>
+      `;
+    });
+
+    const barHtml = `
+      <div class="timeline-bar-wrapper">
+        <div class="timeline-multi-bar">${barSegsHtml}</div>
+        <div class="timeline-legend">${legendHtml}</div>
+      </div>
+    `;
+
+    return { totalMins, barHtml };
+  }
+
+  /* 🚀 核心三：第二階段：完整展開版（Professional Expanded View - 支援電腦/手機 Layout） */
+  function showFullExpandedView(expId) {
+    const exp = state.dataCenter.find(d => d.expId === expId);
+    if (!exp) return;
+
+    const isZH = state.currentLang === 'ZH';
+    const styleObj = getStatusStyle(exp.status);
+    const displayStatus = getStatusText(exp.status, state.currentLang);
+    const displayInfo = formatBilingualText(exp.info, state.currentLang);
+    const formData = exp.formData || {};
+
+    // 擴大彈窗寬度
+    const modalDialog = document.getElementById('modalDialogBox');
+    modalDialog.classList.add('expanded-mode');
+
+    const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
+
+    // 提取各大區域資料
+    const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
+    const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
+    const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
+    const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
+    const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
+
+    // 座標
+    const lamdaAP = formData['field_20_16'] || '0';
+    const lamdaML = formData['field_19_16'] || '0';
+    const eleAP = formData['field_16_16'] || '0';
+    const eleML = formData['field_12_16'] || '0';
+    const eleDH = formData['field_17_16'] || '0';
+
+    // 預留 Column W (資料夾/原始數據連結) 區塊
+    const dataFolderHtml = exp.expDataFolder 
+      ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">📁 ${isZH?'點擊開啟雲端數據資料夾':'Open Raw Data Folder'} ↗</a>`
+      : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'未上傳數據資料夾':'No data folder linked'}</span>`;
+
+    const expandedHtml = `
+      <div class="detail-list" style="max-height:72vh;">
+        
+        <!-- Header 資訊列 -->
+        <div style="background:#f1f5f9; padding:12px; border-radius:var(--radius-md); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <span style="font-size:11px; color:var(--text-muted); font-weight:700;">ID:</span>
+            <strong style="font-family:ui-monospace, monospace; color:var(--primary); font-size:14px;">${exp.expId}</strong>
+          </div>
+          <div>
+            <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
+          </div>
+        </div>
+
+        <!-- 全流程多色比例時間軸區 -->
+        <div class="exp-panel" style="margin-bottom:12px;">
+          <div class="exp-panel-title">⏱️ ${isZH?'實驗全流程時間軸與階段耗時':'Experiment Execution Timeline'}</div>
+          <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px;">
+            ${isZH?'實驗總耗時':'Total Process Time'}: <span style="color:var(--primary); font-size:13px;">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</span>
+          </div>
+          ${timeLogCalculations.barHtml}
+        </div>
+
+        <!-- 響應式雙欄/單欄網格區 -->
+        <div class="expanded-grid">
+          
+          <!-- 面板 1：基本與參數 -->
+          <div class="exp-panel">
+            <div class="exp-panel-title">🧪 ${isZH?'動物劑量與物理參數':'Animal & Physical Parameters'}</div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value">${weightObj.val ? weightObj.val + ' g' : '--'}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline':'PTZ / Saline'}</div><div class="detail-value">${weightObj.val ? (weightObj.val * (doseObj.val||1)).toFixed(1) + ' / ' + (700 - weightObj.val * (doseObj.val||1)).toFixed(1) + ' uL' : '--'}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'超音波頻率':'US Frequency'}</div><div class="detail-value">${freqObj.val ? freqObj.val + ' HZ' : '--'}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'週期 / 電壓':'Cycle / Volt'}</div><div class="detail-value">${cycleObj.val || '--'} / ${voltObj.val || '--'} mV</div></div>
+          </div>
+
+          <!-- 面板 2：立體定位座標 -->
+          <div class="exp-panel">
+            <div class="exp-panel-title">🎯 ${isZH?'立體定位與電極座標':'Stereotaxic Coordinates'}</div>
+            <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Pos'}</div><div class="detail-value">(${lamdaAP}, ${lamdaML})</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value">(${eleAP}, ${eleML}, ${eleDH})</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'負責人員':'Experimenter'}</div><div class="detail-value">${exp.user}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value">${exp.date}</div></div>
+          </div>
+
+          <!-- 面板 3： Column W 實驗數據專區 (Full Width) -->
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">📊 ${isZH?'實驗數據與原始資料連結 (Column W)':'Experimental Data & Files (Column W)'}</div>
+            <div style="padding:6px 0; font-size:12px;">
+              ${dataFolderHtml}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+    document.getElementById('modalTitle').innerText = isZH ? "完整實驗專案報告 (展開版)" : "Full Experiment Detailed Report";
+    document.getElementById('modalMessage').innerHTML = expandedHtml;
+    document.getElementById('modalBtnArea').innerHTML = `
+      <button class="modal-btn-confirm" onclick="showActiveExpDetail('${exp.expId}')">⬅️ ${isZH?'返回精簡明細':'Back to Summary'}</button>
+      <button class="modal-btn-confirm" style="background:var(--text-secondary); margin-top:6px;" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+    `;
+  }
+
+  function closeCustomModal() { 
+    document.getElementById('customModalBackdrop').style.display = 'none'; 
+  }
 </script>
 </body>
 </html>
