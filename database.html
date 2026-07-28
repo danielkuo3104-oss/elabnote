@@ -1011,7 +1011,7 @@ function toggleEditMode(expId) {
   }
 }
 
-/* 3. 儲存修改內容 (修復自動備註註記 + 逆向寫回後端) */
+/* 3. 儲存修改內容 (修復大綱目的被覆蓋問題 + 精準備註與時戳 Stamp) */
 async function saveActiveExpEdit(expId) {
   const isZH = state.currentLang === 'ZH';
   const exp = state.dataCenter.find(d => d.expId === expId);
@@ -1019,7 +1019,11 @@ async function saveActiveExpEdit(expId) {
 
   if (!exp.formData) exp.formData = {};
 
-  // A. 打包修改後的時戳 (_time_logs)
+  // A. 修改時「保留原本的專案大綱與目的鍵值」，防止主頁卡片變成「不保存」
+  const originalOutline = exp.formData['outline_select_val'];
+  const originalPurpose = exp.formData['selected_purpose_name'];
+
+  // B. 打包修改後的時戳 (_time_logs)
   const timeLogInputs = document.querySelectorAll('.time-log-input');
   if (!exp.formData['_time_logs']) exp.formData['_time_logs'] = {};
   
@@ -1030,7 +1034,7 @@ async function saveActiveExpEdit(expId) {
     }
   });
 
-  // B. 打包所有數據與狀況欄位
+  // C. 打包所有數據與狀況欄位
   if (document.getElementById('edit_freq')) exp.formData['field_19_0'] = document.getElementById('edit_freq').value;
   if (document.getElementById('edit_cycle')) exp.formData['field_20_0'] = document.getElementById('edit_cycle').value;
   if (document.getElementById('edit_volt')) exp.formData['field_21_0'] = document.getElementById('edit_volt').value;
@@ -1053,25 +1057,33 @@ async function saveActiveExpEdit(expId) {
   if (document.getElementById('edit_tissue_status')) exp.formData['tissue_status'] = document.getElementById('edit_tissue_status').value;
   if (document.getElementById('edit_storage')) exp.formData['storage'] = document.getElementById('edit_storage').value;
 
-  // C. 處理備註：自動加上系統時間修改註記 Stamp
+  // 還原大綱與目的，確保主頁顯示不損壞
+  if (originalOutline) exp.formData['outline_select_val'] = originalOutline;
+  if (originalPurpose) exp.formData['selected_purpose_name'] = originalPurpose;
+
+  // D. 備註處理：追加內容一般換行，末尾獨立一行單純時戳 Stamp
   const oldNotes = exp.formData['notes'] || '';
   const appendInput = document.getElementById('inputAppendNote');
   const appendVal = appendInput ? appendInput.value.trim() : '';
 
+  // 產生標準格式 Stamp：[2026/07/29 00:00 修改/Modify]
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
   const hh = String(now.getHours()).padStart(2, '0');
   const min = String(now.getMinutes()).padStart(2, '0');
-  const timeStampTag = `[${yyyy}/${mm}/${dd} ${hh}:${min} ${isZH ? '修改記錄' : 'Modified'}]`;
+  const timeStampTag = `[${yyyy}/${mm}/${dd} ${hh}:${min} 修改/Modify]`;
 
   let updatedNotes = oldNotes;
+  
   if (appendVal) {
+    // 舊備註 + 新備註 + 單獨一行的時戳
     updatedNotes = oldNotes 
-      ? `${oldNotes}\n${timeStampTag} 追加：${appendVal}` 
-      : `${timeStampTag} 追加：${appendVal}`;
+      ? `${oldNotes}\n${appendVal}\n${timeStampTag}` 
+      : `${appendVal}\n${timeStampTag}`;
   } else {
+    // 沒填新備註，僅補上記錄單獨一行的時戳
     updatedNotes = oldNotes 
       ? `${oldNotes}\n${timeStampTag}` 
       : timeStampTag;
@@ -1079,7 +1091,7 @@ async function saveActiveExpEdit(expId) {
 
   exp.formData['notes'] = updatedNotes;
 
-  // D. 更新前端記憶體資料 (確保不需重新整理即時反應)
+  // E. 更新前端記憶體資料
   const targetIndex = state.dataCenter.findIndex(d => d.expId === expId);
   if (targetIndex !== -1) {
     state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(exp.formData));
@@ -1091,7 +1103,7 @@ async function saveActiveExpEdit(expId) {
     btnEdit.innerText = isZH ? "同步至雲端中..." : "Saving...";
   }
 
-  // E. 逆向寫回 GAS 後端 (使用 URLSearchParams 確保氣泡不會被 CORS 擋下)
+  // F. 逆向寫回 GAS 後端
   try {
     const payload = {
       action: "updateRecord",
@@ -1109,7 +1121,7 @@ async function saveActiveExpEdit(expId) {
       body: JSON.stringify(payload)
     });
 
-    alert(isZH ? "修改已成功儲存，並自動新增備註註記！" : "Successfully saved and timestamp added!");
+    alert(isZH ? "修改已成功儲存並同步至雲端！" : "Successfully saved!");
   } catch (err) {
     console.error("雲端同步失敗：", err);
     alert(isZH ? "本地已更新，但雲端同步失敗。" : "Failed to sync with cloud.");
