@@ -710,80 +710,92 @@
     return { totalMins, barHtml, miniBarHtml };
   }
 
-  function filterRecordCenterList() {
-    const kw = document.getElementById('txtRecordSearch').value.trim().toLowerCase();
-    const container = document.getElementById('recordCenterList');
-    let html = `<div class="timeline-line"></div>`;
+  /* 🚀 修正版搜尋引擎：支援搜尋「已上傳」、「待上傳」及全動態內容 🚀 */
+function filterRecordCenterList() {
+  const kw = document.getElementById('txtRecordSearch').value.trim().toLowerCase();
+  const container = document.getElementById('recordCenterList');
+  let html = `<div class="timeline-line"></div>`;
 
-    const filtered = state.dataCenter.filter(d => {
-      if (!kw) return true;
-      const displayStatus = getStatusText(d.status, state.currentLang).toLowerCase();
-      const displayInfo = formatBilingualText(d.info, state.currentLang).toLowerCase();
-      
-      const basicMatch = (d.expId||'').toLowerCase().includes(kw) || 
-                         (d.user||'').toLowerCase().includes(kw) || 
-                         displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
-                         displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw);
-      if (basicMatch) return true;
+  const filtered = state.dataCenter.filter(d => {
+    if (!kw) return true;
+    
+    const displayStatus = getStatusText(d.status, state.currentLang).toLowerCase();
+    const displayInfo = formatBilingualText(d.info, state.currentLang).toLowerCase();
 
-      if (d.formData && typeof d.formData === 'object') {
-        const formDataString = JSON.stringify(d.formData).toLowerCase();
-        if (formDataString.includes(kw)) return true;
-      }
+    // 動態計算上傳標籤文字
+    const isCompleted = d.status === '已完成' || d.status === '實驗完成' || d.status === '實驗結束' || d.status === 'Completed';
+    const uploadText = isCompleted 
+      ? (d.hasDataUpload ? (state.currentLang==='ZH'?'已上傳':'uploaded') : (state.currentLang==='ZH'?'待上傳':'pending'))
+      : '';
 
-      return false;
-    }).sort((a,b) => new Date(b.date) - new Date(a.date));
+    // 1. 基本資訊匹配 (加入 uploadText 比對)
+    const basicMatch = (d.expId||'').toLowerCase().includes(kw) || 
+                       (d.user||'').toLowerCase().includes(kw) || 
+                       displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
+                       displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw) ||
+                       uploadText.includes(kw);
+                       
+    if (basicMatch) return true;
 
-    if (filtered.length === 0) {
-      container.innerHTML = html + renderEmptyState(state.currentLang==='ZH'?'無符合條件的實驗紀錄':'No matching records', '');
-      return;
+    // 2. 表單內部 JSON 數據比對
+    if (d.formData && typeof d.formData === 'object') {
+      const formDataString = JSON.stringify(d.formData).toLowerCase();
+      if (formDataString.includes(kw)) return true;
     }
 
-    filtered.forEach(item => {
-      const userObj = state.membersList.find(m => m.name === item.user);
-      const userColor = userObj ? userObj.color : '#f1f5f9';
-      const styleObj = getStatusStyle(item.status);
-      const displayStatus = getStatusText(item.status, state.currentLang);
-      const displayInfo = formatBilingualText(item.info, state.currentLang);
+    return false;
+  }).sort((a,b) => new Date(b.date) - new Date(a.date));
 
-      const isReserved = item.status === '已預約' || item.status === 'Reserved';
-
-      const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
-      const uploadTagHtml = isCompleted 
-        ? (item.hasDataUpload 
-            ? `<span class="upload-status-tag uploaded">${state.currentLang==='ZH'?'已上傳':'Uploaded'}</span>` 
-            : `<span class="upload-status-tag pending">${state.currentLang==='ZH'?'待上傳':'Pending'}</span>`) 
-        : '';
-
-      const timeLogCalculations = calculateProcessTimeline(item.formData?.['_time_logs'] || {});
-      const timeTotalText = timeLogCalculations.totalMins > 0 
-        ? `<span style="font-size:10px; color:var(--text-muted); font-weight:600;">(${state.currentLang==='ZH'?'總耗時':'Total'}: ${timeLogCalculations.totalMins}${state.currentLang==='ZH'?'分':'m'})</span>` 
-        : '';
-
-      html += `
-        <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
-          <div class="timeline-node" style="background:${styleObj.text}"></div>
-          <div class="timeline-card ${isReserved ? 'reserved-card' : ''}">
-            <div class="timeline-date-head">
-              <div class="timeline-date-title">
-                <span>${item.date}</span>
-                <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
-                ${timeTotalText}
-              </div>
-              <div class="timeline-status-group">
-                <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
-                ${uploadTagHtml}
-              </div>
-            </div>
-            <div class="timeline-info-text">${displayInfo || '實驗專案'}</div>
-            ${timeLogCalculations.miniBarHtml}
-            <div class="timeline-exp-id">ID: ${item.expId}</div>
-          </div>
-        </div>
-      `;
-    });
-    container.innerHTML = html;
+  if (filtered.length === 0) {
+    container.innerHTML = html + renderEmptyState(state.currentLang==='ZH'?'無符合條件的實驗紀錄':'No matching records', '');
+    return;
   }
+
+  filtered.forEach(item => {
+    const userObj = state.membersList.find(m => m.name === item.user);
+    const userColor = userObj ? userObj.color : '#f1f5f9';
+    const styleObj = getStatusStyle(item.status);
+    const displayStatus = getStatusText(item.status, state.currentLang);
+    const displayInfo = formatBilingualText(item.info, state.currentLang);
+
+    const isReserved = item.status === '已預約' || item.status === 'Reserved';
+
+    const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
+    const uploadTagHtml = isCompleted 
+      ? (item.hasDataUpload 
+          ? `<span class="upload-status-tag uploaded">${state.currentLang==='ZH'?'已上傳':'Uploaded'}</span>` 
+          : `<span class="upload-status-tag pending">${state.currentLang==='ZH'?'待上傳':'Pending'}</span>`) 
+      : '';
+
+    const timeLogCalculations = calculateProcessTimeline(item.formData?.['_time_logs'] || {});
+    const timeTotalText = timeLogCalculations.totalMins > 0 
+      ? `<span style="font-size:10px; color:var(--text-muted); font-weight:600;">(${state.currentLang==='ZH'?'總耗時':'Total'}: ${timeLogCalculations.totalMins}${state.currentLang==='ZH'?'分':'m'})</span>` 
+      : '';
+
+    html += `
+      <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
+        <div class="timeline-node" style="background:${styleObj.text}"></div>
+        <div class="timeline-card ${isReserved ? 'reserved-card' : ''}">
+          <div class="timeline-date-head">
+            <div class="timeline-date-title">
+              <span>${item.date}</span>
+              <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
+              ${timeTotalText}
+            </div>
+            <div class="timeline-status-group">
+              <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
+              ${uploadTagHtml}
+            </div>
+          </div>
+          <div class="timeline-info-text">${displayInfo || '實驗專案'}</div>
+          ${timeLogCalculations.miniBarHtml}
+          <div class="timeline-exp-id">ID: ${item.expId}</div>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
 
   function getDynamicFieldValue(formData, labelKeywords) {
     if (!state.dynamicForms || !formData) return { val: null, id: null };
