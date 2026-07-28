@@ -153,7 +153,36 @@
     .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 13px; transition: all 0.2s; }
     .modal-btn-expand:hover { background: #dbeafe; }
 
-    /* 拖曳上傳專用 Zone 樣式 */
+    .expanded-grid {
+      display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px;
+    }
+    @media (min-width: 600px) {
+      .expanded-grid { grid-template-columns: 1fr 1fr; }
+      .expanded-grid .full-width { grid-column: span 2; }
+    }
+
+    .exp-panel {
+      background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 12px;
+    }
+    .exp-panel-title {
+      font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border-color); padding-bottom: 4px; letter-spacing: 0.3px;
+    }
+
+    .timeline-bar-wrapper { margin-top: 6px; margin-bottom: 6px; }
+    .timeline-multi-bar { display: flex; width: 100%; height: 12px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0; }
+    .timeline-segment { height: 100%; transition: width 0.3s ease; }
+    .timeline-legend { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; margin-top: 6px; font-weight: 600; }
+    .legend-item { display: inline-flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+    .vertical-time-log { position: relative; padding-left: 14px; margin-top: 4px; }
+    .vertical-time-line { position: absolute; left: 3px; top: 6px; bottom: 6px; width: 2px; background: var(--border-color); }
+    .vertical-time-item { position: relative; display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 5px; }
+    .vertical-time-item:last-child { margin-bottom: 0; }
+    .vertical-time-dot { position: absolute; left: -14px; top: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 1px var(--primary); }
+
+    /* 展開版拖曳上傳 Zone 樣式 */
     .drop-zone {
       border: 2px dashed var(--border-focus);
       border-radius: var(--radius-md);
@@ -459,7 +488,6 @@
     } catch (err) { console.error("解析動態表單架構失敗:", err); }
   }
 
-  /* 🚀 【核心修正】完全擺脫 field_21_24 ("不保存") 對實驗目的之污染 🚀 */
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
@@ -488,7 +516,6 @@
             }
           });
 
-          // 精準獲取大綱與目的，避免不保存侵入
           const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
           
           let purposeName = parsedFormData['selected_purpose_name'];
@@ -507,7 +534,6 @@
           }
 
           const colV = (row.length > 21 && row[21]) ? row[21].trim() : '';
-          // 讀取 W 欄 (Col 22 / 第 23 欄) 雲端資料夾連結
           const expDataFolder = (row.length > 22 && row[22]) ? row[22].trim() : '';
 
           records.push({
@@ -766,7 +792,7 @@
 
   let isEditingActiveModal = false;
 
-  /* 1. 彈窗渲染 (嵌入拖曳與點擊直傳 Zone) */
+  /* 1. 精簡明細彈窗 (保持原始純粹排版，不安插上傳區) */
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
     isEditingActiveModal = false;
@@ -784,7 +810,6 @@
 
     const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
-    // --- A. 狀態歷程時間 ---
     let timeLogsHtml = '';
     let timeLogsMap = formData['_time_logs'] || {};
 
@@ -819,7 +844,6 @@
       }
     }
 
-    // --- B. 數據明細區域 ---
     let filledDataSectionHtml = '';
 
     if (!isReserved) {
@@ -896,11 +920,6 @@
 
     let userNotes = formData['notes'] || '';
 
-    // 雲端資料夾區域
-    const folderHtml = exp.expDataFolder 
-      ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">開啟雲端資料夾 ↗</a>`
-      : `<span style="color:var(--text-muted);">尚未建立資料夾</span>`;
-
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
@@ -913,20 +932,7 @@
         
         ${filledDataSectionHtml}
 
-        <!-- 🚀 拖曳與點擊直傳 Zone 🚀 -->
-        <div class="detail-row" style="flex-direction:column; align-items:stretch; margin-top:6px;">
-          <div class="detail-label" style="width:100%; margin-bottom:2px;">上傳實驗數據 (限定 csv, png, jpeg)</div>
-          <div class="detail-value" style="width:100%; text-align:left; margin-bottom:4px;">${folderHtml}</div>
-          
-          <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInputSecret').click();">
-            <div class="drop-zone-text">📁 點擊或將檔案拖曳至此處上傳</div>
-            <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">(系統將自動歸檔至 [${exp.expId}] 資料夾並寫入 W 欄)</div>
-            <input type="file" id="fileInputSecret" multiple accept=".csv, .png, .jpeg, .jpg" style="display:none;" onchange="handleDirectFileUpload(this.files, '${exp.expId}')">
-          </div>
-          <div id="uploadStatusText" style="font-size:11px; font-weight:700; margin-top:4px;"></div>
-        </div>
-
-        <div class="detail-row" style="flex-direction:column; align-items:stretch; margin-top:8px;">
+        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
           <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄 (舊備註不可刪除)' : 'Notes'}</div>
           <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
           <div id="appendNoteContainer" style="display:none; margin-top:6px;">
@@ -938,9 +944,6 @@
 
     document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
     document.getElementById('modalMessage').innerHTML = htmlContent;
-
-    // 初始化 Drop Zone 事件
-    setupDropZoneEvents(expId);
 
     const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
 
@@ -956,111 +959,6 @@
     }
 
     document.getElementById('customModalBackdrop').style.display = 'flex';
-  }
-
-  // 設定拖曳事件 listen
-  function setupDropZoneEvents(expId) {
-    setTimeout(() => {
-      const dz = document.getElementById('dropZone');
-      if (!dz) return;
-
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dz.addEventListener(eventName, preventDefaults, false);
-      });
-
-      function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-      ['dragenter', 'dragover'].forEach(eventName => {
-        dz.addEventListener(eventName, () => dz.classList.add('dragover'), false);
-      });
-
-      ['dragleave', 'drop'].forEach(eventName => {
-        dz.addEventListener(eventName, () => dz.classList.remove('dragover'), false);
-      });
-
-      dz.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleDirectFileUpload(files, expId);
-      }, false);
-    }, 100);
-  }
-
-  /* 🚀 批次檔案讀取與 POST 到 GAS 🚀 */
-  async function handleDirectFileUpload(files, expId) {
-    const statusElem = document.getElementById('uploadStatusText');
-    if (!files || files.length === 0) return;
-
-    // 檢查副檔名 (僅限 csv, png, jpeg, jpg)
-    const validFiles = [];
-    const allowedExts = ['csv', 'png', 'jpeg', 'jpg'];
-
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      const ext = f.name.split('.').pop().toLowerCase();
-      if (allowedExts.includes(ext)) {
-        validFiles.push(f);
-      }
-    }
-
-    if (validFiles.length === 0) {
-      alert("只接受 CSV、PNG 與 JPEG 格式檔案！");
-      return;
-    }
-
-    statusElem.innerText = `準備傳送 ${validFiles.length} 個檔案中...`;
-    statusElem.style.color = "var(--primary)";
-
-    const convertedPayloads = [];
-
-    for (let i = 0; i < validFiles.length; i++) {
-      const file = validFiles[i];
-      const base64 = await readFileAsBase64(file);
-      convertedPayloads.push({
-        fileName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        fileData: base64
-      });
-    }
-
-    statusElem.innerText = `上傳中，正在寫入 [${expId}] 資料夾與 W 欄...`;
-
-    try {
-      await fetch(GAS_API_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "uploadFilesDirect",
-          expId: expId,
-          files: convertedPayloads
-        })
-      });
-
-      statusElem.innerText = `✅ 上傳成功！已同步歸檔至雲端硬碟 W 欄。`;
-      statusElem.style.color = "var(--success)";
-
-      alert(`成功傳送 ${validFiles.length} 個檔案！` + "\n資料已自動存入 Drive 專屬資料夾並同步 W 欄。");
-      
-      // 重新讀取雲端
-      await fetchDataCenterFromSheet();
-      filterRecordCenterList();
-      showActiveExpDetail(expId);
-
-    } catch (err) {
-      console.error("上傳失敗:", err);
-      statusElem.innerText = "❌ 上傳過程發生錯誤，請重試。";
-      statusElem.style.color = "var(--danger)";
-    }
-  }
-
-  function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = error => reject(error);
-      reader.readAsDataURL(file);
-    });
   }
 
   function toggleEditMode(expId) {
@@ -1287,6 +1185,7 @@
     if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   }
 
+  /* 2. 專業展開版 (🚀 檔案上傳區塊精準安置於此 🚀) */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1373,6 +1272,18 @@
 
     const notesStr = formData['notes'] || (isZH ? '無' : 'None');
 
+    // 雲端資料夾按鈕狀態 ( Column W / expDataFolder )
+    const isCompleted = exp.status === '已完成' || exp.status === '實驗完成' || exp.status === '實驗結束' || exp.status === 'Completed';
+    const uploadTagHtml = isCompleted 
+      ? (exp.hasDataUpload 
+          ? `<span class="upload-status-tag uploaded">${isZH?'已上傳':'Uploaded'}</span>` 
+          : `<span class="upload-status-tag pending">${isZH?'待上傳':'Pending'}</span>`) 
+      : '';
+
+    const folderLinkHtml = exp.expDataFolder 
+      ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">開啟雲端數據資料夾 ↗</a>`
+      : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'尚未建立雲端資料夾':'No cloud folder yet'}</span>`;
+
     const expandedHtml = `
       <div class="detail-list">
         <div class="exp-panel full-width" style="margin-bottom:12px;">
@@ -1451,6 +1362,24 @@
             <div class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:600; padding:2px 0;">${notesStr}</div>
           </div>
 
+          <!-- 區塊 7：獨立實驗數據檔案專區 ( Column W 上傳 Zone ) -->
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">
+              <span>${isZH ? '實驗數據檔案 (Column W)' : 'Experimental Data Files'}</span>
+              ${uploadTagHtml}
+            </div>
+            <div style="padding:4px 0 8px 0; font-size:12px;">
+              <div style="margin-bottom:6px;">${folderLinkHtml}</div>
+              
+              <div id="dropZoneExpanded" class="drop-zone" onclick="document.getElementById('fileInputSecretEx').click();">
+                <div class="drop-zone-text">📁 點擊或將檔案拖曳至此處上傳</div>
+                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">(限定 .csv, .png, .jpeg，系統將自動歸檔至 [${exp.expId}] 並寫入 W 欄)</div>
+                <input type="file" id="fileInputSecretEx" multiple accept=".csv, .png, .jpeg, .jpg" style="display:none;" onchange="handleDirectFileUpload(this.files, '${exp.expId}')">
+              </div>
+              <div id="uploadStatusTextEx" style="font-size:11px; font-weight:700; margin-top:6px;"></div>
+            </div>
+          </div>
+
         </div>
       </div>
     `;
@@ -1461,6 +1390,117 @@
       <button class="modal-btn-confirm" onclick="showActiveExpDetail('${exp.expId}')">${isZH?'返回精簡明細':'Back to Summary'}</button>
       <button class="modal-btn-confirm" style="background:var(--text-secondary);" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
     `;
+
+    // 啟動展開版的拖曳監聽事件
+    setupDropZoneEventsExpanded(exp.expId);
+  }
+
+  /* 3. 展開版拖曳事件監聽 */
+  function setupDropZoneEventsExpanded(expId) {
+    setTimeout(() => {
+      const dz = document.getElementById('dropZoneExpanded');
+      if (!dz) return;
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dz.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dz.addEventListener(eventName, () => dz.classList.add('dragover'), false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dz.addEventListener(eventName, () => dz.classList.remove('dragover'), false);
+      });
+
+      dz.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        handleDirectFileUpload(dt.files, expId);
+      }, false);
+    }, 100);
+  }
+
+  /* 4. 多檔案讀取與直傳處理 */
+  async function handleDirectFileUpload(files, expId) {
+    const statusElem = document.getElementById('uploadStatusTextEx');
+    if (!files || files.length === 0) return;
+
+    const validFiles = [];
+    const allowedExts = ['csv', 'png', 'jpeg', 'jpg'];
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const ext = f.name.split('.').pop().toLowerCase();
+      if (allowedExts.includes(ext)) {
+        validFiles.push(f);
+      }
+    }
+
+    if (validFiles.length === 0) {
+      alert("只接受 CSV、PNG 與 JPEG 格式檔案！");
+      return;
+    }
+
+    if (statusElem) {
+      statusElem.innerText = `準備傳送 ${validFiles.length} 個檔案中...`;
+      statusElem.style.color = "var(--primary)";
+    }
+
+    const convertedPayloads = [];
+
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      const base64 = await readFileAsBase64(file);
+      convertedPayloads.push({
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        fileData: base64
+      });
+    }
+
+    if (statusElem) {
+      statusElem.innerText = `上傳中，正在寫入 [${expId}] 資料夾與 W 欄...`;
+    }
+
+    try {
+      await fetch(GAS_API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "uploadFilesDirect",
+          expId: expId,
+          files: convertedPayloads
+        })
+      });
+
+      if (statusElem) {
+        statusElem.innerText = `✅ 上傳成功！已同步歸檔至雲端硬碟 W 欄。`;
+        statusElem.style.color = "var(--success)";
+      }
+
+      alert(`成功傳送 ${validFiles.length} 個檔案！` + "\n資料已自動存入 Drive 專屬資料夾並寫入試算表 W 欄。");
+      
+      await fetchDataCenterFromSheet();
+      filterRecordCenterList();
+      showFullExpandedView(expId);
+
+    } catch (err) {
+      console.error("上傳失敗:", err);
+      if (statusElem) {
+        statusElem.innerText = "❌ 上傳過程發生錯誤，請重試。";
+        statusElem.style.color = "var(--danger)";
+      }
+    }
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = error => reject(error);
+      reader.readAsDataURL(file);
+    });
   }
 
   function closeCustomModal() { 
