@@ -1420,7 +1420,7 @@
     }, 100);
   }
 
-/* 多檔案直傳 (直接解析後端回傳之 folderUrl，繞過 Google CSV 5分鐘快取延遲) */
+/* 最終版：多檔案直傳 (支援即時顯示 folderUrl + 完美穿透 Drive 權限) */
 async function handleDirectFileUpload(files, expId) {
   const statusElem = document.getElementById('uploadStatusTextEx');
   if (!files || files.length === 0) return;
@@ -1454,7 +1454,7 @@ async function handleDirectFileUpload(files, expId) {
     try {
       const base64 = await readFileAsBase64(file);
 
-      // 使用原生 JSON POST 接收 GAS 傳回的即時結果
+      // 使用 text/plain 規避 CORS 預檢，又能接收 GAS 傳回的 JSON 結果
       const response = await fetch(GAS_API_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -1485,7 +1485,7 @@ async function handleDirectFileUpload(files, expId) {
     }
   }
 
-  // 即時更新前端記憶體資料 (不用等 Google Sheet CSV 的 5分鐘快取)
+  // 即時更新前端記憶體與畫面，不需等 5 分鐘 CSV 快取
   const targetExp = state.dataCenter.find(d => d.expId === expId);
   if (targetExp) {
     if (latestFolderUrl) targetExp.expDataFolder = latestFolderUrl;
@@ -1493,13 +1493,13 @@ async function handleDirectFileUpload(files, expId) {
   }
 
   if (statusElem) {
-    statusElem.innerText = `✅ 全部 ${validFiles.length} 個檔案上傳完成！已成功建置 [${expId}] 雲端資料夾。`;
+    statusElem.innerText = `✅ 全部 ${validFiles.length} 個檔案上傳完成！`;
     statusElem.style.color = "var(--success)";
   }
 
-  alert(`成功上傳 ${validFiles.length} 個檔案！\n已歸檔至雲端硬碟 [${expId}] 資料夾，並同步寫入試算表 W 欄。`);
+  alert(`成功上傳 ${validFiles.length} 個檔案！\n已存入雲端硬碟 [${expId}] 資料夾並寫入 W 欄。`);
 
-  // 刷新畫面
+  // 刷新展開版畫面
   if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   showFullExpandedView(expId);
 }
