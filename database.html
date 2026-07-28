@@ -474,65 +474,64 @@
     } catch (err) { console.error("解析動態表單架構失敗:", err); }
   }
 
-  /* 🚀 【核心修正】完全擺脫 field_21_24 ("不保存") 對實驗目的之污染 🚀 */
   async function fetchDataCenterFromSheet() {
-    try {
-      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
-      const records = [];
+  try {
+    const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
+    const records = [];
 
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row) continue;
-        if (row[0] || row[1]) {
-          const expId = row[0] ? row[0].trim() : '未編號';
-          const date = row[1] ? row[1].trim() : '';
-          const user = row[2] ? row[2].trim() : '';
-          const status = row[3] ? row[3].trim() : '未知';
-          
-          let parsedFormData = {};
-          const jsonCols = [4, 6, 8, 10, 12];
-          jsonCols.forEach(colIdx => {
-            if (row[colIdx]) {
-              let rawJsonStr = row[colIdx].trim();
-              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
-              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
-                try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
-              }
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
+      if (row[0] || row[1]) {
+        const expId = row[0] ? row[0].trim() : '未編號';
+        const date = row[1] ? row[1].trim() : '';
+        const user = row[2] ? row[2].trim() : '';
+        const status = row[3] ? row[3].trim() : '未知';
+        
+        let parsedFormData = {};
+        const jsonCols = [4, 6, 8, 10, 12];
+        jsonCols.forEach(colIdx => {
+          if (row[colIdx]) {
+            let rawJsonStr = row[colIdx].trim();
+            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+              try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
             }
-          });
-
-          // 核心修復：精準排除「不保存」與舊保存方式 key，尋找真正目的
-          const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
-          
-          let purposeName = parsedFormData['selected_purpose_name'];
-          if (!purposeName || purposeName === '不保存') {
-            purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '健康控制組 / Healthy control group';
           }
-          purposeName = cleanDisplayLabel(purposeName);
-          
-          let dynamicInfo = "";
-          if (outlineName && purposeName) {
-            dynamicInfo = `${outlineName} - ${purposeName}`;
-          } else if (outlineName || purposeName) {
-            dynamicInfo = outlineName || purposeName;
-          } else {
-            dynamicInfo = "實驗專案";
-          }
+        });
 
-          const colV = (row.length > 21 && row[21]) ? row[21].trim() : '';
-          const expDataFolder = (row.length > 22 && row[22]) ? row[22].trim() : '';
-
-          records.push({
-            expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder,
-            hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
-          });
+        // 優先以 parsedFormData 最新寫入的 key 為主
+        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
+        
+        let purposeName = parsedFormData['selected_purpose_name'];
+        if (!purposeName || purposeName === '不保存') {
+          purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '';
         }
+        purposeName = cleanDisplayLabel(purposeName);
+        
+        let dynamicInfo = "";
+        if (outlineName && purposeName) {
+          dynamicInfo = `${outlineName} - ${purposeName}`;
+        } else if (outlineName || purposeName) {
+          dynamicInfo = outlineName || purposeName;
+        } else {
+          dynamicInfo = "實驗專案";
+        }
+
+        const colV = (row.length > 21 && row[21]) ? row[21].trim() : '';
+        const expDataFolder = (row.length > 22 && row[22]) ? row[22].trim() : '';
+
+        records.push({
+          expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder,
+          hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
+        });
       }
-      state.dataCenter = records;
-    } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
-  }
+    }
+    state.dataCenter = records;
+  } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
+}
 
   function renderEmptyState(titleText, descText) {
     return `<div class="empty-state-box"><div class="empty-state-title">${titleText}</div><div class="empty-state-desc">${descText}</div></div>`;
@@ -781,178 +780,177 @@
   // 全局紀錄編輯狀態
   let isEditingActiveModal = false;
 
-  /* 1. 彈窗渲染 (精簡版 - 修復保存方式與目的保護) */
   function showActiveExpDetail(expId) {
-    state.activeViewingExpId = expId;
-    isEditingActiveModal = false;
-    const exp = state.dataCenter.find(d => d.expId === expId);
-    if (!exp) return;
+  state.activeViewingExpId = expId;
+  isEditingActiveModal = false;
+  const exp = state.dataCenter.find(d => d.expId === expId);
+  if (!exp) return;
 
-    const isZH = state.currentLang === 'ZH';
-    const styleObj = getStatusStyle(exp.status);
-    const displayStatus = getStatusText(exp.status, state.currentLang);
-    const displayInfo = formatBilingualText(exp.info, state.currentLang);
-    const formData = exp.formData || {};
+  const isZH = state.currentLang === 'ZH';
+  const styleObj = getStatusStyle(exp.status);
+  const displayStatus = getStatusText(exp.status, state.currentLang);
+  const displayInfo = formatBilingualText(exp.info, state.currentLang);
+  const formData = exp.formData || {};
 
-    const modalDialog = document.getElementById('modalDialogBox');
-    if (modalDialog) modalDialog.classList.remove('expanded-mode');
+  const modalDialog = document.getElementById('modalDialogBox');
+  if (modalDialog) modalDialog.classList.remove('expanded-mode');
 
-    const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
+  const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
-    // --- A. 狀態歷程時間 ---
-    let timeLogsHtml = '';
-    let timeLogsMap = formData['_time_logs'] || {};
+  // --- A. 狀態歷程時間 ---
+  let timeLogsHtml = '';
+  let timeLogsMap = formData['_time_logs'] || {};
 
-    const defaultKeys = ['已預約', '準備中', '準備完成', '手術中', '休息中', '訊號蒐集中', '訊號蒐集完成', '犧牲中', '實驗善後'];
-    const activeKeys = Object.keys(timeLogsMap).length > 0 ? Object.keys(timeLogsMap) : defaultKeys;
+  const defaultKeys = ['已預約', '準備中', '準備完成', '手術中', '休息中', '訊號蒐集中', '訊號蒐集完成', '犧牲中', '實驗善後'];
+  const activeKeys = Object.keys(timeLogsMap).length > 0 ? Object.keys(timeLogsMap) : defaultKeys;
 
-    timeLogsHtml = activeKeys.map(st => {
-      const transSt = getStatusText(st, state.currentLang);
-      const timeVal = timeLogsMap[st] || '';
-      return `
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:3px;">
-          <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
-          <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${timeVal || '--'}</span>
-          <input type="text" class="edit-mode-input form-control time-log-input" data-time-key="${st}" value="${timeVal}" style="display:none; width:165px; padding:2px 4px; font-size:10px; font-family:ui-monospace, monospace; text-align:right;">
+  timeLogsHtml = activeKeys.map(st => {
+    const transSt = getStatusText(st, state.currentLang);
+    const timeVal = timeLogsMap[st] || '';
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:3px;">
+        <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
+        <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${timeVal || '--'}</span>
+        <input type="text" class="edit-mode-input form-control time-log-input" data-time-key="${st}" value="${timeVal}" style="display:none; width:165px; padding:2px 4px; font-size:10px; font-family:ui-monospace, monospace; text-align:right;">
+      </div>
+    `;
+  }).join('');
+
+  // 手術用時計算
+  let surgeryDurationHtml = '';
+  if (timeLogsMap['手術中'] && (timeLogsMap['休息中'] || timeLogsMap['已死亡'])) {
+    const start = new Date(timeLogsMap['手術中']);
+    const end = new Date(timeLogsMap['休息中'] || timeLogsMap['已死亡']);
+    const diffMs = end - start;
+    if (!isNaN(diffMs) && diffMs > 0) {
+      const diffMins = Math.floor(diffMs / 60000);
+      surgeryDurationHtml = `
+        <div class="detail-row">
+          <div class="detail-label" style="color:var(--danger);">${isZH ? '手術用時' : 'Surgery Duration'}</div>
+          <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH ? '分鐘' : 'mins'}</div>
         </div>
       `;
-    }).join('');
-
-    // 手術用時計算
-    let surgeryDurationHtml = '';
-    if (timeLogsMap['手術中'] && (timeLogsMap['休息中'] || timeLogsMap['已死亡'])) {
-      const start = new Date(timeLogsMap['手術中']);
-      const end = new Date(timeLogsMap['休息中'] || timeLogsMap['已死亡']);
-      const diffMs = end - start;
-      if (!isNaN(diffMs) && diffMs > 0) {
-        const diffMins = Math.floor(diffMs / 60000);
-        surgeryDurationHtml = `
-          <div class="detail-row">
-            <div class="detail-label" style="color:var(--danger);">${isZH ? '手術用時' : 'Surgery Duration'}</div>
-            <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH ? '分鐘' : 'mins'}</div>
-          </div>
-        `;
-      }
     }
+  }
 
-    // --- B. 數據明細區域 ---
-    let filledDataSectionHtml = '';
+  // --- B. 數據明細區域 (嚴格讀取 JSON 內的真實值，無預設硬寫) ---
+  let filledDataSectionHtml = '';
 
-    if (!isReserved) {
-      const freqVal = formData['field_19_0'] !== undefined ? formData['field_19_0'] : '3.5';
-      const cycleVal = formData['field_20_0'] !== undefined ? formData['field_20_0'] : '2000';
-      const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : '239';
-      const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : '25';
+  if (!isReserved) {
+    const freqVal = formData['field_19_0'] !== undefined ? formData['field_19_0'] : '';
+    const cycleVal = formData['field_20_0'] !== undefined ? formData['field_20_0'] : '';
+    const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : '';
+    const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : '';
 
-      const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || 250);
-      const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
-      
-      const calculatedPTZ = (ratWeight * ptzDose).toFixed(1);
-      const calculatedSaline = Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1);
+    const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || 0);
+    const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
+    
+    const calculatedPTZ = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const calculatedSaline = ratWeight > 0 ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
 
-      const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : '0';
-      const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : '-7.65';
+    const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : '';
+    const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : '';
 
-      const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : '2';
-      const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : '-2.5';
-      const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : '-10.5';
+    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : '';
+    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : '';
+    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : '';
 
-      // 狀況欄位（保存方式優先讀取新 key: storage）
-      const ratStatusText = formData['rat_status'] || '過輕，麻醉適應最佳（低於預設劑量），呼吸過慢';
-      const surgeryStatusText = formData['surgery_status'] || '大量出血（頭部）殘留頭骨';
-      const elecStatusText = formData['elec_status'] || '電極連線不穩';
-      const signalStatusText = formData['signal_status'] || '雜訊偏多，意外干擾，34:20-35:20 healthy 有人闖入';
-      const sacMethodText = formData['sac_method'] || 'perfusion&decapitation';
-      const sacStatusText = formData['sac_status'] || '灌流不完全';
-      const tissueText = formData['tissue'] || '大腦';
-      const tissueStatusText = formData['tissue_status'] || '大腦部分損傷';
-      const storageText = formData['storage'] || formData['field_21_24'] || '不保存';
+    // 優先讀取動態修改過的值
+    const ratStatusText = formData['rat_status'] || (Array.isArray(formData['field_23_16']) ? formData['field_23_16'].join(', ') : '') || '';
+    const surgeryStatusText = formData['surgery_status'] || '';
+    const elecStatusText = formData['elec_status'] || '';
+    const signalStatusText = formData['signal_status'] || '';
+    const sacMethodText = formData['sac_method'] || formData['field_3_24'] || '';
+    const sacStatusText = formData['sac_status'] || '';
+    const tissueText = formData['tissue'] || '';
+    const tissueStatusText = formData['tissue_status'] || '';
+    const storageText = formData['storage'] || formData['field_21_24'] || '';
 
-      filledDataSectionHtml = `
-        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
-          <div class="detail-label" style="width:100%; margin-bottom:6px; font-size:12px; font-weight:800; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:4px;">${isZH ? '填寫數據明細' : 'Field Data Details'}</div>
-          <div id="editableFieldsContainer" class="detail-value" style="text-align:left; width:100%; padding:4px 0;">
-            
-            <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            
-            <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
+    filledDataSectionHtml = `
+      <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+        <div class="detail-label" style="width:100%; margin-bottom:6px; font-size:12px; font-weight:800; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:4px;">${isZH ? '填寫數據明細' : 'Field Data Details'}</div>
+        <div id="editableFieldsContainer" class="detail-value" style="text-align:left; width:100%; padding:4px 0;">
+          
+          <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal || '--'}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          
+          <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
 
-            <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
 
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value normal-value"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value normal-value"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
 
-            <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
-              <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">訊號蒐集時間軸 (長度: 62 min)</div>
-              <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">
-                <div style="width:16%; background:#2563eb;" title="Base line: 10m"></div>
-                <div style="width:84%; background:#ef4444;" title="Healthy: 52m"></div>
-              </div>
-              <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600;">
-                <span style="color:#2563eb;">■ Base line: 10m</span>
-                <span style="color:#ef4444;">■ Healthy: 52m</span>
-              </div>
+          <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">訊號蒐集時間軸 (長度: 62 min)</div>
+            <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">
+              <div style="width:16%; background:#2563eb;" title="Base line: 10m"></div>
+              <div style="width:84%; background:#ef4444;" title="Healthy: 52m"></div>
             </div>
-
+            <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600;">
+              <span style="color:#2563eb;">■ Base line: 10m</span>
+              <span style="color:#ef4444;">■ Healthy: 52m</span>
+            </div>
           </div>
-        </div>
-      `;
-    }
 
-    let userNotes = formData['notes'] || '';
-
-    const htmlContent = `
-      <div class="detail-list">
-        <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
-        ${surgeryDurationHtml}
-        <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:68%;">${timeLogsHtml}</div></div>
-        
-        ${filledDataSectionHtml}
-
-        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
-          <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄 (舊備註不可刪除)' : 'Notes'}</div>
-          <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
-          <div id="appendNoteContainer" style="display:none; margin-top:6px;">
-            <textarea id="inputAppendNote" class="form-control" rows="2" placeholder="${isZH?'請輸入欲追加的新備註內容...':'Enter new notes...'}" style="width:100%; font-size:11px; border-color:var(--border-focus);"></textarea>
-          </div>
         </div>
       </div>
     `;
-
-    document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
-    document.getElementById('modalMessage').innerHTML = htmlContent;
-
-    const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
-
-    if (btnGroup) {
-      btnGroup.innerHTML = `
-        <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
-        <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
-          <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除':'Delete'}</button>
-          <button id="btnToggleEdit" class="modal-btn-expand" style="flex:1; margin-top:0;" onclick="toggleEditMode('${exp.expId}')">${isZH?'修改':'Edit'}</button>
-        </div>
-        <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
-      `;
-    }
-
-    document.getElementById('customModalBackdrop').style.display = 'flex';
   }
+
+  let userNotes = formData['notes'] || '';
+
+  const htmlContent = `
+    <div class="detail-list">
+      <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
+      ${surgeryDurationHtml}
+      <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:68%;">${timeLogsHtml}</div></div>
+      
+      ${filledDataSectionHtml}
+
+      <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+        <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄 (舊備註不可刪除)' : 'Notes'}</div>
+        <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
+        <div id="appendNoteContainer" style="display:none; margin-top:6px;">
+          <textarea id="inputAppendNote" class="form-control" rows="2" placeholder="${isZH?'請輸入欲追加的新備註內容...':'Enter new notes...'}" style="width:100%; font-size:11px; border-color:var(--border-focus);"></textarea>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
+  document.getElementById('modalMessage').innerHTML = htmlContent;
+
+  const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
+
+  if (btnGroup) {
+    btnGroup.innerHTML = `
+      <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
+      <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
+        <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除':'Delete'}</button>
+        <button id="btnToggleEdit" class="modal-btn-expand" style="flex:1; margin-top:0;" onclick="toggleEditMode('${exp.expId}')">${isZH?'修改':'Edit'}</button>
+      </div>
+      <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+    `;
+  }
+
+  document.getElementById('customModalBackdrop').style.display = 'flex';
+}
 
   /* 2. 切換修改模式 */
   function toggleEditMode(expId) {
