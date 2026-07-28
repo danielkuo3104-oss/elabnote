@@ -1387,8 +1387,8 @@ function showActiveExpDetail(expId) {
 
  // C. 座標位置 (Lamda & 電極)
 // 優先提取正確的欄位：Lamda (field_9_16, field_10_16)，保底退回 (field_20_16, field_19_16)
-const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_9_16'] : (formData['field_20_16'] || '0');
-const lamdaML = formData['field_12_16'] !== undefined ? formData['field_10_16'] : (formData['field_19_16'] || '0');
+const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_20_16'] || '0');
+const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_19_16'] || '0');
 detailsList.push({ label: isZH ? 'Lamda位置' : 'Lamda Position', val: `(${lamdaAP}, ${lamdaML})` });
 
 // 優先提取正確的欄位：電極 (field_15_16, field_16_16, field_17_16)，保底退回原邏輯
