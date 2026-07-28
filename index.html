@@ -541,15 +541,19 @@ function checkSession() {
       state.currentUser = JSON.parse(savedUser);
       state.isGuest = state.currentUser.role === 'Guest';
       
-      // 自動隱藏登入頁，顯示主畫面
+      // 自動隱藏登入頁，顯示主畫面與 FAB 按鈕
       document.getElementById('authPage').style.display = 'none';
       document.getElementById('fabBtn').style.display = 'flex';
       
       const badge = document.getElementById('userBadge');
-      badge.innerText = state.currentUser.name;
-      badge.style.background = state.currentUser.color || '#f1f5f9';
+      if (badge) {
+        badge.innerText = state.currentUser.name;
+        badge.style.background = state.currentUser.color || '#f1f5f9';
+      }
     } catch(e) {
       localStorage.removeItem('elabnote_user');
+      document.getElementById('authPage').style.display = 'flex';
+      document.getElementById('fabBtn').style.display = 'none';
     }
   } else {
     document.getElementById('authPage').style.display = 'flex';
@@ -1029,32 +1033,38 @@ function performLogin() {
   }
 
   async function fetchMembersFromSheet() {
-    try {
-      const res = await fetch(`${URL_MEMBERS}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
-      
-      const members = [];
-      for(let i = 1; i < rows.length; i++) {
-        if(rows[i][0]) {
-          members.push({
-            name: rows[i][0].trim(),
-            email: rows[i][1] ? rows[i][1].trim() : '',
-            color: rows[i][3] ? rows[i][3].trim() : '#f1f5f9',
-            role: rows[i][4] ? rows[i][4].trim() : '協作會員',
-            password: rows[i][5] ? rows[i][5].trim() : '',
-            lang: rows[i][6] ? rows[i][6].trim() : 'ZH',
-            userCode: rows[i][7] ? rows[i][7].trim().toUpperCase() : '' // 抓取自訂識別簡碼
-          });
-        }
+  try {
+    const res = await fetch(`${URL_MEMBERS}&_t=${Date.now()}`);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
+    
+    const members = [];
+    for(let i = 1; i < rows.length; i++) {
+      if(rows[i][0]) {
+        members.push({
+          name: rows[i][0].trim(),
+          email: rows[i][1] ? rows[i][1].trim() : '',
+          color: rows[i][3] ? rows[i][3].trim() : '#f1f5f9',
+          role: rows[i][4] ? rows[i][4].trim() : '協作會員',
+          password: rows[i][5] ? rows[i][5].trim() : '',
+          lang: rows[i][6] ? rows[i][6].trim() : 'ZH',
+          userCode: rows[i][7] ? rows[i][7].trim().toUpperCase() : ''
+        });
       }
-      state.membersList = members;
-      initAuthDropdown();
-      initColorDropdown();
-    } catch(err) {
-      console.error("同步會員中心失敗:", err);
     }
+    state.membersList = members;
+    initAuthDropdown();
+    initColorDropdown();
+
+    // 關鍵保護：如果已經是登入狀態，堅決不讓 authPage 彈出來！
+    if (state.currentUser || localStorage.getItem('elabnote_user')) {
+      document.getElementById('authPage').style.display = 'none';
+      document.getElementById('fabBtn').style.display = 'flex';
+    }
+  } catch(err) {
+    console.error("同步會員中心失敗:", err);
   }
+}
 
   function checkDuplicateName() {
     const nameInput = document.getElementById('txtRegName').value.trim().toLowerCase();
@@ -1741,28 +1751,7 @@ function showActiveExpDetail(expId) {
     document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
   }
 
-  function performLogin() {
-    const selectedName = document.getElementById('selLoginUser').value;
-    const inputPwd = document.getElementById('txtLoginPwd').value.trim();
-    const user = state.membersList.find(m => m.name === selectedName);
 
-    if (!user) { showCustomAlert("提示", "請選擇會員帳號"); return; }
-    if (user.password && inputPwd !== user.password) { showCustomAlert("登入失敗", "識別密碼錯誤，請重新輸入！"); return; }
-
-    state.currentUser = user;
-    state.isGuest = false;
-    state.currentLang = user.lang || "ZH";
-    document.getElementById('authPage').style.display = 'none';
-    document.getElementById('fabBtn').style.display = 'flex';
-
-    const badge = document.getElementById('userBadge');
-    badge.innerText = user.name;
-    badge.style.background = user.color || '#f1f5f9';
-
-    applyLanguage();
-    refreshDashboard(true);
-    showCustomAlert("登入成功", `歡迎回來，${user.name}！`);
-  }
 
   function guestLogin() {
   const guestObj = { name: "訪客", role: "Guest", color: "#f1f5f9" };
