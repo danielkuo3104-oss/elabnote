@@ -799,7 +799,7 @@
   // 全局紀錄編輯狀態
 let isEditingActiveModal = false;
 
-/* 1. 精簡明細彈窗 (修復按鈕排版、完全去除表符、訪客權限鎖定) */
+/* 1. 彈窗渲染 (支援可編輯輸入框與備註追加) */
 function showActiveExpDetail(expId) {
   state.activeViewingExpId = expId;
   isEditingActiveModal = false;
@@ -817,7 +817,7 @@ function showActiveExpDetail(expId) {
 
   const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
-  // 1. 歷程時間軸 & 手術用時
+  // A. 狀態歷程時間 & 手術用時 (不可修改)
   let timeLogsHtml = '';
   let surgeryDurationHtml = '';
   
@@ -851,137 +851,93 @@ function showActiveExpDetail(expId) {
     timeLogsHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</span>`;
   }
 
-  // 2. 數據明細動態提取
+  // B. 數據明細區域 (非預約狀態)
   let filledDataSectionHtml = '';
 
   if (!isReserved) {
-    let detailsList = [];
+    // 讀取各數值
+    const freqVal = formData['field_19_0'] !== undefined ? formData['field_19_0'] : (getDynamicFieldValue(formData, ['頻率', 'frequency']).val || '');
+    const cycleVal = formData['field_20_0'] !== undefined ? formData['field_20_0'] : (getDynamicFieldValue(formData, ['週期', 'cycle']).val || '');
+    const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : (getDynamicFieldValue(formData, ['電壓', 'voltage']).val || '');
+    const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : (getDynamicFieldValue(formData, ['間隔', 'interval']).val || '');
 
-    const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
-    if (freqObj.val) detailsList.push({ label: isZH ? '頻率' : 'Frequency', val: `${freqObj.val} HZ`, isCondition: false });
-
-    const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
-    if (cycleObj.val) detailsList.push({ label: isZH ? '週期數' : 'Cycles', val: `${cycleObj.val} times`, isCondition: false });
-
-    const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
-    if (voltObj.val) detailsList.push({ label: isZH ? '電壓' : 'Voltage', val: `${voltObj.val} mV`, isCondition: false });
-
-    const interObj = getDynamicFieldValue(formData, ['間隔', 'interval']);
-    if (interObj.val) detailsList.push({ label: isZH ? '間隔' : 'Interval', val: `${interObj.val} ms`, isCondition: false });
-
-    const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
-    const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
-    const ratWeight = parseFloat(weightObj.val || 0);
-    const ptzDose = parseFloat(doseObj.val || 1);
-
-    if (ratWeight > 0) {
-      const ptzVol = ratWeight * ptzDose;
-      const salineVol = 700 - ptzVol;
-      detailsList.push({ label: isZH ? '大鼠體重（g）' : 'Rat Weight (g)', val: `${ratWeight}`, isCondition: false });
-      detailsList.push({ label: isZH ? 'PTZ使用劑量' : 'PTZ Dosage', val: `${ptzVol} uL`, isCondition: false });
-      detailsList.push({ label: isZH ? 'Saline用量' : 'Saline Volume', val: `${salineVol} uL`, isCondition: false });
-    }
+    const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || getDynamicFieldValue(formData, ['體重', 'weight']).val || 0);
+    const ptzDose = parseFloat(formData['field_4_16'] || getDynamicFieldValue(formData, ['劑量', 'dose']).val || 1);
+    const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
 
     const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_20_16'] || '0');
     const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_19_16'] || '0');
-    detailsList.push({ label: isZH ? 'Lamda位置' : 'Lamda Position', val: `(${lamdaAP}, ${lamdaML})`, isCondition: false });
 
     const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_16_16'] || '0');
     const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_12_16'] || '0');
     const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_17_16'] || '0');
-    detailsList.push({ label: isZH ? '電極插入位置' : 'Electrode Insertion Pos', val: `(${eleAP}, ${eleML}, ${eleDH})`, isCondition: false });
 
-    const conditionConfigs = [
-      { zh: '大鼠生理情況', en: 'Rat Physiological State', kw: ['生理', 'physiological'] },
-      { zh: '手術過程狀況', en: 'Surgical Conditions', kw: ['手術', 'surgical', 'surgery'] },
-      { zh: '電極插入狀況', en: 'Electrode Insertion State', kw: ['電極', 'electrode'] }
-    ];
-
-    conditionConfigs.forEach(cfg => {
-      let fieldObj = getDynamicFieldValue(formData, cfg.kw);
-      let itemArr = [];
-
-      if (fieldObj.val && Array.isArray(fieldObj.val) && fieldObj.val.length > 0) {
-        itemArr = [...fieldObj.val];
-        const otherInput = formData[`${fieldObj.id}_input`] || '';
-        itemArr = itemArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
-      } else if (fieldObj.val && typeof fieldObj.val === 'string' && fieldObj.val.trim() !== '') {
-        itemArr = [formatBilingualText(fieldObj.val, state.currentLang)];
-      }
-
-      if (itemArr.length > 0) {
-        detailsList.push({ label: isZH ? cfg.zh : cfg.en, val: itemArr.join(', '), isBlock: true, isCondition: true });
-      } else {
-        const noCondText = isZH ? '無特殊情況' : 'No special conditions';
-        detailsList.push({ label: isZH ? cfg.zh : cfg.en, val: noCondText, isBlock: true, isCondition: false });
-      }
-    });
-
-    const filledDataHtml = detailsList.length > 0 
-      ? detailsList.map(item => {
-          if (item.isBlock) {
-            const valClass = item.isCondition ? 'condition-highlight' : 'muted-value';
-            return `
-              <div style="margin-bottom:8px; border-bottom:1px dashed #f1f5f9; padding-bottom:5px;">
-                <div style="color:var(--text-muted); font-weight:700; font-size:11px; margin-bottom:2px;">${item.label}:</div>
-                <div class="detail-value ${valClass}" style="text-align:left; width:100%; font-size:12px; line-height:1.4;">${item.val}</div>
-              </div>
-            `;
-          } else {
-            return `
-              <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; border-bottom:1px dashed #f1f5f9; padding-bottom:3px;">
-                <span style="color:var(--text-muted); font-weight:700; max-width:55%; font-size:11px;">${item.label}:</span>
-                <span class="detail-value normal-value" style="font-family:ui-monospace, monospace;">${item.val}</span>
-              </div>
-            `;
-          }
-        }).join('')
-      : `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄數據' : 'No recorded data'}</span>`;
+    // 特殊狀況文字讀取
+    const physObj = getDynamicFieldValue(formData, ['生理', 'physiological']);
+    let physText = isZH ? '無特殊情況' : 'No special conditions';
+    if (physObj.val && Array.isArray(physObj.val) && physObj.val.length > 0) {
+      physText = physObj.val.map(v => formatBilingualText(v, state.currentLang)).join(', ');
+    } else if (formData['field_23_16']) {
+      const arr = Array.isArray(formData['field_23_16']) ? formData['field_23_16'] : [formData['field_23_16']];
+      physText = arr.map(v => formatBilingualText(v, state.currentLang)).join(', ');
+    }
 
     filledDataSectionHtml = `
       <div class="detail-row" style="flex-direction:column; align-items:stretch;">
         <div class="detail-label" style="width:100%; margin-bottom:6px;">${isZH ? '填寫數據明細' : 'Field Data'}</div>
-        <div class="detail-value" style="text-align:left; max-height:220px; overflow-y:auto; width:100%; padding:4px 0;">${filledDataHtml}</div>
+        <div id="editableFieldsContainer" class="detail-value" style="text-align:left; max-height:260px; overflow-y:auto; width:100%; padding:4px 0;">
+          
+          <!-- 超音波參數 -->
+          <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal || '--'}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+
+          <!-- 動物體重與劑量 -->
+          <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${ptzVol} / ${salineVol}</div></div>
+
+          <!-- 定位座標 -->
+          <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
+
+          <!-- 生理狀況內容 (藍字) -->
+          <div style="margin-bottom:8px; border-bottom:1px dashed #f1f5f9; padding-bottom:5px;">
+            <div style="color:var(--text-muted); font-weight:700; font-size:11px; margin-bottom:2px;">${isZH?'大鼠生理情況':'Physiological State'}:</div>
+            <div class="detail-value condition-highlight" style="text-align:left; width:100%; font-size:12px; line-height:1.4;">${physText}</div>
+          </div>
+
+        </div>
       </div>
     `;
   }
 
-  // 3. 備註與修訂 Log
+  // C. 備註與修訂歷史 Log (實作「只能增，不能減」)
   let userNotes = formData['notes'] || '';
   let editLogsStr = formData['_edit_logs_history'] || '';
   let editLogHtml = editLogsStr ? `<div style="font-size:10px; color:var(--text-muted); font-style:italic; margin-top:4px; white-space:pre-line;">${editLogsStr}</div>` : '';
 
   const htmlContent = `
     <div class="detail-list">
-      <div class="detail-row">
-        <div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div>
-        <div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div>
-      </div>
-      <div class="detail-row">
-        <div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div>
-        <div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div>
-      </div>
-      <div class="detail-row">
-        <div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div>
-        <div class="detail-value normal-value">${displayInfo}</div>
-      </div>
-      <div class="detail-row">
-        <div class="detail-label">${isZH ? '負責人' : 'Owner'}</div>
-        <div class="detail-value normal-value">${exp.user}</div>
-      </div>
-      <div class="detail-row">
-        <div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div>
-        <div class="detail-value normal-value">${exp.date}</div>
-      </div>
+      <!-- 鎖定項目 (不允許修改) -->
+      <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
       ${surgeryDurationHtml}
-      <div class="detail-row">
-        <div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div>
-        <div class="detail-value" style="text-align:left;">${timeLogsHtml}</div>
-      </div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left;">${timeLogsHtml}</div></div>
+      
       ${filledDataSectionHtml}
+
+      <!-- 備註區塊 -->
       <div class="detail-row" style="flex-direction:column; align-items:stretch;">
-        <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄' : 'Notes'}</div>
+        <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄 (舊備註不可刪除)' : 'Notes (Read-only for past entries)'}</div>
         <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
+        <div id="appendNoteContainer" style="display:none; margin-top:6px;">
+          <textarea id="inputAppendNote" class="form-control" rows="2" placeholder="${isZH?'請輸入欲追加的新備註內容...':'Enter new notes to append...'}" style="width:100%; font-size:11px; border-color:var(--border-focus);"></textarea>
+        </div>
         ${editLogHtml}
       </div>
     </div>
@@ -990,18 +946,14 @@ function showActiveExpDetail(expId) {
   document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
   document.getElementById('modalMessage').innerHTML = htmlContent;
 
-  // 4. 底部按鈕群組（重新規範排版，無表符、防壓疊）
+  // D. 按鈕配置
   const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
   const isGuestUser = state.isGuest || (state.currentUser && state.currentUser.role === 'Guest');
 
   if (btnGroup) {
     if (isGuestUser) {
-      // 訪客：鎖定全部修改/刪除權限
-      btnGroup.innerHTML = `
-        <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
-      `;
+      btnGroup.innerHTML = `<button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>`;
     } else if (isReserved) {
-      // 已預約：不提供展開，但可修改備註或刪除
       btnGroup.innerHTML = `
         <div style="display:flex; gap:8px; width:100%;">
           <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除預約':'Delete'}</button>
@@ -1010,7 +962,6 @@ function showActiveExpDetail(expId) {
         <button class="modal-btn-confirm" style="margin-top:6px;" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
       `;
     } else {
-      // 一般進行中/已完成專案：展現清晰結構化三層按鈕
       btnGroup.innerHTML = `
         <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
         <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
@@ -1025,7 +976,7 @@ function showActiveExpDetail(expId) {
   document.getElementById('customModalBackdrop').style.display = 'flex';
 }
 
-/* 2. 切換修改模式 (含訪客鎖定權限) */
+/* 2. 切換修改模式 (顯隱對應之 View/Edit UI) */
 function toggleEditMode(expId) {
   const isZH = state.currentLang === 'ZH';
 
@@ -1037,7 +988,6 @@ function toggleEditMode(expId) {
   const exp = state.dataCenter.find(d => d.expId === expId);
   if (!exp) return;
 
-  const formData = exp.formData || {};
   const btnEdit = document.getElementById('btnToggleEdit');
 
   if (!isEditingActiveModal) {
@@ -1049,17 +999,26 @@ function toggleEditMode(expId) {
       btnEdit.style.borderColor = "var(--success)";
     }
 
-    const noteVal = formData['notes'] || '';
-    const noteContainer = document.getElementById('txtDisplayNote');
-    if (noteContainer) {
-      noteContainer.innerHTML = `<textarea id="inputEditNotes" class="form-control" rows="3" style="width:100%; font-size:12px; margin-top:4px; border-color:var(--border-focus);">${noteVal}</textarea>`;
-    }
+    // 1. 切換數據輸入框為可編輯狀態
+    const viewTexts = document.querySelectorAll('.view-mode-text');
+    const editInputs = document.querySelectorAll('.edit-mode-input');
+    
+    viewTexts.forEach(el => el.style.display = 'none');
+    editInputs.forEach(el => {
+      if (el.tagName === 'DIV') el.style.display = 'flex';
+      else el.style.display = 'inline-block';
+    });
+
+    // 2. 開啟備註追加輸入框 (舊備註保持唯讀)
+    const appendContainer = document.getElementById('appendNoteContainer');
+    if (appendContainer) appendContainer.style.display = 'block';
+
   } else {
     saveActiveExpEdit(expId);
   }
 }
 
-/* 3. 儲存修改內容 + 雲端同步 + 灰字修訂紀錄追加 */
+/* 3. 儲存修改內容 (整合資料、追加備註、銷毀刪除、寫回雲端) */
 async function saveActiveExpEdit(expId) {
   const isZH = state.currentLang === 'ZH';
 
@@ -1071,10 +1030,43 @@ async function saveActiveExpEdit(expId) {
   const exp = state.dataCenter.find(d => d.expId === expId);
   if (!exp) return;
 
-  const inputNotesEl = document.getElementById('inputEditNotes');
-  const newNotes = inputNotesEl ? inputNotesEl.value.trim() : (exp.formData['notes'] || '');
+  // A. 抓取數據修改值
+  const editFreq = document.getElementById('edit_freq')?.value;
+  const editCycle = document.getElementById('edit_cycle')?.value;
+  const editVolt = document.getElementById('edit_volt')?.value;
+  const editInter = document.getElementById('edit_inter')?.value;
+  const editWeight = document.getElementById('edit_weight')?.value;
 
-  // 格式化修訂時間戳記：[YY/MM/dd hh:mm 修改]
+  const editLamdaAP = document.getElementById('edit_lamdaAP')?.value;
+  const editLamdaML = document.getElementById('edit_lamdaML')?.value;
+  const editEleAP = document.getElementById('edit_eleAP')?.value;
+  const editEleML = document.getElementById('edit_eleML')?.value;
+  const editEleDH = document.getElementById('edit_eleDH')?.value;
+
+  // 更新至 formData
+  if (editFreq !== undefined) exp.formData['field_19_0'] = editFreq;
+  if (editCycle !== undefined) exp.formData['field_20_0'] = editCycle;
+  if (editVolt !== undefined) exp.formData['field_21_0'] = editVolt;
+  if (editInter !== undefined) exp.formData['field_22_0'] = editInter;
+  if (editWeight !== undefined) exp.formData['field_5_16'] = editWeight;
+
+  if (editLamdaAP !== undefined) exp.formData['field_13_16'] = editLamdaAP;
+  if (editLamdaML !== undefined) exp.formData['field_12_16'] = editLamdaML;
+  if (editEleAP !== undefined) exp.formData['field_15_16'] = editEleAP;
+  if (editEleML !== undefined) exp.formData['field_16_16'] = editEleML;
+  if (editEleDH !== undefined) exp.formData['field_17_16'] = editEleDH;
+
+  // B. 處理備註：只許追加，不許減少
+  const oldNotes = exp.formData['notes'] || '';
+  const appendInput = document.getElementById('inputAppendNote');
+  const appendVal = appendInput ? appendInput.value.trim() : '';
+
+  let finalNotes = oldNotes;
+  if (appendVal) {
+    finalNotes = oldNotes ? `${oldNotes}\n[${isZH?'追加':'Appended'}]: ${appendVal}` : appendVal;
+  }
+
+  // C. 追加系統灰字修改 Log：[YY/MM/dd hh:mm 修改]
   const now = new Date();
   const yy = String(now.getFullYear()).slice(2);
   const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -1087,7 +1079,7 @@ async function saveActiveExpEdit(expId) {
   let historyLogs = exp.formData['_edit_logs_history'] || '';
   historyLogs = historyLogs ? `${historyLogs}\n${editLogStamp}` : editLogStamp;
 
-  exp.formData['notes'] = newNotes;
+  exp.formData['notes'] = finalNotes;
   exp.formData['_edit_logs_history'] = historyLogs;
 
   const btnEdit = document.getElementById('btnToggleEdit');
@@ -1096,7 +1088,7 @@ async function saveActiveExpEdit(expId) {
     btnEdit.innerText = isZH ? "同步中..." : "Saving...";
   }
 
-  // 打包傳回 Google Sheet 寫入
+  // D. 打包 JSON 傳回 Google Sheet 寫入
   const jsonPayloadString = JSON.stringify(exp.formData);
 
   await syncToGoogleSheet("updateRecord", {
@@ -1108,6 +1100,7 @@ async function saveActiveExpEdit(expId) {
     formData: exp.formData
   });
 
+  // 更新記憶體
   let targetInMemory = state.dataCenter.find(d => d.expId === expId);
   if (targetInMemory) {
     targetInMemory.formData = { ...exp.formData };
@@ -1115,6 +1108,7 @@ async function saveActiveExpEdit(expId) {
 
   isEditingActiveModal = false;
 
+  // 刷新畫面
   if (typeof renderMainDashboardUI === 'function') renderMainDashboardUI();
   if (typeof renderTimeline === 'function') renderTimeline();
   if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
