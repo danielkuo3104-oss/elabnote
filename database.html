@@ -1420,7 +1420,7 @@
     }, 100);
   }
 
-/* 單檔案逐一發送上傳，解決 Payload 過大被 Google 攔截問題 */
+/* 多檔案直傳 (直接解析後端回傳之 folderUrl，繞過 Google CSV 5分鐘快取延遲) */
 async function handleDirectFileUpload(files, expId) {
   const statusElem = document.getElementById('uploadStatusTextEx');
   if (!files || files.length === 0) return;
@@ -1441,6 +1441,8 @@ async function handleDirectFileUpload(files, expId) {
     return;
   }
 
+  let latestFolderUrl = "";
+
   for (let i = 0; i < validFiles.length; i++) {
     const file = validFiles[i];
     
@@ -1452,20 +1454,26 @@ async function handleDirectFileUpload(files, expId) {
     try {
       const base64 = await readFileAsBase64(file);
 
-      // 改用 URLSearchParams 打 POST API
-      const formDataParams = new URLSearchParams();
-      formDataParams.append('action', 'uploadSingleFile');
-      formDataParams.append('expId', expId);
-      formDataParams.append('fileName', file.name);
-      formDataParams.append('mimeType', file.type || 'application/octet-stream');
-      formDataParams.append('fileData', base64);
-
-      await fetch(GAS_API_URL, {
+      // 使用原生 JSON POST 接收 GAS 傳回的即時結果
+      const response = await fetch(GAS_API_URL, {
         method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
-        body: formDataParams.toString()
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "uploadSingleFile",
+          expId: expId,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          fileData: base64
+        })
       });
+
+      const resText = await response.text();
+      let resJson = {};
+      try { resJson = JSON.parse(resText); } catch(e) {}
+
+      if (resJson.folderUrl) {
+        latestFolderUrl = resJson.folderUrl;
+      }
 
     } catch (err) {
       console.error(`檔案 ${file.name} 上傳失敗:`, err);
@@ -1477,16 +1485,22 @@ async function handleDirectFileUpload(files, expId) {
     }
   }
 
+  // 即時更新前端記憶體資料 (不用等 Google Sheet CSV 的 5分鐘快取)
+  const targetExp = state.dataCenter.find(d => d.expId === expId);
+  if (targetExp) {
+    if (latestFolderUrl) targetExp.expDataFolder = latestFolderUrl;
+    targetExp.hasDataUpload = true;
+  }
+
   if (statusElem) {
-    statusElem.innerText = `✅ 全部 ${validFiles.length} 個檔案上傳完成！已建立 [${expId}] 資料夾並寫入 W 欄。`;
+    statusElem.innerText = `✅ 全部 ${validFiles.length} 個檔案上傳完成！已成功建置 [${expId}] 雲端資料夾。`;
     statusElem.style.color = "var(--success)";
   }
 
-  alert(`成功上傳 ${validFiles.length} 個檔案！\n已歸檔至云端硬碟 [${expId}] 資料夾並寫入 W 欄。`);
+  alert(`成功上傳 ${validFiles.length} 個檔案！\n已歸檔至雲端硬碟 [${expId}] 資料夾，並同步寫入試算表 W 欄。`);
 
-  // 重新同步後端與畫面
-  await fetchDataCenterFromSheet();
-  filterRecordCenterList();
+  // 刷新畫面
+  if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   showFullExpandedView(expId);
 }
 
