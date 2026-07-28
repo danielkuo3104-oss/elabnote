@@ -176,6 +176,43 @@
     .timeline-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-top: 8px; font-weight: 600; }
     .legend-item { display: inline-flex; align-items: center; gap: 4px; }
     .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+    /* 點與線狀態歷程時間軸 */
+.vertical-time-log {
+  position: relative;
+  padding-left: 16px;
+  margin-top: 8px;
+}
+.vertical-time-line {
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--border-color);
+}
+.vertical-time-item {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.vertical-time-item:last-child {
+  margin-bottom: 0;
+}
+.vertical-time-dot {
+  position: absolute;
+  left: -16px;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--card-bg);
+  box-shadow: 0 0 0 1px var(--primary);
+}
   </style>
 </head>
 <body>
@@ -913,7 +950,7 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  /* 第二階段：專業展開版（嚴格依需求 5 大分類重構） */
+  /* 第二階段：專業展開版 (含點線時間軸 + 完整實驗數據專區) */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -927,10 +964,35 @@
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.add('expanded-mode');
 
-    // 1. 全流程耗時
+    // 1. 全流程耗時計算
     const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
-    // 2. 超音波參數（全為 0 則不顯示）
+    // 2. 點與線垂直歷程時間軸 (Vertical Dot-Line Time Log)
+    let dotLineLogsHtml = '';
+    if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
+      const logs = formData['_time_logs'];
+      const itemsHtml = Object.entries(logs).map(([st, time]) => {
+        const transSt = getStatusText(st, state.currentLang);
+        return `
+          <div class="vertical-time-item">
+            <div class="vertical-time-dot"></div>
+            <span style="font-weight:700; color:var(--text-secondary);">${transSt}</span>
+            <span style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${time}</span>
+          </div>
+        `;
+      }).join('');
+
+      dotLineLogsHtml = `
+        <div class="vertical-time-log">
+          <div class="vertical-time-line"></div>
+          ${itemsHtml}
+        </div>
+      `;
+    } else {
+      dotLineLogsHtml = `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</div>`;
+    }
+
+    // 3. 超音波刺激參數
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
     const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
     const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
@@ -956,7 +1018,7 @@
       `;
     }
 
-    // 3. 動物基本參數與生理狀況
+    // 4. 動物基本參數與生理狀況
     const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
     const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
     const ratWeight = parseFloat(weightObj.val || 0);
@@ -974,7 +1036,7 @@
     }
     const physText = physItems.length > 0 ? physItems.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
 
-    // 4. 手術情形
+    // 5. 手術情形
     let surgDurationText = '--';
     if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
       const start = new Date(formData['_time_logs']['手術中']);
@@ -993,7 +1055,7 @@
     }
     const surgCondText = surgCondItems.length > 0 ? surgCondItems.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
 
-    // 5. 電極設置與訊號蒐集
+    // 6. 電極設置與訊號蒐集
     const lamdaAP = formData['field_20_16'] || '0';
     const lamdaML = formData['field_19_16'] || '0';
     const eleAP = formData['field_16_16'] || '0';
@@ -1071,7 +1133,7 @@
       `;
     }
 
-    // 6. 犧牲與組織保存
+    // 7. 犧牲與組織保存
     const getValueByKw = (kwArr, fbKeys) => {
       let fObj = getDynamicFieldValue(formData, kwArr);
       let rawVal = fObj.val;
@@ -1091,7 +1153,7 @@
     const excCond   = getValueByKw(['摘除情況', 'excisionstatus'], ['field_17_24']);
     const presMode  = getValueByKw(['保存方式', 'preservation'], ['field_21_24']);
 
-    // 7. 備註與數據檔案專區
+    // 8. 備註與數據檔案專區
     let notesArr = [];
     if (formData['notes'] && String(formData['notes']).trim() !== '') {
       notesArr.push(String(formData['notes']).trim());
@@ -1112,7 +1174,7 @@
     const expandedHtml = `
       <div class="detail-list">
         
-        <!-- 區塊 1：基本資訊與執行總覽 (含時間軸) -->
+        <!-- 區塊 1：基本資訊與執行總覽 (含 12小時進度條 + 點線歷程時間) -->
         <div class="exp-panel full-width" style="margin-bottom:12px;">
           <div class="exp-panel-title">
             <span>${isZH ? '基本資訊與執行總覽' : 'Basic Information Overview'}</span>
@@ -1122,16 +1184,19 @@
             <div>
               <div class="detail-row"><div class="detail-label">${isZH?'實驗編號':'Experiment ID'}</div><div class="detail-value" style="font-family:ui-monospace, monospace; color:var(--primary); font-size:13px;">${exp.expId}</div></div>
               <div class="detail-row"><div class="detail-label">${isZH?'大綱與目的':'Outline & Purpose'}</div><div class="detail-value">${displayInfo}</div></div>
-            </div>
-            <div>
               <div class="detail-row"><div class="detail-label">${isZH?'負責人員':'Experimenter'}</div><div class="detail-value">${exp.user}</div></div>
               <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value">${exp.date}</div></div>
+            </div>
+            <!-- 點與線詳細歷程時間 Log -->
+            <div style="background:#fff; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px;">
+              <div style="font-weight:700; color:var(--text-muted); font-size:11px; margin-bottom:6px;">${isZH?'狀態歷程點線記錄':'Time Log History'}</div>
+              ${dotLineLogsHtml}
             </div>
           </div>
           
           <div style="border-top:1px dashed var(--border-color); padding-top:8px;">
             <div style="font-size:11px; font-weight:700; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
-              <span>${isZH?'實驗全流程時間軸':'Execution Timeline'}</span>
+              <span>${isZH?'實驗全流程時間軸 (12小時基準)':'Execution Timeline (12h Max)'}</span>
               <span>${isZH?'實驗總耗時':'Total Duration'}: <strong style="color:var(--primary); font-size:13px;">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</strong></span>
             </div>
             ${timeLogCalculations.barHtml}
@@ -1191,10 +1256,10 @@
             </div>
           </div>
 
-          <!-- 區塊 6：備註與雲端數據資料 (Full Width) -->
+          <!-- 區塊 6：實驗數據與資料專區 (Full Width) -->
           <div class="exp-panel full-width">
             <div class="exp-panel-title">
-              <span>${isZH ? '備註與數據資料 (Column W)' : 'Notes & Experimental Data'}</span>
+              <span>${isZH ? '實驗數據與檔案 (Column W)' : 'Experimental Data & Files'}</span>
               ${uploadTagHtml}
             </div>
             <div class="detail-row"><div class="detail-label">${isZH?'備註紀錄':'Notes'}</div><div class="detail-value" style="white-space:pre-line; text-align:left;">${notesStr}</div></div>
