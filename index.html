@@ -409,8 +409,12 @@
 
     <div class="section-divider">實驗歷史紀錄 / HISTORY LOG</div>
 
-    <div id="timelineContainer" class="timeline-container" onclick="openRecordCenter()">
-      <div class="timeline-line"></div>
+    <!-- 外圍虛擬框：點擊直接開啟獨立 database.html 頁面 -->
+    <div class="timeline-outer-box" onclick="window.location.href='database.html'" title="點擊進入完整歷史資料庫">
+      <div class="timeline-outer-hint">點擊框圍區域進入完整歷史資料庫 ↗</div>
+      <div id="timelineContainer" class="timeline-container">
+        <div class="timeline-line"></div>
+      </div>
     </div>
 
     <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.1</div>
@@ -2848,7 +2852,11 @@ function showActiveExpDetail(expId) {
   }
 
   function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心", "開啟排程中心面板。"); }
-  function openRecordCenter() { closeFabMenu(); showCustomAlert("紀錄中心", "開啟實驗紀錄中心面板。"); }
+  // 修改 index.html 裡的 openRecordCenter：
+  function openRecordCenter() {
+    closeFabMenu();
+    window.location.href = "database.html"; // 🚀 直接開新的 html 頁面
+  }
   function openEditProfile() {
     closeFabMenu();
     if(state.currentUser) {
