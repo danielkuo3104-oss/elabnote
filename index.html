@@ -409,13 +409,16 @@
 
     <div class="section-divider">實驗歷史紀錄 / HISTORY LOG</div>
 
-    <!-- 外圍虛擬框：點擊直接開啟獨立 database.html 頁面 -->
-    <div class="timeline-outer-box" onclick="window.location.href='database.html'" title="點擊進入完整歷史資料庫">
-      <div class="timeline-outer-hint">點擊框圍區域進入完整歷史資料庫 ↗</div>
-      <div id="timelineContainer" class="timeline-container">
-        <div class="timeline-line"></div>
-      </div>
+    <!-- 歷史紀錄外圍框：支援雙語與精簡點擊引導 -->
+  <div class="timeline-outer-box" onclick="window.location.href='database.html'" title="進入完整歷史資料庫">
+    <div class="timeline-outer-hint">
+      <span id="txtHistoryHeaderTitle">最近歷史紀錄</span>
+      <span id="txtHistoryHeaderLink">進入完整歷史資料庫 ↗</span>
     </div>
+    <div id="timelineContainer" class="timeline-container">
+      <div class="timeline-line"></div>
+    </div>
+  </div>
 
     <div class="copyright-notice">© DanielGuo. All Rights Reserved. v2.1</div>
   </div>
@@ -1811,6 +1814,17 @@ function showActiveExpDetail(expId) {
 
     // 在 applyLanguage() 裡面補上這行：
     document.getElementById('btnFormPrev').innerText = isZH ? "上一頁" : "Previous";
+
+    // 在 applyLanguage() 函式最後面補上：
+    const histTitle = document.getElementById('txtHistoryHeaderTitle');
+    const histLink = document.getElementById('txtHistoryHeaderLink');
+    
+    if (histTitle) {
+      histTitle.innerText = isZH ? "最近歷史紀錄" : "RECENT LOGS";
+    }
+    if (histLink) {
+      histLink.innerText = isZH ? "進入完整歷史資料庫 ↗" : "Full Database ↗";
+    }
   }
 
   function updateDashboardButtons() {
