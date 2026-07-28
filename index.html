@@ -2161,7 +2161,13 @@ function startMakeupExpFormByStatus(targetExp) {
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
 
-    if (expId !== 'NEW_PROJECT') {
+    // 當選擇「新增專案」或「新增過去專案 (補登)」時，清空舊數據載入
+    if (expId === 'NEW_PROJECT' || expId === 'NEW_PAST_PROJECT') {
+      delete currentFormCtx.data['outline_select_val'];
+      delete currentFormCtx.data['selected_purpose_name'];
+      delete currentFormCtx.data['notes'];
+      state.activeSelectedExpId = null;
+    } else {
       const existingRecord = state.dataCenter.find(d => d.expId === expId);
       if (existingRecord) {
         if (existingRecord.user) saveFormFieldData('user_select_val', existingRecord.user);
@@ -2173,7 +2179,6 @@ function startMakeupExpFormByStatus(targetExp) {
         const targetPurpose = cleanDisplayLabel(savedData['selected_purpose_name'] || '');
         if (targetPurpose) {
           currentFormCtx.data['selected_purpose_name'] = targetPurpose;
-          
           const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
           if (page && page.fields) {
             page.fields.forEach(f => {
@@ -2302,21 +2307,50 @@ function startMakeupExpFormByStatus(targetExp) {
     else if (field.type === "exp_select") {
       const isZH = state.currentLang === 'ZH';
       const newProjText = isZH ? "➕ 新增實驗專案" : "➕ New Experiment Project";
-      const isTodayLogin = currentFormCtx.formId === "FORM_001_1";
+      const newPastProjText = isZH ? "➕ 新增過去專案 (補登)" : "➕ New Past Project (Makeup)";
       
-      const activeProjects = state.dataCenter.filter(d => {
-        const notFinished = d.status !== '實驗結束' && d.status !== 'Completed';
-        return isTodayLogin ? (d.date === state.simulatedDate && notFinished) : notFinished;
-      });
+      const isTodayLogin = currentFormCtx.formId === "FORM_001_1" && !currentFormCtx.isMakeup;
+      const isMakeupMode = currentFormCtx.isMakeup;
+
+      // 核心過濾條件：嚴格排除已完成/實驗完成/實驗結束/Completed
+      const isUnfinished = (statusStr) => {
+        return !['已完成', '實驗完成', '實驗結束', 'Completed', 'Finished'].includes(statusStr);
+      };
+
+      let activeProjects = [];
+
+      if (isMakeupMode) {
+        // 補登模式：只抓「早於今日」且「尚未完成」的預約專案
+        activeProjects = state.dataCenter.filter(d => {
+          const isPastDate = new Date(d.date) < new Date(state.simulatedDate);
+          return isPastDate && isUnfinished(d.status);
+        });
+      } else if (isTodayLogin) {
+        // 今日登錄：只抓「今日」且「尚未完成」的專案
+        activeProjects = state.dataCenter.filter(d => {
+          return d.date === state.simulatedDate && isUnfinished(d.status);
+        });
+      } else {
+        // 其他通用模式：抓所有「尚未完成」的專案
+        activeProjects = state.dataCenter.filter(d => isUnfinished(d.status));
+      }
 
       const currentExpValue = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
+
+      // 動態組裝選單頂部的「新增」選項
+      let topOptionHtml = '';
+      if (isMakeupMode) {
+        topOptionHtml = `<option value="NEW_PAST_PROJECT">${newPastProjText}</option>`;
+      } else if (!isTodayLogin) {
+        topOptionHtml = `<option value="NEW_PROJECT">${newProjText}</option>`;
+      }
 
       html += `
         <div class="form-group">
           <label>${field.label}</label>
           <select class="form-control" onchange="handleExpSelectChange(this.value)">
-            ${!isTodayLogin ? `<option value="NEW_PROJECT">${newProjText}</option>` : ''}
-            ${activeProjects.length === 0 ? `<option value="">-- ${isZH?'無符合之實驗':'No Active Experiment'} --</option>` : ''}
+            ${topOptionHtml}
+            ${activeProjects.length === 0 ? `<option value="">-- ${isZH?'無符合之未完成實驗':'No Unfinished Experiments'} --</option>` : ''}
             ${activeProjects.map(p => {
               const optText = `[${p.expId}] ${p.date} (${p.user})`;
               const selected = currentExpValue === p.expId ? 'selected' : '';
@@ -2888,25 +2922,27 @@ function startMakeupExpFormByStatus(targetExp) {
     }
   });
 
+  // 在 submitFormFinal 裡面：
   let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
   let finalExpId = "";
   let isUpdateMode = false;
   
   const isReservation = currentFormCtx.formId === "FORM_001_2";
+  const isNewProject = selectedExpSelectVal === 'NEW_PROJECT' || selectedExpSelectVal === 'NEW_PAST_PROJECT' || !selectedExpSelectVal;
   
-  if (!isReservation && selectedExpSelectVal && selectedExpSelectVal !== 'NEW_PROJECT' && selectedExpSelectVal !== 'NEW_PAST_PROJECT' && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
+  if (!isReservation && !isNewProject && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
     finalExpId = selectedExpSelectVal;
-    isUpdateMode = true;
+    isUpdateMode = true; // 繼續接續舊專案填寫
   } else {
     finalExpId = generateExperimentId(submitDate);
-    isUpdateMode = false;
+    isUpdateMode = false; // 當作新專案建立
   }
 
   if (!currentFormCtx.data['_time_logs']) {
     currentFormCtx.data['_time_logs'] = {};
   }
 
-  // 🚀 補登模式下，銷毀時間戳，以 "--" 代替
+  // 🚀 關鍵：若是補登模式 (isMakeup === true)，時間戳記一律寫為 "--" 摧毀即時時間
   if (currentFormCtx.isMakeup) {
     currentFormCtx.data['_time_logs'][targetStatus] = "--";
   } else {
