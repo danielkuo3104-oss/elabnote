@@ -93,10 +93,11 @@
 
     /* 無資料 Empty State 美化樣式 */
     .empty-state-box {
-      text-align: center; padding: 36px 16px; color: var(--text-muted);
+      text-align: center; padding: 28px 16px; color: var(--text-muted);
       background: var(--card-bg); border: 1px dashed var(--border-color); border-radius: var(--radius-md);
+      margin: 8px 0;
     }
-    .empty-state-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-top: 6px; }
+    .empty-state-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-top: 4px; }
     .empty-state-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
     /* Modal - 緊湊排版 */
@@ -163,21 +164,7 @@
 <script>
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwvsd4fRN4qgWBL2ku7E_r-DekIiVtikpvjyVLRqOiGWPPb1sts3Mj10bMiX9n_zoO1tw/exec";
   const URL_MEMBERS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=280963157&single=true&output=csv";
-  // 關鍵修復 1：補上 URL_DATA 變數，避免 JS 報錯崩潰
   const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
-
-  // 關鍵修復 2：正確從 Apps Script 後端即時抓取 JSON 數據
-  async function fetchDataCenterFromSheet() {
-    try {
-      const res = await fetch(`${GAS_API_URL}?action=readData&_t=${Date.now()}`);
-      const result = await res.json();
-      if (result && result.records) { 
-        state.dataCenter = result.records; 
-      }
-    } catch (err) {
-      console.error("同步失敗:", err);
-    }
-  }
 
   const STATUS_STYLES = {
     "已預約": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },        
@@ -200,6 +187,11 @@
   };
 
   window.addEventListener('DOMContentLoaded', async () => {
+    // 檢查 Session 保持登入狀態
+    if (!localStorage.getItem('elabnote_user')) {
+      console.warn("未檢測到登入紀錄，返回時將引導登入");
+    }
+
     await fetchMembersFromSheet();
     await fetchDataCenterFromSheet();
     renderRecordCenterStats();
@@ -241,16 +233,66 @@
       const csvText = await res.text();
       const rows = parseCSV(csvText);
       state.membersList = rows.slice(1).map(r => ({ name: r[0]?.trim(), color: r[3]?.trim() || '#f1f5f9' })).filter(m => m.name);
-    } catch(e) {}
+    } catch(e) {
+      console.error("讀取會員列表失敗:", e);
+    }
   }
 
+  // 核心數據讀取：API + CSV 雙保險機制
   async function fetchDataCenterFromSheet() {
+    // 1. 優先嘗試 GAS API
     try {
       const res = await fetch(`${GAS_API_URL}?action=readData&_t=${Date.now()}`);
       const result = await res.json();
-      if (result && result.records) { state.dataCenter = result.records; }
+      if (result && result.records && result.records.length > 0) { 
+        state.dataCenter = result.records; 
+        return;
+      }
     } catch (err) {
-      console.error("同步失敗:", err);
+      console.warn("GAS API 呼叫失敗，自動降級切換為直接解析 CSV 數據發布連結...", err);
+    }
+
+    // 2. 備用降級機制：直接讀取發布的 CSV URL（解決資料庫顯示空白問題）
+    try {
+      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      const records = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row[0] || row[1]) {
+          const expId = row[0] ? row[0].trim() : '未編號';
+          const date = row[1] ? row[1].trim() : '';
+          const user = row[2] ? row[2].trim() : '';
+          const status = row[3] ? row[3].trim() : '未知';
+          
+          let dynamicInfo = '實驗專案';
+          if (row[4]) {
+            try {
+              let jsonStr = row[4].trim();
+              if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) jsonStr = jsonStr.slice(1, -1).replace(/""/g, '"');
+              const formObj = JSON.parse(jsonStr);
+              const outline = formObj['outline_select_val'] || '';
+              const purpose = formObj['selected_purpose_name'] || '';
+              if (outline && purpose) dynamicInfo = `${outline} - ${purpose}`;
+              else dynamicInfo = outline || purpose || '實驗專案';
+            } catch(e) {}
+          }
+
+          records.push({
+            expId: expId,
+            date: date,
+            user: user,
+            status: status,
+            info: dynamicInfo,
+            formData: {}
+          });
+        }
+      }
+      state.dataCenter = records;
+    } catch (csvErr) {
+      console.error("降級 CSV 解析亦失敗:", csvErr);
     }
   }
 
