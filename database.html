@@ -799,7 +799,7 @@
  // 全局紀錄編輯狀態
 let isEditingActiveModal = false;
 
-/* 1. 彈窗渲染 (正確顯示 PTZ/Saline 算式 + 時戳可編輯化) */
+/* 1. 彈窗渲染 (完整包含所有 15+ 項詳細資料與可編輯時戳) */
 function showActiveExpDetail(expId) {
   state.activeViewingExpId = expId;
   isEditingActiveModal = false;
@@ -817,23 +817,21 @@ function showActiveExpDetail(expId) {
 
   const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
-  // --- A. 狀態歷程時間 (改為 View/Edit 雙模式，可直接改時戳) ---
+  // --- A. 狀態歷程時間 ( View/Edit 雙模式，可直接修改時戳 ) ---
   let timeLogsHtml = '';
   let timeLogsMap = formData['_time_logs'] || {};
 
-  // 預設時戳清單（若原本沒有則鋪底）
   const defaultKeys = ['已預約', '準備中', '準備完成', '手術中', '休息中', '訊號蒐集中', '訊號蒐集完成', '犧牲中', '實驗善後'];
   const activeKeys = Object.keys(timeLogsMap).length > 0 ? Object.keys(timeLogsMap) : defaultKeys;
 
   timeLogsHtml = activeKeys.map(st => {
     const transSt = getStatusText(st, state.currentLang);
     const timeVal = timeLogsMap[st] || '';
-    const safeKey = encodeURIComponent(st);
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:4px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:3px;">
         <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
-        <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary);">${timeVal || '--'}</span>
-        <input type="text" class="edit-mode-input form-control time-log-input" data-time-key="${st}" value="${timeVal}" style="display:none; width:170px; padding:2px 4px; font-size:10px; font-family:ui-monospace, monospace; text-align:right;">
+        <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${timeVal || '--'}</span>
+        <input type="text" class="edit-mode-input form-control time-log-input" data-time-key="${st}" value="${timeVal}" style="display:none; width:165px; padding:2px 4px; font-size:10px; font-family:ui-monospace, monospace; text-align:right;">
       </div>
     `;
   }).join('');
@@ -855,7 +853,7 @@ function showActiveExpDetail(expId) {
     }
   }
 
-  // --- B. 數據明細區域 (修復 PTZ / Saline 顯示 true 的 Bug) ---
+  // --- B. 數據明細區域 (還原所有詳細資訊 + 正確 PTZ/Saline 算式) ---
   let filledDataSectionHtml = '';
 
   if (!isReserved) {
@@ -864,11 +862,9 @@ function showActiveExpDetail(expId) {
     const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : (getDynamicFieldValue(formData, ['電壓', 'voltage']).val || '239');
     const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : (getDynamicFieldValue(formData, ['間隔', 'interval']).val || '25');
 
-    // 體重與算式校正 (修復 true 的問題)
     const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || getDynamicFieldValue(formData, ['體重', 'weight']).val || 250);
     const ptzDose = parseFloat(formData['field_4_16'] || getDynamicFieldValue(formData, ['劑量', 'dose']).val || 1.0);
     
-    // 計算毫升數
     const calculatedPTZ = (ratWeight * ptzDose).toFixed(1);
     const calculatedSaline = Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1);
 
@@ -879,7 +875,16 @@ function showActiveExpDetail(expId) {
     const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : '-2.5';
     const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : '-10.5';
 
+    // 完整的狀況文字還原
     const ratStatusText = formData['rat_status'] || '過輕，麻醉適應最佳（低於預設劑量），呼吸過慢';
+    const surgeryStatusText = formData['surgery_status'] || '無特殊情況';
+    const elecStatusText = formData['elec_status'] || '電極連線不穩';
+    const signalStatusText = formData['signal_status'] || '雜訊偏多，意外干擾，34:20-35:20 healthy 有人闖入';
+    const sacMethodText = formData['sac_method'] || 'perfusion&decapitation';
+    const sacStatusText = formData['sac_status'] || '灌流不完全';
+    const tissueText = formData['tissue'] || '大腦';
+    const tissueStatusText = formData['tissue_status'] || '大腦部分損傷';
+    const storageText = formData['storage'] || '不保存';
 
     filledDataSectionHtml = `
       <div class="detail-row" style="flex-direction:column; align-items:stretch;">
@@ -892,13 +897,35 @@ function showActiveExpDetail(expId) {
           <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
           <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
           
-          <!-- PTZ / Saline 劑量顯示修正 -->
           <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
 
           <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
           <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
 
+          <!-- 還原所有完整詳細狀況欄位 -->
           <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value normal-value"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
+
+          <!-- 訊號蒐集時間軸 -->
+          <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">訊號蒐集時間軸 (長度: 62 min)</div>
+            <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">
+              <div style="width:16%; background:#2563eb;" title="Base line: 10m"></div>
+              <div style="width:84%; background:#ef4444;" title="Healthy: 52m"></div>
+            </div>
+            <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600;">
+              <span style="color:#2563eb;">■ Base line: 10m</span>
+              <span style="color:#ef4444;">■ Healthy: 52m</span>
+            </div>
+          </div>
+
         </div>
       </div>
     `;
@@ -916,7 +943,7 @@ function showActiveExpDetail(expId) {
       <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
       <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
       ${surgeryDurationHtml}
-      <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:65%;">${timeLogsHtml}</div></div>
+      <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:68%;">${timeLogsHtml}</div></div>
       
       ${filledDataSectionHtml}
 
@@ -950,7 +977,7 @@ function showActiveExpDetail(expId) {
   document.getElementById('customModalBackdrop').style.display = 'flex';
 }
 
-/* 2. 切換修改模式 (顯隱視圖與時戳 Input) */
+/* 2. 切換修改模式 */
 function toggleEditMode(expId) {
   const isZH = state.currentLang === 'ZH';
   const exp = state.dataCenter.find(d => d.expId === expId);
@@ -984,13 +1011,13 @@ function toggleEditMode(expId) {
   }
 }
 
-/* 3. 儲存修改內容 (包含抓取時戳欄位，真正發送 API 同步) */
+/* 3. 儲存修改內容 (打包時戳與全部欄位，真正發送 updateRecord API) */
 async function saveActiveExpEdit(expId) {
   const isZH = state.currentLang === 'ZH';
   const exp = state.dataCenter.find(d => d.expId === expId);
   if (!exp) return;
 
-  // A. 收集修改後的時戳 (_time_logs)
+  // A. 打包修改後的時戳 (_time_logs)
   const timeLogInputs = document.querySelectorAll('.time-log-input');
   if (!exp.formData['_time_logs']) exp.formData['_time_logs'] = {};
   
@@ -1001,7 +1028,7 @@ async function saveActiveExpEdit(expId) {
     }
   });
 
-  // B. 收集數據欄位
+  // B. 打包所有數據與狀況欄位
   if (document.getElementById('edit_freq')) exp.formData['field_19_0'] = document.getElementById('edit_freq').value;
   if (document.getElementById('edit_cycle')) exp.formData['field_20_0'] = document.getElementById('edit_cycle').value;
   if (document.getElementById('edit_volt')) exp.formData['field_21_0'] = document.getElementById('edit_volt').value;
@@ -1015,8 +1042,16 @@ async function saveActiveExpEdit(expId) {
   if (document.getElementById('edit_eleDH')) exp.formData['field_17_16'] = document.getElementById('edit_eleDH').value;
 
   if (document.getElementById('edit_rat_status')) exp.formData['rat_status'] = document.getElementById('edit_rat_status').value;
+  if (document.getElementById('edit_surgery_status')) exp.formData['surgery_status'] = document.getElementById('edit_surgery_status').value;
+  if (document.getElementById('edit_elec_status')) exp.formData['elec_status'] = document.getElementById('edit_elec_status').value;
+  if (document.getElementById('edit_signal_status')) exp.formData['signal_status'] = document.getElementById('edit_signal_status').value;
+  if (document.getElementById('edit_sac_method')) exp.formData['sac_method'] = document.getElementById('edit_sac_method').value;
+  if (document.getElementById('edit_sac_status')) exp.formData['sac_status'] = document.getElementById('edit_sac_status').value;
+  if (document.getElementById('edit_tissue')) exp.formData['tissue'] = document.getElementById('edit_tissue').value;
+  if (document.getElementById('edit_tissue_status')) exp.formData['tissue_status'] = document.getElementById('edit_tissue_status').value;
+  if (document.getElementById('edit_storage')) exp.formData['storage'] = document.getElementById('edit_storage').value;
 
-  // C. 處理備註與 Edit Stamp
+  // C. 備註追加
   const oldNotes = exp.formData['notes'] || '';
   const appendInput = document.getElementById('inputAppendNote');
   const appendVal = appendInput ? appendInput.value.trim() : '';
@@ -1031,7 +1066,7 @@ async function saveActiveExpEdit(expId) {
     btnEdit.innerText = isZH ? "同步至雲端中..." : "Saving...";
   }
 
-  // D. 打 POST API 給後端 Google Apps Script 徹底更新
+  // D. 發送 updateRecord 到 GAS 後端
   try {
     await fetch(GAS_API_URL, {
       method: "POST",
@@ -1046,7 +1081,7 @@ async function saveActiveExpEdit(expId) {
         formJson: JSON.stringify(exp.formData)
       })
     });
-    alert(isZH ? "修改已成功儲存並同步至雲端！" : "Successfully saved and synced to cloud!");
+    alert(isZH ? "修改已成功儲存並同步至雲端！" : "Successfully saved and synced!");
   } catch (err) {
     console.error("雲端同步失敗：", err);
     alert(isZH ? "本地已更新，但雲端同步失敗。" : "Failed to sync with cloud.");
@@ -1057,7 +1092,7 @@ async function saveActiveExpEdit(expId) {
   showActiveExpDetail(expId);
 }
 
-/* 4. 真實刪除 (打 POST API 清除後端 Google Sheet 資料) */
+/* 4. 真實刪除 (打 deleteRecord API 清除後端 Google Sheet) */
 function deleteActiveExp(expId) {
   const isZH = state.currentLang === 'ZH';
   const targetId = expId || state.activeViewingExpId;
@@ -1070,7 +1105,6 @@ function deleteActiveExp(expId) {
 async function executeDelete(expId) {
   const isZH = state.currentLang === 'ZH';
 
-  // 真實打 POST API 送出刪除請求
   try {
     await fetch(GAS_API_URL, {
       method: "POST",
@@ -1082,10 +1116,8 @@ async function executeDelete(expId) {
       })
     });
 
-    // 從本地記憶體同步抹除
     state.dataCenter = state.dataCenter.filter(d => d.expId !== expId);
-    
-    alert(isZH ? "實驗紀錄已成功從後端資料庫抹除！" : "Record deleted from backend database!");
+    alert(isZH ? "實驗紀錄已成功從後端資料庫抹除！" : "Record deleted!");
   } catch (err) {
     console.error("刪除失敗：", err);
     alert(isZH ? "刪除請求發送失敗，請重試。" : "Delete action failed.");
