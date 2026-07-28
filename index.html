@@ -1117,99 +1117,99 @@ function performLogin() {
   }
 
   async function fetchDataCenterFromSheet() {
-    try {
-      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+  try {
+    const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
 
-      const STATUS_RANK = {
-        "已預約": 1, "準備中": 2, "實驗準備": 2, "準備完成": 3,
-        "手術中": 4, "休息中": 5, "訊號蒐集中": 6, "訊號蒐集完成": 7,
-        "已死亡": 8, "犧牲中": 8, "實驗善後": 9, "已完成": 10,
-        "實驗完成": 10, "實驗結束": 10
-      };
+    const STATUS_RANK = {
+      "已預約": 1, "準備中": 2, "實驗準備": 2, "準備完成": 3,
+      "手術中": 4, "休息中": 5, "訊號蒐集中": 6, "訊號蒐集完成": 7,
+      "已死亡": 8, "犧牲中": 8, "實驗善後": 9, "已完成": 10,
+      "實驗完成": 10, "實驗結束": 10
+    };
 
-      const records = [];
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row[0] || row[1]) {
-          const expId = row[0] ? row[0].trim() : '未編號';
-          const date = row[1] ? row[1].trim() : '';
-          const user = row[2] ? row[2].trim() : '';
-          let statusFromSheet = row[3] ? row[3].trim() : '';
-          
-          let parsedFormData = {};
-
-          const jsonCols = [4, 6, 8, 10, 12];
-          jsonCols.forEach(colIdx => {
-            if (row[colIdx]) {
-              let rawJsonStr = row[colIdx].trim();
-              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
-                rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
-              }
-              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
-                try {
-                  const jsonObj = JSON.parse(rawJsonStr);
-                  parsedFormData = { ...parsedFormData, ...jsonObj };
-                } catch (e) {}
-              }
+    const records = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[0] || row[1]) {
+        const expId = row[0] ? row[0].trim() : '未編號';
+        const date = row[1] ? row[1].trim() : '';
+        const user = row[2] ? row[2].trim() : '';
+        let statusFromSheet = row[3] ? row[3].trim() : '';
+        
+        let parsedFormData = {};
+        const jsonCols = [4, 6, 8, 10, 12];
+        jsonCols.forEach(colIdx => {
+          if (row[colIdx]) {
+            let rawJsonStr = row[colIdx].trim();
+            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
+              rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
             }
-          });
-
-          let form001Data = {};
-          if (row[4]) {
-            let rawForm1Str = row[4].trim();
-            if (rawForm1Str.startsWith('"') && rawForm1Str.endsWith('"')) {
-              rawForm1Str = rawForm1Str.slice(1, -1).replace(/""/g, '"');
-            }
-            if (rawForm1Str.startsWith('{') && rawForm1Str.endsWith('}')) {
-              try { form001Data = JSON.parse(rawForm1Str); } catch (e) {}
+            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+              try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
             }
           }
+        });
 
-          const outlineName = cleanDisplayLabel(form001Data['outline_select_val'] || '');
-          const purposeName = cleanDisplayLabel(form001Data['selected_purpose_name'] || '');
-          
-          let dynamicInfo = "";
-          if (outlineName && purposeName) {
-            dynamicInfo = `${outlineName} - ${purposeName}`;
-          } else if (outlineName || purposeName) {
-            dynamicInfo = outlineName || purposeName;
-          } else {
-            dynamicInfo = "實驗專案";
-          }
-
-          const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
-          let finalStatus = statusFromSheet;
-
-          if (existingLocalRecord) {
-            const currentRank = STATUS_RANK[existingLocalRecord.status] || 0;
-            const sheetRank = STATUS_RANK[statusFromSheet] || 0;
-
-            if (currentRank > sheetRank) {
-              finalStatus = existingLocalRecord.status;
-            } else {
-              finalStatus = statusFromSheet;
-            }
-          }
-
-          const colV = row[21] ? row[21].trim() : '';
-          records.push({
-            expId: expId,
-            date: date,
-            user: user,
-            status: finalStatus,
-            info: dynamicInfo,
-            formData: parsedFormData,
-            hasDataUpload: colV !== '' && colV !== '0' && colV !== '-'
-          });
+        // 1. 專案大綱與目的 (防止被「不保存」誤導覆蓋)
+        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
+        let purposeName = parsedFormData['selected_purpose_name'];
+        if (!purposeName || purposeName === '不保存') {
+          purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '';
         }
+        purposeName = cleanDisplayLabel(purposeName);
+        
+        let dynamicInfo = "";
+        if (outlineName && purposeName) {
+          dynamicInfo = `${outlineName} - ${purposeName}`;
+        } else if (outlineName || purposeName) {
+          dynamicInfo = outlineName || purposeName;
+        } else {
+          dynamicInfo = "實驗專案";
+        }
+
+        // 2. 狀態優先級比對
+        const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
+        let finalStatus = statusFromSheet;
+        if (existingLocalRecord) {
+          const currentRank = STATUS_RANK[existingLocalRecord.status] || 0;
+          const sheetRank = STATUS_RANK[statusFromSheet] || 0;
+          finalStatus = currentRank > sheetRank ? existingLocalRecord.status : statusFromSheet;
+        }
+
+        // 3. 全列掃描 W 欄 (Google Drive 連結)，有連結才判定為「已上傳」
+        let expDataFolder = "";
+        for (let c = 0; c < row.length; c++) {
+          const cellVal = String(row[c] || "").trim();
+          if (cellVal.includes("drive.google.com")) {
+            expDataFolder = cellVal;
+            break;
+          }
+        }
+        if (!expDataFolder && row.length > 22) {
+          expDataFolder = String(row[22] || "").trim();
+        }
+
+        const isFolderValid = expDataFolder.startsWith("http");
+
+        records.push({
+          expId: expId,
+          date: date,
+          user: user,
+          status: finalStatus,
+          info: dynamicInfo,
+          formData: parsedFormData,
+          expDataFolder: expDataFolder,
+          hasDataUpload: isFolderValid
+        });
       }
-      state.dataCenter = records;
-    } catch (err) {
-      console.error("同步資料中心失敗:", err);
     }
+    state.dataCenter = records;
+  } catch (err) {
+    console.error("同步資料中心失敗:", err);
   }
+}
 
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
