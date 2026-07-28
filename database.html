@@ -129,11 +129,11 @@
       transition: max-width 0.3s ease;
     }
     .custom-modal.expanded-mode {
-      max-width: 860px;
+      max-width: 880px;
     }
 
     .custom-modal h3 { margin-bottom: 12px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
-    .detail-list { text-align: left; overflow-y: auto; max-height: 68vh; font-size: 12px; padding: 2px; }
+    .detail-list { text-align: left; overflow-y: auto; max-height: 72vh; font-size: 12px; padding: 2px; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 35%; flex-shrink: 0; }
     .detail-value { font-weight: 600; color: var(--text-primary); width: 65%; text-align: right; word-break: break-word; }
@@ -142,9 +142,9 @@
     .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; margin-top: 10px; font-size: 13px; transition: all 0.2s; }
     .modal-btn-expand:hover { background: #dbeafe; }
 
-    /* 展開版 Layout */
+    /* 展開版專業 Grid Layout */
     .expanded-grid {
-      display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 10px;
+      display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 10px;
     }
     @media (min-width: 640px) {
       .expanded-grid { grid-template-columns: 1fr 1fr; }
@@ -152,7 +152,7 @@
     }
 
     .exp-panel {
-      background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px;
+      background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px;
     }
     .exp-panel-title {
       font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
@@ -160,7 +160,7 @@
     }
 
     /* 多色耗數比例時間軸 */
-    .timeline-bar-wrapper { margin-top: 8px; margin-bottom: 10px; }
+    .timeline-bar-wrapper { margin-top: 8px; margin-bottom: 8px; }
     .timeline-multi-bar { display: flex; width: 100%; height: 14px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0; }
     .timeline-segment { height: 100%; transition: width 0.3s ease; }
     .timeline-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-top: 8px; font-weight: 600; }
@@ -649,7 +649,7 @@
     return { val: null, id: null };
   }
 
-  /* 🚀 完全與主頁邏輯同步的資料解析與彈窗引擎 🚀 */
+  /* 第一階段：精簡明細彈窗 */
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
     const exp = state.dataCenter.find(d => d.expId === expId);
@@ -664,7 +664,6 @@
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.remove('expanded-mode');
 
-    // 1. 歷程時間軸 & 手術用時計算
     let timeLogsHtml = '';
     let surgeryDurationHtml = '';
     
@@ -698,7 +697,6 @@
       timeLogsHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</span>`;
     }
 
-    // 2. 數據明細動態提取
     let detailsList = [];
 
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
@@ -709,9 +707,6 @@
 
     const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
     if (voltObj.val) detailsList.push({ label: isZH ? '電壓 / Voltage' : 'Voltage', val: `${voltObj.val} mV` });
-
-    const interObj = getDynamicFieldValue(formData, ['間隔', 'interval']);
-    if (interObj.val) detailsList.push({ label: isZH ? '間隔 / Interval' : 'Interval', val: `${interObj.val} ms` });
 
     const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
     const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
@@ -898,27 +893,6 @@
       notesArr.push(String(formData['notes']).trim());
     }
 
-    if (state.dynamicForms) {
-      Object.keys(state.dynamicForms).forEach(fId => {
-        const pages = state.dynamicForms[fId];
-        if (Array.isArray(pages)) {
-          pages.forEach(p => {
-            if (p.fields && Array.isArray(p.fields)) {
-              p.fields.forEach(f => {
-                if ((f.type === 'note' || f.isNoteTag) && !usedSignalKeys.has(f.id)) {
-                  const noteVal = formData[f.id];
-                  if (noteVal && String(noteVal).trim() !== '') {
-                    const cleanVal = String(noteVal).trim();
-                    if (!notesArr.includes(cleanVal)) notesArr.push(cleanVal);
-                  }
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-
     let notesStr = notesArr.length > 0 ? notesArr.join('\n') : (isZH ? '無' : 'None');
 
     const htmlContent = `
@@ -968,7 +942,7 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  /* 多色流程時間軸計算引擎 */
+  /* 🚀 精準全流程多段耗時計算引擎 🚀 */
   function calculateProcessTimeline(timeLogs) {
     const isZH = state.currentLang === 'ZH';
     const segments = [];
@@ -987,22 +961,26 @@
     const tSacrificeStart = getTime('犧牲中');
     const tCleanupEnd = getTime('實驗善後') || getTime('已完成') || getTime('實驗完成');
 
+    // 1. 手術耗時
     if (tSurgeryStart && (tBreakStart || tSignalStart)) {
       const end = tBreakStart || tSignalStart;
       const diff = Math.max(0, Math.floor((end - tSurgeryStart) / 60000));
       if (diff > 0) { segments.push({ name: isZH ? '手術耗時' : 'Surgery', mins: diff, color: '#ef4444' }); totalMins += diff; }
     }
 
+    // 2. 休息間隔
     if (tBreakStart && tSignalStart) {
       const diff = Math.max(0, Math.floor((tSignalStart - tBreakStart) / 60000));
       if (diff > 0) { segments.push({ name: isZH ? '休息間隔' : 'Rest Interval', mins: diff, color: '#10b981' }); totalMins += diff; }
     }
 
+    // 3. 訊號蒐集耗時
     if (tSignalStart && tSignalEnd) {
       const diff = Math.max(0, Math.floor((tSignalEnd - tSignalStart) / 60000));
       if (diff > 0) { segments.push({ name: isZH ? '訊號蒐集耗時' : 'Signal Duration', mins: diff, color: '#f59e0b' }); totalMins += diff; }
     }
 
+    // 4. 犧牲與善後耗時
     if (tSacrificeStart && tCleanupEnd) {
       const diff = Math.max(0, Math.floor((tCleanupEnd - tSacrificeStart) / 60000));
       if (diff > 0) { segments.push({ name: isZH ? '犧牲耗時' : 'Sacrifice', mins: diff, color: '#8b5cf6' }); totalMins += diff; }
@@ -1039,7 +1017,7 @@
     return { totalMins, barHtml };
   }
 
-  /* 第二階段：完整展開版 */
+  /* 🚀 第二階段：全資訊專業展開版（網格結構化完整呈現） 🚀 */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1052,66 +1030,218 @@
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.add('expanded-mode');
 
+    // 1. 全流程多段耗時計算
     const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
+    // 2. 提取物理與動物參數
     const weightObj = getDynamicFieldValue(formData, ['體重', 'weight']);
     const doseObj = getDynamicFieldValue(formData, ['劑量', 'dose']);
     const freqObj = getDynamicFieldValue(formData, ['頻率', 'frequency']);
     const cycleObj = getDynamicFieldValue(formData, ['週期', 'cycle']);
     const voltObj = getDynamicFieldValue(formData, ['電壓', 'voltage']);
 
+    const ratWeight = parseFloat(weightObj.val || 0);
+    const ptzDose = parseFloat(doseObj.val || 1);
+    const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
+
+    // 3. 立體定位座標
     const lamdaAP = formData['field_20_16'] || '0';
     const lamdaML = formData['field_19_16'] || '0';
     const eleAP = formData['field_16_16'] || '0';
     const eleML = formData['field_12_16'] || '0';
     const eleDH = formData['field_17_16'] || '0';
 
+    // 4. 實驗過程狀況、特殊情況與犧牲摘除全抓取
+    let conditionRowsHtml = '';
+
+    const conditionConfigs = [
+      { zh: '大鼠生理情況', en: 'Rat Physiological State', kw: ['生理', 'physiological'] },
+      { zh: '手術過程狀況', en: 'Surgical Conditions', kw: ['手術', 'surgical', 'surgery'] },
+      { zh: '電極插入狀況', en: 'Electrode Insertion State', kw: ['電極', 'electrode'] }
+    ];
+
+    conditionConfigs.forEach(cfg => {
+      let fieldObj = getDynamicFieldValue(formData, cfg.kw);
+      let itemArr = [];
+      if (fieldObj.val && Array.isArray(fieldObj.val) && fieldObj.val.length > 0) {
+        itemArr = [...fieldObj.val];
+        const otherInput = formData[`${fieldObj.id}_input`] || '';
+        itemArr = itemArr.map(item => item.includes('其他') ? (otherInput || (isZH ? '其他' : 'Other')) : formatBilingualText(item, state.currentLang));
+      } else if (fieldObj.val && typeof fieldObj.val === 'string' && fieldObj.val.trim() !== '') {
+        itemArr = [formatBilingualText(fieldObj.val, state.currentLang)];
+      }
+
+      const valStr = itemArr.length > 0 ? itemArr.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
+      const textColor = itemArr.length > 0 ? 'var(--primary)' : 'var(--text-muted)';
+      conditionRowsHtml += `<div class="detail-row"><div class="detail-label">${isZH ? cfg.zh : cfg.en}</div><div class="detail-value" style="color:${textColor}; font-weight:700;">${valStr}</div></div>`;
+    });
+
+    // 訊號蒐集情況
+    let signalItems = [];
+    Object.keys(formData).forEach(k => {
+      if (k.endsWith('_20') && !['field_3_20', 'field_4_20', 'field_5_20', 'field_6_20'].includes(k)) {
+        const val = formData[k];
+        if (Array.isArray(val) && val.length > 0) {
+          val.forEach(item => {
+            const formatted = formatBilingualText(item, state.currentLang);
+            if (!signalItems.includes(formatted)) signalItems.push(formatted);
+          });
+        } else if (typeof val === 'string' && val.trim() !== '' && !['on', 'true'].includes(val.trim().toLowerCase())) {
+          const formatted = String(val).trim();
+          if (!signalItems.includes(formatted)) signalItems.push(formatted);
+        }
+      }
+    });
+    const signalValStr = signalItems.length > 0 ? signalItems.join(', ') : (isZH ? '無特殊情況' : 'No special conditions');
+    const signalTextColor = signalItems.length > 0 ? 'var(--primary)' : 'var(--text-muted)';
+    conditionRowsHtml += `<div class="detail-row"><div class="detail-label">${isZH ? '訊號蒐集情況' : 'Signal Collection'}</div><div class="detail-value" style="color:${signalTextColor}; font-weight:700;">${signalValStr}</div></div>`;
+
+    // 犧牲與組織摘除
+    const sacrificeConfigs = [
+      { zh: '犧牲方式', en: 'Sacrifice Method', kw: ['犧牲方式', '犧牲方法', 'sacrificemethod'], fallbackKeys: ['field_3_24'] },
+      { zh: '犧牲情況', en: 'Sacrifice Condition', kw: ['犧牲情況', '犧牲狀況', '犧牲過程', '灌流狀況', '灌流情況', '灌流', 'sacrificestatus', 'sacrificedetail'], fallbackKeys: ['field_9_24'] },
+      { zh: '本次摘除組織', en: 'Excised Tissue', kw: ['摘除組織', '摘取組織', '摘除器官', 'tissue', 'organ'], fallbackKeys: ['field_14_24'] },
+      { zh: '摘除情況', en: 'Excision Condition', kw: ['摘除情況', '摘除狀況', '摘除過程', '組織情況', '組織狀況', '器官情況', 'excisionstatus', 'excisiondetail'], fallbackKeys: ['field_17_24'] },
+      { zh: '保存方式', en: 'Preservation Method', kw: ['保存方式', '保存方法', '保存', 'preservation'], fallbackKeys: ['field_21_24'] }
+    ];
+
+    sacrificeConfigs.forEach(cfg => {
+      let fieldObj = getDynamicFieldValue(formData, cfg.kw);
+      let rawVal = fieldObj.val;
+      if ((rawVal === null || rawVal === undefined) && cfg.fallbackKeys) {
+        for (const fbKey of cfg.fallbackKeys) {
+          if (formData[fbKey] !== undefined && formData[fbKey] !== '') { rawVal = formData[fbKey]; break; }
+        }
+      }
+
+      if (rawVal !== null && rawVal !== undefined) {
+        let displayStr = Array.isArray(rawVal) ? rawVal.map(v => formatBilingualText(v, state.currentLang)).filter(Boolean).join(', ') : formatBilingualText(rawVal, state.currentLang);
+        if (displayStr.trim() !== '') {
+          conditionRowsHtml += `<div class="detail-row"><div class="detail-label">${isZH ? cfg.zh : cfg.en}</div><div class="detail-value" style="color:var(--primary); font-weight:700;">${displayStr}</div></div>`;
+        }
+      }
+    });
+
+    // 5. 腦訊號蒐集區段時間軸動態解析
+    let validStages = [];
+    let totalBrainMin = 0;
+    Object.keys(formData).forEach(k => {
+      if (Array.isArray(formData[k]) && formData[k].length > 0) {
+        formData[k].forEach(st => {
+          if (st && st.name && st.time !== undefined) {
+            const t = parseFloat(st.time) || 0;
+            if (t > 0 && String(st.name).trim() !== '') {
+              totalBrainMin += t;
+              validStages.push({ name: String(st.name).trim(), time: t });
+            }
+          }
+        });
+      }
+    });
+
+    let brainTimelineHtml = '';
+    if (totalBrainMin > 0) {
+      const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899'];
+      let barBarsHtml = '';
+      let legendsHtml = '';
+      validStages.forEach((st, idx) => {
+        const color = colors[idx % colors.length];
+        const pct = ((st.time / totalBrainMin) * 100).toFixed(1);
+        barBarsHtml += `<div style="width:${pct}%; background:${color};" title="${st.name}: ${st.time}m"></div>`;
+        legendsHtml += `<span style="color:${color};">■ ${st.name}: ${st.time}m</span>`;
+      });
+
+      brainTimelineHtml = `
+        <div style="margin-top:6px;">
+          <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">
+            ${isZH ? '腦訊號搜集總長度' : 'Signal Duration'}: ${totalBrainMin} min
+          </div>
+          <div style="display:flex; width:100%; height:12px; border-radius:6px; overflow:hidden; border:1px solid #cbd5e1; background:#f1f5f9;">
+            ${barBarsHtml}
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:10px; margin-top:6px; font-weight:600;">
+            ${legendsHtml}
+          </div>
+        </div>
+      `;
+    } else {
+      brainTimelineHtml = `<span style="color:var(--text-muted); font-size:11px;">${isZH ? '無紀錄腦訊號搜集區段' : 'No recorded signal stages'}</span>`;
+    }
+
+    // 6. 備註紀錄
+    let notesArr = [];
+    if (formData['notes'] && String(formData['notes']).trim() !== '') {
+      notesArr.push(String(formData['notes']).trim());
+    }
+    let notesStr = notesArr.length > 0 ? notesArr.join('\n') : (isZH ? '無' : 'None');
+
+    // 7. 數據資料夾連結 (Column W)
     const dataFolderHtml = exp.expDataFolder 
       ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">📁 ${isZH?'點擊開啟雲端數據資料夾':'Open Raw Data Folder'} ↗</a>`
       : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'未上傳數據資料夾':'No data folder linked'}</span>`;
 
     const expandedHtml = `
-      <div class="detail-list" style="max-height:72vh;">
+      <div class="detail-list" style="max-height:75vh;">
         
-        <div style="background:#f1f5f9; padding:12px; border-radius:var(--radius-md); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <!-- Header 識別標頭 -->
+        <div style="background:#f1f5f9; padding:12px 16px; border-radius:var(--radius-md); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
           <div>
             <span style="font-size:11px; color:var(--text-muted); font-weight:700;">ID:</span>
-            <strong style="font-family:ui-monospace, monospace; color:var(--primary); font-size:14px;">${exp.expId}</strong>
+            <strong style="font-family:ui-monospace, monospace; color:var(--primary); font-size:15px; margin-left:4px;">${exp.expId}</strong>
           </div>
           <div>
             <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
           </div>
         </div>
 
+        <!-- 面板 1：全流程總耗時間軸區 -->
         <div class="exp-panel" style="margin-bottom:12px;">
-          <div class="exp-panel-title">⏱️ ${isZH?'實驗全流程時間軸與階段耗時':'Experiment Execution Timeline'}</div>
+          <div class="exp-panel-title">${isZH?'實驗全流程時間軸與階段耗時':'Experiment Execution Timeline'}</div>
           <div style="font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:4px;">
             ${isZH?'實驗總耗時':'Total Process Time'}: <span style="color:var(--primary); font-size:13px;">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</span>
           </div>
           ${timeLogCalculations.barHtml}
         </div>
 
+        <!-- 響應式雙欄結構化網格區 -->
         <div class="expanded-grid">
           
+          <!-- 面板 2：物理與動物參數 -->
           <div class="exp-panel">
-            <div class="exp-panel-title">🧪 ${isZH?'動物劑量與物理參數':'Animal & Physical Parameters'}</div>
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value">${weightObj.val ? weightObj.val + ' g' : '--'}</div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline':'PTZ / Saline'}</div><div class="detail-value">${weightObj.val ? (weightObj.val * (doseObj.val||1)).toFixed(1) + ' / ' + Math.max(0, 700 - weightObj.val * (doseObj.val||1)).toFixed(1) + ' uL' : '--'}</div></div>
+            <div class="exp-panel-title">${isZH?'動物劑量與物理參數':'Animal & Physical Parameters'}</div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value">${ratWeight > 0 ? ratWeight + ' g' : '--'}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline':'PTZ / Saline'}</div><div class="detail-value">${ptzVol} / ${salineVol} uL</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'超音波頻率':'US Frequency'}</div><div class="detail-value">${freqObj.val ? freqObj.val + ' HZ' : '--'}</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'週期 / 電壓':'Cycle / Volt'}</div><div class="detail-value">${cycleObj.val || '--'} / ${voltObj.val || '--'} mV</div></div>
           </div>
 
+          <!-- 面板 3：立體定位與執行資訊 -->
           <div class="exp-panel">
-            <div class="exp-panel-title">🎯 ${isZH?'立體定位與電極座標':'Stereotaxic Coordinates'}</div>
+            <div class="exp-panel-title">${isZH?'立體定位與電極座標':'Stereotaxic Coordinates'}</div>
             <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Pos'}</div><div class="detail-value">(${lamdaAP}, ${lamdaML})</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value">(${eleAP}, ${eleML}, ${eleDH})</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'負責人員':'Experimenter'}</div><div class="detail-value">${exp.user}</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value">${exp.date}</div></div>
           </div>
 
+          <!-- 面板 4：實驗過程狀況與組織摘除 (Full Width) -->
           <div class="exp-panel full-width">
-            <div class="exp-panel-title">📊 ${isZH?'實驗數據與原始資料連結 (Column W)':'Experimental Data & Files (Column W)'}</div>
-            <div style="padding:6px 0; font-size:12px;">
+            <div class="exp-panel-title">${isZH?'實驗過程狀況與犧牲摘除紀錄':'Surgical Conditions & Organ Excision'}</div>
+            ${conditionRowsHtml}
+          </div>
+
+          <!-- 面板 5：腦訊號蒐集時間軸 (Full Width) -->
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">${isZH?'腦訊號搜集區段時間軸':'Brain Signal Collection Stages'}</div>
+            ${brainTimelineHtml}
+          </div>
+
+          <!-- 面板 6：備註與雲端數據資料夾 (Full Width) -->
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">${isZH?'備註與雲端數據資料夾 (Column W)':'Notes & Experimental Data Files'}</div>
+            <div class="detail-row"><div class="detail-label">${isZH?'備註紀錄':'Notes'}</div><div class="detail-value" style="white-space:pre-line; text-align:left;">${notesStr}</div></div>
+            <div style="padding-top:6px; font-size:12px;">
               ${dataFolderHtml}
             </div>
           </div>
