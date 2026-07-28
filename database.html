@@ -163,6 +163,21 @@
 <script>
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwvsd4fRN4qgWBL2ku7E_r-DekIiVtikpvjyVLRqOiGWPPb1sts3Mj10bMiX9n_zoO1tw/exec";
   const URL_MEMBERS = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=280963157&single=true&output=csv";
+  // 關鍵修復 1：補上 URL_DATA 變數，避免 JS 報錯崩潰
+  const URL_DATA    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSrNpnTtT0ParHdFoT3lqwf07EzA2TbjEjrsHKu-BA8oNspw8ZvlGUVHfuXRZ18HHfGAtgnzyZqMziF/pub?gid=301837161&single=true&output=csv";
+
+  // 關鍵修復 2：正確從 Apps Script 後端即時抓取 JSON 數據
+  async function fetchDataCenterFromSheet() {
+    try {
+      const res = await fetch(`${GAS_API_URL}?action=readData&_t=${Date.now()}`);
+      const result = await res.json();
+      if (result && result.records) { 
+        state.dataCenter = result.records; 
+      }
+    } catch (err) {
+      console.error("同步失敗:", err);
+    }
+  }
 
   const STATUS_STYLES = {
     "已預約": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" },        
