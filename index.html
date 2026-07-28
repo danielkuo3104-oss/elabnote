@@ -541,7 +541,7 @@ function checkSession() {
       state.currentUser = JSON.parse(savedUser);
       state.isGuest = state.currentUser.role === 'Guest';
       
-      // 自動隱藏登入頁，顯示主畫面與 FAB 按鈕
+      // 已登入：隱藏登入頁，顯示主畫面與 FAB
       document.getElementById('authPage').style.display = 'none';
       document.getElementById('fabBtn').style.display = 'flex';
       
@@ -552,13 +552,21 @@ function checkSession() {
       }
     } catch(e) {
       localStorage.removeItem('elabnote_user');
-      document.getElementById('authPage').style.display = 'flex';
-      document.getElementById('fabBtn').style.display = 'none';
+      showAuthPageOnly();
     }
   } else {
-    document.getElementById('authPage').style.display = 'flex';
-    document.getElementById('fabBtn').style.display = 'none';
+    // 未登入：強制全螢幕遮擋
+    showAuthPageOnly();
   }
+}
+
+// 輔助函式：未登入時強制開啟登入頁並隱藏懸浮按鈕
+function showAuthPageOnly() {
+  state.currentUser = null;
+  state.isGuest = false;
+  document.getElementById('authPage').style.display = 'flex';
+  document.getElementById('fabBtn').style.display = 'none';
+  document.getElementById('userBadge').innerText = "未登入";
 }
 
 function performLogin() {
@@ -1057,10 +1065,15 @@ function performLogin() {
     initColorDropdown();
 
     // 關鍵保護：如果已經是登入狀態，堅決不讓 authPage 彈出來！
-    if (state.currentUser || localStorage.getItem('elabnote_user')) {
-      document.getElementById('authPage').style.display = 'none';
-      document.getElementById('fabBtn').style.display = 'flex';
-    }
+    // 在 fetchMembersFromSheet() 結尾處替換保護邏輯：
+  if (state.currentUser || localStorage.getItem('elabnote_user')) {
+    document.getElementById('authPage').style.display = 'none';
+    document.getElementById('fabBtn').style.display = 'flex';
+  } else {
+    // 關鍵修正：若尚未登入，堅決保持 authPage 顯示！
+    document.getElementById('authPage').style.display = 'flex';
+    document.getElementById('fabBtn').style.display = 'none';
+  }
   } catch(err) {
     console.error("同步會員中心失敗:", err);
   }
