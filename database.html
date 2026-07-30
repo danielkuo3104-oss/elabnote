@@ -361,19 +361,19 @@
   }
 
   function cleanDisplayLabel(text) {
-  if (typeof text !== 'string') text = String(text || ''); // 🚀 關鍵防禦：防範非字串型態引發 replace 報錯
-  return text
-    .replace(/\[submit\]/gi, '')
-    .replace(/\[fetch_detail:[^\]]+\]/gi, '')
-    .replace(/\[status:[^\]]+\]/gi, '')
-    .replace(/\[info\]/gi, '')
-    .replace(/\[warning\]/gi, '')
-    .replace(/\[formula:[^\]]+\]/gi, '')
-    .replace(/\[unit:[^\]]+\]/gi, '')
-    .replace(/\[placeholder:[^\]]+\]/gi, '')
-    .replace(/\[default:[^\]]+\]/gi, '')
-    .trim();
-}
+    if (typeof text !== 'string') text = String(text || ''); 
+    return text
+      .replace(/\[submit\]/gi, '')
+      .replace(/\[fetch_detail:[^\]]+\]/gi, '')
+      .replace(/\[status:[^\]]+\]/gi, '')
+      .replace(/\[info\]/gi, '')
+      .replace(/\[warning\]/gi, '')
+      .replace(/\[formula:[^\]]+\]/gi, '')
+      .replace(/\[unit:[^\]]+\]/gi, '')
+      .replace(/\[placeholder:[^\]]+\]/gi, '')
+      .replace(/\[default:[^\]]+\]/gi, '')
+      .trim();
+  }
 
   function formatBilingualText(fullInfoStr, lang) {
     if (!fullInfoStr) return '';
@@ -489,80 +489,75 @@
   }
 
   async function fetchDataCenterFromSheet() {
-  try {
-    const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-    const csvText = await res.text();
-    const rows = parseCSV(csvText);
-    const records = [];
+    try {
+      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      const records = [];
 
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row) continue;
-      if (row[0] || row[1]) {
-        const expId = row[0] ? row[0].trim() : '未編號';
-        const date = row[1] ? row[1].trim() : '';
-        const user = row[2] ? row[2].trim() : '';
-        const status = row[3] ? row[3].trim() : '未知';
-        
-        let parsedFormData = {};
-        const jsonCols = [4, 6, 8, 10, 12];
-        jsonCols.forEach(colIdx => {
-          if (row[colIdx]) {
-            let rawJsonStr = row[colIdx].trim();
-            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
-            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
-              try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row) continue;
+        if (row[0] || row[1]) {
+          const expId = row[0] ? row[0].trim() : '未編號';
+          const date = row[1] ? row[1].trim() : '';
+          const user = row[2] ? row[2].trim() : '';
+          const status = row[3] ? row[3].trim() : '未知';
+          
+          let parsedFormData = {};
+          const jsonCols = [4, 6, 8, 10, 12];
+          jsonCols.forEach(colIdx => {
+            if (row[colIdx]) {
+              let rawJsonStr = row[colIdx].trim();
+              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+                try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
+              }
+            }
+          });
+
+          const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
+          
+          let rawPurpose = parsedFormData['selected_purpose_name'];
+          if (!rawPurpose || rawPurpose === '不保存' || rawPurpose === '過麻') {
+            rawPurpose = parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || parsedFormData['field_7_4'] || '';
+          }
+          
+          let purposeName = cleanDisplayLabel(rawPurpose);
+          
+          let dynamicInfo = "";
+          if (outlineName && purposeName) {
+            dynamicInfo = `${outlineName} - ${purposeName}`;
+          } else if (outlineName || purposeName) {
+            dynamicInfo = outlineName || purposeName;
+          } else {
+            dynamicInfo = "實驗專案";
+          }
+
+          let expDataFolder = "";
+          for (let c = 0; c < row.length; c++) {
+            const cellVal = String(row[c] || "").trim();
+            if (cellVal.includes("drive.google.com")) {
+              expDataFolder = cellVal;
+              break;
             }
           }
-        });
-
-        // 專案大綱與目的 (修正：嚴格排除「過麻」與犧牲字眼被當成實驗目的)
-        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
-        
-        let rawPurpose = parsedFormData['selected_purpose_name'];
-        if (!rawPurpose || rawPurpose === '不保存' || rawPurpose === '過麻') {
-          // 按順序優先尋找真正的實驗目的欄位
-          rawPurpose = parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || parsedFormData['field_7_4'] || '';
-        }
-        
-        let purposeName = cleanDisplayLabel(rawPurpose);
-        
-        let dynamicInfo = "";
-        if (outlineName && purposeName) {
-          dynamicInfo = `${outlineName} - ${purposeName}`;
-        } else if (outlineName || purposeName) {
-          dynamicInfo = outlineName || purposeName;
-        } else {
-          dynamicInfo = "實驗專案";
-        }
-
-        // 🚀 【修復重點】動態尋找包含 "drive.google.com" 的欄位作為資料夾網址
-        let expDataFolder = "";
-        for (let c = 0; c < row.length; c++) {
-          const cellVal = String(row[c] || "").trim();
-          if (cellVal.includes("drive.google.com")) {
-            expDataFolder = cellVal;
-            break;
+          
+          if (!expDataFolder && row.length > 22) {
+            expDataFolder = String(row[22] || "").trim();
           }
-        }
-        
-        // 若上面沒找到，保底取第 23 欄 (W 欄，Index 22)
-        if (!expDataFolder && row.length > 22) {
-          expDataFolder = String(row[22] || "").trim();
-        }
 
-        // 只要 W 欄有 Drive 連結，或 parsedFormData 內標記了上傳，就判定為「已上傳」
-        const isFolderValid = expDataFolder.startsWith("http");
+          const isFolderValid = expDataFolder.startsWith("http");
 
-        records.push({
-          expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder,
-          hasDataUpload: isFolderValid
-        });
+          records.push({
+            expId, date, user, status, info: dynamicInfo, formData: parsedFormData, expDataFolder,
+            hasDataUpload: isFolderValid
+          });
+        }
       }
-    }
-    state.dataCenter = records;
-  } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
-}
+      state.dataCenter = records;
+    } catch (csvErr) { console.error("解析 CSV 失敗:", csvErr); }
+  }
 
   function renderEmptyState(titleText, descText) {
     return `<div class="empty-state-box"><div class="empty-state-title">${titleText}</div><div class="empty-state-desc">${descText}</div></div>`;
@@ -713,92 +708,88 @@
     return { totalMins, barHtml, miniBarHtml };
   }
 
-  /* 🚀 修正版搜尋引擎：支援搜尋「已上傳」、「待上傳」及全動態內容 🚀 */
-function filterRecordCenterList() {
-  const kw = document.getElementById('txtRecordSearch').value.trim().toLowerCase();
-  const container = document.getElementById('recordCenterList');
-  let html = `<div class="timeline-line"></div>`;
+  function filterRecordCenterList() {
+    const kw = document.getElementById('txtRecordSearch').value.trim().toLowerCase();
+    const container = document.getElementById('recordCenterList');
+    let html = `<div class="timeline-line"></div>`;
 
-  const filtered = state.dataCenter.filter(d => {
-    if (!kw) return true;
-    
-    const displayStatus = getStatusText(d.status, state.currentLang).toLowerCase();
-    const displayInfo = formatBilingualText(d.info, state.currentLang).toLowerCase();
+    const filtered = state.dataCenter.filter(d => {
+      if (!kw) return true;
+      
+      const displayStatus = getStatusText(d.status, state.currentLang).toLowerCase();
+      const displayInfo = formatBilingualText(d.info, state.currentLang).toLowerCase();
 
-    // 動態計算上傳標籤文字
-    const isCompleted = d.status === '已完成' || d.status === '實驗完成' || d.status === '實驗結束' || d.status === 'Completed';
-    const uploadText = isCompleted 
-      ? (d.hasDataUpload ? (state.currentLang==='ZH'?'已上傳':'uploaded') : (state.currentLang==='ZH'?'待上傳':'pending'))
-      : '';
+      const isCompleted = d.status === '已完成' || d.status === '實驗完成' || d.status === '實驗結束' || d.status === 'Completed';
+      const uploadText = isCompleted 
+        ? (d.hasDataUpload ? (state.currentLang==='ZH'?'已上傳':'uploaded') : (state.currentLang==='ZH'?'待上傳':'pending'))
+        : '';
 
-    // 1. 基本資訊匹配 (加入 uploadText 比對)
-    const basicMatch = (d.expId||'').toLowerCase().includes(kw) || 
-                       (d.user||'').toLowerCase().includes(kw) || 
-                       displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
-                       displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw) ||
-                       uploadText.includes(kw);
-                       
-    if (basicMatch) return true;
+      const basicMatch = (d.expId||'').toLowerCase().includes(kw) || 
+                         (d.user||'').toLowerCase().includes(kw) || 
+                         displayStatus.includes(kw) || (d.status||'').toLowerCase().includes(kw) ||
+                         displayInfo.includes(kw) || (d.date||'').toLowerCase().includes(kw) ||
+                         uploadText.includes(kw);
+                         
+      if (basicMatch) return true;
 
-    // 2. 表單內部 JSON 數據比對
-    if (d.formData && typeof d.formData === 'object') {
-      const formDataString = JSON.stringify(d.formData).toLowerCase();
-      if (formDataString.includes(kw)) return true;
+      if (d.formData && typeof d.formData === 'object') {
+        const formDataString = JSON.stringify(d.formData).toLowerCase();
+        if (formDataString.includes(kw)) return true;
+      }
+
+      return false;
+    }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    if (filtered.length === 0) {
+      container.innerHTML = html + renderEmptyState(state.currentLang==='ZH'?'無符合條件的實驗紀錄':'No matching records', '');
+      return;
     }
 
-    return false;
-  }).sort((a,b) => new Date(b.date) - new Date(a.date));
+    filtered.forEach(item => {
+      const userObj = state.membersList.find(m => m.name === item.user);
+      const userColor = userObj ? userObj.color : '#f1f5f9';
+      const styleObj = getStatusStyle(item.status);
+      const displayStatus = getStatusText(item.status, state.currentLang);
+      const displayInfo = formatBilingualText(item.info, state.currentLang);
 
-  if (filtered.length === 0) {
-    container.innerHTML = html + renderEmptyState(state.currentLang==='ZH'?'無符合條件的實驗紀錄':'No matching records', '');
-    return;
-  }
+      const isReserved = item.status === '已預約' || item.status === 'Reserved';
 
-  filtered.forEach(item => {
-    const userObj = state.membersList.find(m => m.name === item.user);
-    const userColor = userObj ? userObj.color : '#f1f5f9';
-    const styleObj = getStatusStyle(item.status);
-    const displayStatus = getStatusText(item.status, state.currentLang);
-    const displayInfo = formatBilingualText(item.info, state.currentLang);
+      const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
+      const uploadTagHtml = isCompleted 
+        ? (item.hasDataUpload 
+            ? `<span class="upload-status-tag uploaded">${state.currentLang==='ZH'?'已上傳':'Uploaded'}</span>` 
+            : `<span class="upload-status-tag pending">${state.currentLang==='ZH'?'待上傳':'Pending'}</span>`) 
+        : '';
 
-    const isReserved = item.status === '已預約' || item.status === 'Reserved';
+      const timeLogCalculations = calculateProcessTimeline(item.formData?.['_time_logs'] || {});
+      const timeTotalText = timeLogCalculations.totalMins > 0 
+        ? `<span style="font-size:10px; color:var(--text-muted); font-weight:600;">(${state.currentLang==='ZH'?'總耗時':'Total'}: ${timeLogCalculations.totalMins}${state.currentLang==='ZH'?'分':'m'})</span>` 
+        : '';
 
-    const isCompleted = item.status === '已完成' || item.status === '實驗完成' || item.status === '實驗結束' || item.status === 'Completed';
-    const uploadTagHtml = isCompleted 
-      ? (item.hasDataUpload 
-          ? `<span class="upload-status-tag uploaded">${state.currentLang==='ZH'?'已上傳':'Uploaded'}</span>` 
-          : `<span class="upload-status-tag pending">${state.currentLang==='ZH'?'待上傳':'Pending'}</span>`) 
-      : '';
-
-    const timeLogCalculations = calculateProcessTimeline(item.formData?.['_time_logs'] || {});
-    const timeTotalText = timeLogCalculations.totalMins > 0 
-      ? `<span style="font-size:10px; color:var(--text-muted); font-weight:600;">(${state.currentLang==='ZH'?'總耗時':'Total'}: ${timeLogCalculations.totalMins}${state.currentLang==='ZH'?'分':'m'})</span>` 
-      : '';
-
-    html += `
-      <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
-        <div class="timeline-node" style="background:${styleObj.text}"></div>
-        <div class="timeline-card ${isReserved ? 'reserved-card' : ''}">
-          <div class="timeline-date-head">
-            <div class="timeline-date-title">
-              <span>${item.date}</span>
-              <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
-              ${timeTotalText}
+      html += `
+        <div class="timeline-item" onclick="showActiveExpDetail('${item.expId}')">
+          <div class="timeline-node" style="background:${styleObj.text}"></div>
+          <div class="timeline-card ${isReserved ? 'reserved-card' : ''}">
+            <div class="timeline-date-head">
+              <div class="timeline-date-title">
+                <span>${item.date}</span>
+                <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
+                ${timeTotalText}
+              </div>
+              <div class="timeline-status-group">
+                <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
+                ${uploadTagHtml}
+              </div>
             </div>
-            <div class="timeline-status-group">
-              <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
-              ${uploadTagHtml}
-            </div>
+            <div class="timeline-info-text">${displayInfo || '實驗專案'}</div>
+            ${timeLogCalculations.miniBarHtml}
+            <div class="timeline-exp-id">ID: ${item.expId}</div>
           </div>
-          <div class="timeline-info-text">${displayInfo || '實驗專案'}</div>
-          ${timeLogCalculations.miniBarHtml}
-          <div class="timeline-exp-id">ID: ${item.expId}</div>
         </div>
-      </div>
-    `;
-  });
-  container.innerHTML = html;
-}
+      `;
+    });
+    container.innerHTML = html;
+  }
 
   function getDynamicFieldValue(formData, labelKeywords) {
     if (!state.dynamicForms || !formData) return { val: null, id: null };
@@ -822,247 +813,245 @@ function filterRecordCenterList() {
 
   let isEditingActiveModal = false;
 
-  /* 輔助函式：根據文字內容動態回傳對應顏色的 CSS Class */
-function getConditionClass(text) {
-  if (!text) return 'normal-value';
-  const clean = String(text).trim();
-  if (['無特殊情況', '無', '不保存', 'None', '--', '正常'].includes(clean)) {
-    return 'normal-value'; // 深灰色 / 黑色
+  function getConditionClass(text) {
+    if (!text) return 'normal-value';
+    const clean = String(text).trim();
+    if (['無特殊情況', '無', '不保存', 'None', '--', '正常'].includes(clean)) {
+      return 'normal-value';
+    }
+    return 'condition-highlight';
   }
-  return 'condition-highlight'; // 亮藍色 (有異常狀況)
-}
 
-/* 1. 精簡明細彈窗 */
-function showActiveExpDetail(expId) {
-  state.activeViewingExpId = expId;
-  isEditingActiveModal = false;
-  const exp = state.dataCenter.find(d => d.expId === expId);
-  if (!exp) return;
+  /* 1. 精簡明細彈窗 */
+  function showActiveExpDetail(expId) {
+    state.activeViewingExpId = expId;
+    isEditingActiveModal = false;
+    const exp = state.dataCenter.find(d => d.expId === expId);
+    if (!exp) return;
 
-  const isZH = state.currentLang === 'ZH';
-  const styleObj = getStatusStyle(exp.status);
-  const displayStatus = getStatusText(exp.status, state.currentLang);
-  const displayInfo = formatBilingualText(exp.info, state.currentLang);
-  const formData = exp.formData || {};
+    const isZH = state.currentLang === 'ZH';
+    const styleObj = getStatusStyle(exp.status);
+    const displayStatus = getStatusText(exp.status, state.currentLang);
+    const displayInfo = formatBilingualText(exp.info, state.currentLang);
+    const formData = exp.formData || {};
 
-  const modalDialog = document.getElementById('modalDialogBox');
-  if (modalDialog) modalDialog.classList.remove('expanded-mode');
+    const modalDialog = document.getElementById('modalDialogBox');
+    if (modalDialog) modalDialog.classList.remove('expanded-mode');
 
-  const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
+    const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
-  let timeLogsHtml = '';
-  let timeLogsMap = formData['_time_logs'] || {};
+    let timeLogsHtml = '';
+    let timeLogsMap = formData['_time_logs'] || {};
 
-  const defaultKeys = ['已預約', '準備中', '準備完成', '手術中', '休息中', '訊號蒐集中', '訊號蒐集完成', '犧牲中', '實驗善後'];
-  const activeKeys = Object.keys(timeLogsMap).length > 0 ? Object.keys(timeLogsMap) : defaultKeys;
+    const defaultKeys = ['已預約', '準備中', '準備完成', '手術中', '休息中', '訊號蒐集中', '訊號蒐集完成', '犧牲中', '實驗善後'];
+    const activeKeys = Object.keys(timeLogsMap).length > 0 ? Object.keys(timeLogsMap) : defaultKeys;
 
-  timeLogsHtml = activeKeys.map(st => {
-    const transSt = getStatusText(st, state.currentLang);
-    const timeVal = timeLogsMap[st] || '';
-    return `
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:3px;">
-        <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
-        <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${timeVal || '--'}</span>
-        <input type="text" class="edit-mode-input form-control time-log-input" data-time-key="${st}" value="${timeVal}" style="display:none; width:165px; padding:2px 4px; font-size:10px; font-family:ui-monospace, monospace; text-align:right;">
-      </div>
-    `;
-  }).join('');
-
-  let surgeryDurationHtml = '';
-  if (timeLogsMap['手術中'] && (timeLogsMap['休息中'] || timeLogsMap['已死亡'])) {
-    const start = new Date(timeLogsMap['手術中']);
-    const end = new Date(timeLogsMap['休息中'] || timeLogsMap['已死亡']);
-    const diffMs = end - start;
-    if (!isNaN(diffMs) && diffMs > 0) {
-      const diffMins = Math.floor(diffMs / 60000);
-      surgeryDurationHtml = `
-        <div class="detail-row">
-          <div class="detail-label" style="color:var(--danger);">${isZH ? '手術用時' : 'Surgery Duration'}</div>
-          <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH ? '分鐘' : 'mins'}</div>
+    timeLogsHtml = activeKeys.map(st => {
+      const transSt = getStatusText(st, state.currentLang);
+      const timeVal = timeLogsMap[st] || '';
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:3px;">
+          <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
+          <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${timeVal || '--'}</span>
+          <input type="text" class="edit-mode-input form-control time-log-input" data-time-key="${st}" value="${timeVal}" style="display:none; width:165px; padding:2px 4px; font-size:10px; font-family:ui-monospace, monospace; text-align:right;">
         </div>
       `;
-    }
-  }
+    }).join('');
 
-  let filledDataSectionHtml = '';
-
-  if (!isReserved) {
-    const freqVal = formData['freq'] !== undefined ? formData['freq'] : (formData['field_19_0'] !== undefined ? formData['field_19_0'] : '3.5');
-    const cycleVal = formData['cycle'] !== undefined ? formData['cycle'] : (formData['field_20_0'] !== undefined ? formData['field_20_0'] : '2000');
-    const voltVal = formData['volt'] !== undefined ? formData['volt'] : (formData['field_21_0'] !== undefined ? formData['field_21_0'] : '239');
-    const interVal = formData['inter'] !== undefined ? formData['inter'] : (formData['field_22_0'] !== undefined ? formData['field_22_0'] : '25');
-
-    const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
-    const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
-    
-    const calculatedPTZ = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
-    const calculatedSaline = ratWeight > 0 ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
-
-    const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
-    const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
-
-    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_20_16'] || '0');
-    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
-    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
-
-    // 🚀 全能動態解析器 (徹底防護 false, true, null, undefined)
-    const extractSmartValue = (kwArr, fallbackKeys = [], defaultText = '--') => {
-      let raw = null;
-      let inputVal = "";
-
-      const isValidVal = (val) => {
-        if (val === null || val === undefined || val === false || val === true) return false;
-        const str = String(val).trim().toLowerCase();
-        return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
-      };
-
-      const fieldObj = getDynamicFieldValue(formData, kwArr);
-      if (fieldObj && isValidVal(fieldObj.val)) {
-        raw = fieldObj.val;
-        inputVal = formData[`${fieldObj.id}_input`] || "";
-      }
-
-      if (!isValidVal(raw) && fallbackKeys.length > 0) {
-        for (const fbKey of fallbackKeys) {
-          if (isValidVal(formData[fbKey])) {
-            raw = formData[fbKey];
-            inputVal = formData[`${fbKey}_input`] || "";
-            break;
-          }
-        }
-      }
-
-      if (!isValidVal(raw)) return defaultText;
-
-      let resStr = "";
-      if (Array.isArray(raw)) {
-        const filteredArr = raw.filter(v => isValidVal(v));
-        if (filteredArr.length === 0) return defaultText;
-        resStr = filteredArr.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
-      } else if (typeof raw === 'object') {
-        resStr = JSON.stringify(raw);
-      } else {
-        resStr = formatBilingualText(String(raw), state.currentLang);
-      }
-
-      if (inputVal && isValidVal(inputVal)) {
-        resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
-      }
-      return resStr || defaultText;
-    };
-
-    const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], isZH ? '無特殊情況' : 'None');
-    const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], isZH ? '無特殊情況' : 'None');
-    const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], isZH ? '無特殊情況' : 'None');
-    const signalStatusText = formData['signal_status'] || extractSmartValue(['訊號', 'signal'], ['field_7_20'], isZH ? '無特殊情況' : 'None');
-    const sacMethodText = formData['sac_method'] || extractSmartValue(['犧牲方式', 'sacrificemethod'], ['field_3_24'], isZH ? '無' : 'None');
-    const sacStatusText = formData['sac_status'] || extractSmartValue(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], isZH ? '無特殊情況' : 'None');
-    const tissueText = formData['tissue'] || extractSmartValue(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], isZH ? '無' : 'None');
-    const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
-    const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
-
-    // 訊號時間軸 (來自 field_4_20)
-    let timelineBarHtml = '';
-    const stages = formData['field_4_20'];
-    if (Array.isArray(stages) && stages.length > 0) {
-      let totalMin = 0;
-      stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
-      if (totalMin > 0) {
-        const colors = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
-        let bars = '';
-        let legends = '';
-        stages.forEach((s, idx) => {
-          const t = parseFloat(s.time) || 0;
-          const pct = ((t / totalMin) * 100).toFixed(1);
-          const c = colors[idx % colors.length];
-          bars += `<div style="width:${pct}%; background:${c};" title="${s.name}: ${t}m"></div>`;
-          legends += `<span style="color:${c};">■ ${s.name}: ${t}m</span>`;
-        });
-        timelineBarHtml = `
-          <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
-            <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">訊號蒐集時間軸 (總長: ${totalMin} min)</div>
-            <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">${bars}</div>
-            <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600; flex-wrap:wrap;">${legends}</div>
+    let surgeryDurationHtml = '';
+    if (timeLogsMap['手術中'] && (timeLogsMap['休息中'] || timeLogsMap['已死亡'])) {
+      const start = new Date(timeLogsMap['手術中']);
+      const end = new Date(timeLogsMap['休息中'] || timeLogsMap['已死亡']);
+      const diffMs = end - start;
+      if (!isNaN(diffMs) && diffMs > 0) {
+        const diffMins = Math.floor(diffMs / 60000);
+        surgeryDurationHtml = `
+          <div class="detail-row">
+            <div class="detail-label" style="color:var(--danger);">${isZH ? '手術用時' : 'Surgery Duration'}</div>
+            <div class="detail-value" style="font-weight:700; color:var(--danger);">${diffMins} ${isZH ? '分鐘' : 'mins'}</div>
           </div>
         `;
       }
     }
 
-    filledDataSectionHtml = `
-      <div class="detail-row" style="flex-direction:column; align-items:stretch;">
-        <div class="detail-label" style="width:100%; margin-bottom:6px; font-size:12px; font-weight:800; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:4px;">${isZH ? '填寫數據明細' : 'Field Data Details'}</div>
-        <div id="editableFieldsContainer" class="detail-value" style="text-align:left; width:100%; padding:4px 0;">
-          
-          <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-          
-          <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
+    let filledDataSectionHtml = '';
 
-          <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
+    if (!isReserved) {
+      const freqVal = formData['freq'] !== undefined ? formData['freq'] : (formData['field_19_0'] !== undefined ? formData['field_19_0'] : '3.5');
+      const cycleVal = formData['cycle'] !== undefined ? formData['cycle'] : (formData['field_20_0'] !== undefined ? formData['field_20_0'] : '2000');
+      const voltVal = formData['volt'] !== undefined ? formData['volt'] : (formData['field_21_0'] !== undefined ? formData['field_21_0'] : '239');
+      const interVal = formData['inter'] !== undefined ? formData['inter'] : (formData['field_22_0'] !== undefined ? formData['field_22_0'] : '25');
 
-          <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
-
-          ${timelineBarHtml}
-
-        </div>
-      </div>
-    `;
-  }
-
-  let userNotes = formData['notes'] || '';
-
-  const htmlContent = `
-    <div class="detail-list">
-      <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
-      <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
-      <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
-      <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
-      <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
-      ${surgeryDurationHtml}
-      <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:68%;">${timeLogsHtml}</div></div>
+      const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
+      const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
       
-      ${filledDataSectionHtml}
+      const calculatedPTZ = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
+      const calculatedSaline = ratWeight > 0 ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
 
-      <div class="detail-row" style="flex-direction:column; align-items:stretch;">
-        <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄 (舊備註不可刪除)' : 'Notes'}</div>
-        <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
-        <div id="appendNoteContainer" style="display:none; margin-top:6px;">
-          <textarea id="inputAppendNote" class="form-control" rows="2" placeholder="${isZH?'請輸入欲追加的新備註內容...':'Enter new notes...'}" style="width:100%; font-size:11px; border-color:var(--border-focus);"></textarea>
+      const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
+      const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
+
+      const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_20_16'] || '0');
+      const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
+      const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
+
+      // 🚀 動態解析器防護
+      const extractSmartValue = (kwArr, fallbackKeys = [], defaultText = '--') => {
+        let raw = null;
+        let inputVal = "";
+
+        const isValidVal = (val) => {
+          if (val === null || val === undefined || val === false || val === true) return false;
+          const str = String(val).trim().toLowerCase();
+          return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
+        };
+
+        const fieldObj = getDynamicFieldValue(formData, kwArr);
+        if (fieldObj && isValidVal(fieldObj.val)) {
+          raw = fieldObj.val;
+          inputVal = formData[`${fieldObj.id}_input`] || "";
+        }
+
+        if (!isValidVal(raw) && fallbackKeys.length > 0) {
+          for (const fbKey of fallbackKeys) {
+            if (isValidVal(formData[fbKey])) {
+              raw = formData[fbKey];
+              inputVal = formData[`${fbKey}_input`] || "";
+              break;
+            }
+          }
+        }
+
+        if (!isValidVal(raw)) return defaultText;
+
+        let resStr = "";
+        if (Array.isArray(raw)) {
+          const filteredArr = raw.filter(v => isValidVal(v));
+          if (filteredArr.length === 0) return defaultText;
+          resStr = filteredArr.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
+        } else if (typeof raw === 'object') {
+          resStr = JSON.stringify(raw);
+        } else {
+          resStr = formatBilingualText(String(raw), state.currentLang);
+        }
+
+        if (inputVal && isValidVal(inputVal)) {
+          resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
+        }
+        return resStr || defaultText;
+      };
+
+      const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], isZH ? '無特殊情況' : 'None');
+      const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], isZH ? '無特殊情況' : 'None');
+      const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], isZH ? '無特殊情況' : 'None');
+      const signalStatusText = formData['signal_status'] || extractSmartValue(['訊號', 'signal'], ['field_7_20'], isZH ? '無特殊情況' : 'None');
+      const sacMethodText = formData['sac_method'] || extractSmartValue(['犧牲方式', 'sacrificemethod'], ['field_3_24'], isZH ? '無' : 'None');
+      const sacStatusText = formData['sac_status'] || extractSmartValue(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], isZH ? '無特殊情況' : 'None');
+      const tissueText = formData['tissue'] || extractSmartValue(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], isZH ? '無' : 'None');
+      const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
+      const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
+
+      let timelineBarHtml = '';
+      const stages = formData['field_4_20'];
+      if (Array.isArray(stages) && stages.length > 0) {
+        let totalMin = 0;
+        stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
+        if (totalMin > 0) {
+          const colors = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
+          let bars = '';
+          let legends = '';
+          stages.forEach((s, idx) => {
+            const t = parseFloat(s.time) || 0;
+            const pct = ((t / totalMin) * 100).toFixed(1);
+            const c = colors[idx % colors.length];
+            bars += `<div style="width:${pct}%; background:${c};" title="${s.name}: ${t}m"></div>`;
+            legends += `<span style="color:${c};">■ ${s.name}: ${t}m</span>`;
+          });
+          timelineBarHtml = `
+            <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
+              <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">訊號蒐集時間軸 (總長: ${totalMin} min)</div>
+              <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">${bars}</div>
+              <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600; flex-wrap:wrap;">${legends}</div>
+            </div>
+          `;
+        }
+      }
+
+      filledDataSectionHtml = `
+        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+          <div class="detail-label" style="width:100%; margin-bottom:6px; font-size:12px; font-weight:800; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:4px;">${isZH ? '填寫數據明細' : 'Field Data Details'}</div>
+          <div id="editableFieldsContainer" class="detail-value" style="text-align:left; width:100%; padding:4px 0;">
+            
+            <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            
+            <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
+
+            <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
+
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
+
+            ${timelineBarHtml}
+
+          </div>
+        </div>
+      `;
+    }
+
+    let userNotes = formData['notes'] || '';
+
+    const htmlContent = `
+      <div class="detail-list">
+        <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
+        <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
+        ${surgeryDurationHtml}
+        <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:68%;">${timeLogsHtml}</div></div>
+        
+        ${filledDataSectionHtml}
+
+        <div class="detail-row" style="flex-direction:column; align-items:stretch;">
+          <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄 (舊備註不可刪除)' : 'Notes'}</div>
+          <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
+          <div id="appendNoteContainer" style="display:none; margin-top:6px;">
+            <textarea id="inputAppendNote" class="form-control" rows="2" placeholder="${isZH?'請輸入欲追加的新備註內容...':'Enter new notes...'}" style="width:100%; font-size:11px; border-color:var(--border-focus);"></textarea>
+          </div>
         </div>
       </div>
-    </div>
-  `;
-
-  document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
-  document.getElementById('modalMessage').innerHTML = htmlContent;
-
-  const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
-
-  if (btnGroup) {
-    btnGroup.innerHTML = `
-      <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
-      <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
-        <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除':'Delete'}</button>
-        <button id="btnToggleEdit" class="modal-btn-expand" style="flex:1; margin-top:0;" onclick="toggleEditMode('${exp.expId}')">${isZH?'修改':'Edit'}</button>
-      </div>
-      <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
     `;
-  }
 
-  document.getElementById('customModalBackdrop').style.display = 'flex';
-}
+    document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
+    document.getElementById('modalMessage').innerHTML = htmlContent;
+
+    const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
+
+    if (btnGroup) {
+      btnGroup.innerHTML = `
+        <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
+        <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
+          <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除':'Delete'}</button>
+          <button id="btnToggleEdit" class="modal-btn-expand" style="flex:1; margin-top:0;" onclick="toggleEditMode('${exp.expId}')">${isZH?'修改':'Edit'}</button>
+        </div>
+        <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+      `;
+    }
+
+    document.getElementById('customModalBackdrop').style.display = 'flex';
+  }
 
   function toggleEditMode(expId) {
     const isZH = state.currentLang === 'ZH';
@@ -1288,259 +1277,259 @@ function showActiveExpDetail(expId) {
     if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   }
 
-  /* 2. 專業展開版 (重新補齊所有排版與顏色動態切換) */
-function showFullExpandedView(expId) {
-  const exp = state.dataCenter.find(d => d.expId === expId);
-  if (!exp) return;
+  /* 2. 專業展開版 */
+  function showFullExpandedView(expId) {
+    const exp = state.dataCenter.find(d => d.expId === expId);
+    if (!exp) return;
 
-  const isZH = state.currentLang === 'ZH';
-  const styleObj = getStatusStyle(exp.status);
-  const displayStatus = getStatusText(exp.status, state.currentLang);
-  const displayInfo = formatBilingualText(exp.info, state.currentLang);
-  const formData = exp.formData || {};
+    const isZH = state.currentLang === 'ZH';
+    const styleObj = getStatusStyle(exp.status);
+    const displayStatus = getStatusText(exp.status, state.currentLang);
+    const displayInfo = formatBilingualText(exp.info, state.currentLang);
+    const formData = exp.formData || {};
 
-  const modalDialog = document.getElementById('modalDialogBox');
-  modalDialog.classList.add('expanded-mode');
+    const modalDialog = document.getElementById('modalDialogBox');
+    modalDialog.classList.add('expanded-mode');
 
-  const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
+    const timeLogCalculations = calculateProcessTimeline(formData['_time_logs'] || {});
 
-  let dotLineLogsHtml = '';
-  if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
-    const logs = formData['_time_logs'];
-    const itemsHtml = Object.entries(logs).map(([st, time]) => {
-      const transSt = getStatusText(st, state.currentLang);
-      return `
-        <div class="vertical-time-item">
-          <div class="vertical-time-dot"></div>
-          <span style="font-weight:700; color:var(--text-secondary);">${transSt}</span>
-          <span style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${time}</span>
+    let dotLineLogsHtml = '';
+    if (formData['_time_logs'] && Object.keys(formData['_time_logs']).length > 0) {
+      const logs = formData['_time_logs'];
+      const itemsHtml = Object.entries(logs).map(([st, time]) => {
+        const transSt = getStatusText(st, state.currentLang);
+        return `
+          <div class="vertical-time-item">
+            <div class="vertical-time-dot"></div>
+            <span style="font-weight:700; color:var(--text-secondary);">${transSt}</span>
+            <span style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${time}</span>
+          </div>
+        `;
+      }).join('');
+
+      dotLineLogsHtml = `
+        <div class="vertical-time-log">
+          <div class="vertical-time-line"></div>
+          ${itemsHtml}
         </div>
       `;
-    }).join('');
+    } else {
+      dotLineLogsHtml = `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</div>`;
+    }
 
-    dotLineLogsHtml = `
-      <div class="vertical-time-log">
-        <div class="vertical-time-line"></div>
-        ${itemsHtml}
+    const freqVal = formData['field_19_0'] !== undefined ? formData['field_19_0'] : (formData['freq'] !== undefined ? formData['freq'] : '3.5');
+    const cycleVal = formData['field_20_0'] !== undefined ? formData['field_20_0'] : (formData['cycle'] !== undefined ? formData['cycle'] : '2000');
+    const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : (formData['volt'] !== undefined ? formData['volt'] : '239');
+    const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : (formData['inter'] !== undefined ? formData['inter'] : '25');
+
+    const ultrasoundPanelHtml = `
+      <div class="exp-panel">
+        <div class="exp-panel-title">${isZH ? '超音波刺激參數' : 'Ultrasound Parameters'}</div>
+        <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'}</div><div class="detail-value normal-value">${freqVal} HZ</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value">${cycleVal} times</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'}</div><div class="detail-value normal-value">${voltVal} mV</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'}</div><div class="detail-value normal-value">${interVal} ms</div></div>
       </div>
     `;
-  } else {
-    dotLineLogsHtml = `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</div>`;
-  }
 
-  const freqVal = formData['field_19_0'] !== undefined ? formData['field_19_0'] : (formData['freq'] !== undefined ? formData['freq'] : '3.5');
-  const cycleVal = formData['field_20_0'] !== undefined ? formData['field_20_0'] : (formData['cycle'] !== undefined ? formData['cycle'] : '2000');
-  const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : (formData['volt'] !== undefined ? formData['volt'] : '239');
-  const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : (formData['inter'] !== undefined ? formData['inter'] : '25');
+    const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || formData['rat_weight'] || 0);
+    const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
+    const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
 
-  const ultrasoundPanelHtml = `
-    <div class="exp-panel">
-      <div class="exp-panel-title">${isZH ? '超音波刺激參數' : 'Ultrasound Parameters'}</div>
-      <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'}</div><div class="detail-value normal-value">${freqVal} HZ</div></div>
-      <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value">${cycleVal} times</div></div>
-      <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'}</div><div class="detail-value normal-value">${voltVal} mV</div></div>
-      <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'}</div><div class="detail-value normal-value">${interVal} ms</div></div>
-    </div>
-  `;
+    const extractSmartValueEx = (kwArr, fallbackKeys = [], defaultText = '--') => {
+      let raw = null;
+      let inputVal = "";
 
-  const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || formData['rat_weight'] || 0);
-  const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
-  const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
-  const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
+      const isValidVal = (val) => {
+        if (val === null || val === undefined || val === false || val === true) return false;
+        const str = String(val).trim().toLowerCase();
+        return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
+      };
 
-  const extractSmartValueEx = (kwArr, fallbackKeys = [], defaultText = '--') => {
-    let raw = null;
-    let inputVal = "";
+      const fieldObj = getDynamicFieldValue(formData, kwArr);
+      if (fieldObj && isValidVal(fieldObj.val)) {
+        raw = fieldObj.val;
+        inputVal = formData[`${fieldObj.id}_input`] || "";
+      }
 
-    const isValidVal = (val) => {
-      if (val === null || val === undefined || val === false || val === true) return false;
-      const str = String(val).trim().toLowerCase();
-      return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
-    };
-
-    const fieldObj = getDynamicFieldValue(formData, kwArr);
-    if (fieldObj && isValidVal(fieldObj.val)) {
-      raw = fieldObj.val;
-      inputVal = formData[`${fieldObj.id}_input`] || "";
-    }
-
-    if (!isValidVal(raw) && fallbackKeys.length > 0) {
-      for (const fbKey of fallbackKeys) {
-        if (isValidVal(formData[fbKey])) {
-          raw = formData[fbKey];
-          inputVal = formData[`${fbKey}_input`] || "";
-          break;
+      if (!isValidVal(raw) && fallbackKeys.length > 0) {
+        for (const fbKey of fallbackKeys) {
+          if (isValidVal(formData[fbKey])) {
+            raw = formData[fbKey];
+            inputVal = formData[`${fbKey}_input`] || "";
+            break;
+          }
         }
       }
+
+      if (!isValidVal(raw)) return defaultText;
+
+      let resStr = "";
+      if (Array.isArray(raw)) {
+        const filteredArr = raw.filter(v => isValidVal(v));
+        if (filteredArr.length === 0) return defaultText;
+        resStr = filteredArr.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
+      } else if (typeof raw === 'object') {
+        resStr = JSON.stringify(raw);
+      } else {
+        resStr = formatBilingualText(String(raw), state.currentLang);
+      }
+
+      if (inputVal && isValidVal(inputVal)) {
+        resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
+      }
+      return resStr || defaultText;
+    };
+
+    const ratStatusText = formData['rat_status'] || extractSmartValueEx(['生理', 'physiological'], ['field_23_16'], isZH ? '無特殊情況' : 'None');
+
+    let surgDurationText = '--';
+    if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
+      const start = new Date(formData['_time_logs']['手術中']);
+      const end = new Date(formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡']);
+      const diffMs = end - start;
+      if (!isNaN(diffMs) && diffMs > 0) surgDurationText = `${Math.floor(diffMs / 60000)} ${isZH ? '分鐘' : 'mins'}`;
     }
+    const surgeryStatusText = formData['surgery_status'] || extractSmartValueEx(['手術', 'surgical'], ['field_31_16'], isZH ? '無特殊情況' : 'None');
 
-    if (!isValidVal(raw)) return defaultText;
+    const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
+    const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
+    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_20_16'] || '0');
+    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
+    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-    let resStr = "";
-    if (Array.isArray(raw)) {
-      const filteredArr = raw.filter(v => isValidVal(v));
-      if (filteredArr.length === 0) return defaultText;
-      resStr = filteredArr.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
-    } else if (typeof raw === 'object') {
-      resStr = JSON.stringify(raw);
-    } else {
-      resStr = formatBilingualText(String(raw), state.currentLang);
-    }
+    const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], isZH ? '無特殊情況' : 'None');
+    const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], isZH ? '無特殊情況' : 'None');
 
-    if (inputVal && isValidVal(inputVal)) {
-      resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
-    }
-    return resStr || defaultText;
-  };
+    const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], isZH ? '無' : 'None');
+    const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], isZH ? '無特殊情況' : 'None');
+    const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], isZH ? '無' : 'None');
+    const tissueStatusText = formData['tissue_status'] || extractSmartValueEx(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
+    const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValueEx(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
 
-  const ratStatusText = formData['rat_status'] || extractSmartValueEx(['生理', 'physiological'], ['field_23_16'], isZH ? '無特殊情況' : 'None');
+    const notesStr = formData['notes'] || (isZH ? '無' : 'None');
 
-  let surgDurationText = '--';
-  if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
-    const start = new Date(formData['_time_logs']['手術中']);
-    const end = new Date(formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡']);
-    const diffMs = end - start;
-    if (!isNaN(diffMs) && diffMs > 0) surgDurationText = `${Math.floor(diffMs / 60000)} ${isZH ? '分鐘' : 'mins'}`;
-  }
-  const surgeryStatusText = formData['surgery_status'] || extractSmartValueEx(['手術', 'surgical'], ['field_31_16'], isZH ? '無特殊情況' : 'None');
+    const isCompleted = exp.status === '已完成' || exp.status === '實驗完成' || exp.status === '實驗結束' || exp.status === 'Completed';
+    const uploadTagHtml = isCompleted 
+      ? (exp.hasDataUpload 
+          ? `<span class="upload-status-tag uploaded">${isZH?'已上傳':'Uploaded'}</span>` 
+          : `<span class="upload-status-tag pending">${isZH?'待上傳':'Pending'}</span>`) 
+      : '';
 
-  const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
-  const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
-  const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_20_16'] || '0');
-  const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
-  const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
+    const folderLinkHtml = exp.expDataFolder 
+      ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">開啟雲端數據資料夾 ↗</a>`
+      : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'尚未建立雲端資料夾':'No cloud folder yet'}</span>`;
 
-  const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], isZH ? '無特殊情況' : 'None');
-  const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], isZH ? '無特殊情況' : 'None');
-
-  const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], isZH ? '無' : 'None');
-  const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], isZH ? '無特殊情況' : 'None');
-  const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], isZH ? '無' : 'None');
-  const tissueStatusText = formData['tissue_status'] || extractSmartValueEx(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
-  const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValueEx(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
-
-  const notesStr = formData['notes'] || (isZH ? '無' : 'None');
-
-  const isCompleted = exp.status === '已完成' || exp.status === '實驗完成' || exp.status === '實驗結束' || exp.status === 'Completed';
-  const uploadTagHtml = isCompleted 
-    ? (exp.hasDataUpload 
-        ? `<span class="upload-status-tag uploaded">${isZH?'已上傳':'Uploaded'}</span>` 
-        : `<span class="upload-status-tag pending">${isZH?'待上傳':'Pending'}</span>`) 
-    : '';
-
-  const folderLinkHtml = exp.expDataFolder 
-    ? `<a href="${exp.expDataFolder}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:none;">開啟雲端數據資料夾 ↗</a>`
-    : `<span style="color:var(--text-muted); font-size:11px;">${isZH?'尚未建立雲端資料夾':'No cloud folder yet'}</span>`;
-
-  const expandedHtml = `
-    <div class="detail-list">
-      <div class="exp-panel full-width" style="margin-bottom:12px;">
-        <div class="exp-panel-title">
-          <span>${isZH ? '基本資訊與執行總覽' : 'Basic Information Overview'}</span>
-          <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
-        </div>
-        <div class="expanded-grid" style="margin-top:0; margin-bottom:10px;">
-          <div>
-            <div class="detail-row"><div class="detail-label">${isZH?'實驗編號':'Experiment ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary); font-size:13px;">${exp.expId}</div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'大綱與目的':'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'負責人員':'Experimenter'}</div><div class="detail-value normal-value">${exp.user}</div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
-          </div>
-          <div style="background:#fff; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px;">
-            <div style="font-weight:700; color:var(--text-muted); font-size:11px; margin-bottom:6px;">${isZH?'狀態歷程點線記錄':'Time Log History'}</div>
-            ${dotLineLogsHtml}
-          </div>
-        </div>
-        <div style="border-top:1px dashed var(--border-color); padding-top:8px;">
-          <div style="font-size:11px; font-weight:700; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
-            <span>${isZH?'實驗全流程時間軸 (12小時基準)':'Execution Timeline (12h Max)'}</span>
-            <span>${isZH?'實驗總耗時':'Total Duration'}: <strong style="color:var(--primary); font-size:13px;">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</strong></span>
-          </div>
-          ${timeLogCalculations.barHtml}
-        </div>
-      </div>
-
-      <div class="expanded-grid">
-        ${ultrasoundPanelHtml}
-
-        <div class="exp-panel">
-          <div class="exp-panel-title">${isZH ? '動物基本參數與生理狀況' : 'Animal Parameters & State'}</div>
-          <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value normal-value">${ratWeight || '--'} g</div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline 劑量':'PTZ / Saline Dose'}</div><div class="detail-value normal-value">${ptzVol} / ${salineVol} uL</div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'生理情況標記':'Physiological State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}">${ratStatusText}</div></div>
-        </div>
-
-        <div class="exp-panel">
-          <div class="exp-panel-title">${isZH ? '手術情形' : 'Surgical Conditions'}</div>
-          <div class="detail-row"><div class="detail-label">${isZH?'手術耗時':'Surgery Duration'}</div><div class="detail-value" style="color:var(--danger); font-weight:700;">${surgDurationText}</div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgical Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}">${surgeryStatusText}</div></div>
-        </div>
-
-        <div class="exp-panel full-width">
-          <div class="exp-panel-title">${isZH ? '電極設置與訊號蒐集' : 'Electrode Setup & Signal Collection'}</div>
-          <div class="expanded-grid" style="margin-top:0;">
-            <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Position'}</div><div class="detail-value normal-value">(${lamdaAP}, ${lamdaML})</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Position'}</div><div class="detail-value normal-value">(${eleAP}, ${eleML}, ${eleDH})</div></div>
-            </div>
-            <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}">${elecStatusText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集狀況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}">${signalStatusText}</div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="exp-panel full-width">
-          <div class="exp-panel-title">${isZH ? '犧牲與組織保存' : 'Sacrifice & Tissue Preservation'}</div>
-          <div class="expanded-grid" style="margin-top:0;">
-            <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}">${sacMethodText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'犧牲狀況':'Sacrifice Condition'}</div><div class="detail-value ${getConditionClass(sacStatusText)}">${sacStatusText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'摘除組織':'Excised Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}">${tissueText}</div></div>
-            </div>
-            <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'摘除狀況':'Excision Condition'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}">${tissueStatusText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Preservation Method'}</div><div class="detail-value normal-value">${storageText}</div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="exp-panel full-width">
-          <div class="exp-panel-title">${isZH ? '備註紀錄' : 'Notes'}</div>
-          <div class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:600; padding:2px 0;">${notesStr}</div>
-        </div>
-
-        <!-- 區塊 7：獨立實驗數據檔案專區 ( Column W 上傳 Zone ) -->
-        <div class="exp-panel full-width">
+    const expandedHtml = `
+      <div class="detail-list">
+        <div class="exp-panel full-width" style="margin-bottom:12px;">
           <div class="exp-panel-title">
-            <span>${isZH ? '實驗數據檔案 (Column W)' : 'Experimental Data Files'}</span>
-            ${uploadTagHtml}
+            <span>${isZH ? '基本資訊與執行總覽' : 'Basic Information Overview'}</span>
+            <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
           </div>
-          <div style="padding:4px 0 8px 0; font-size:12px;">
-            <div style="margin-bottom:6px;">${folderLinkHtml}</div>
-            
-            <div id="dropZoneExpanded" class="drop-zone" onclick="document.getElementById('fileInputSecretEx').click();">
-              <div class="drop-zone-text">📁 點擊或將檔案拖曳至此處上傳</div>
-              <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">(限定 .csv, .png, .jpeg，系統將自動歸檔至 [${exp.expId}] 並寫入 W 欄)</div>
-              <input type="file" id="fileInputSecretEx" multiple accept=".csv, .png, .jpeg, .jpg" style="display:none;" onchange="handleDirectFileUpload(this.files, '${exp.expId}')">
+          <div class="expanded-grid" style="margin-top:0; margin-bottom:10px;">
+            <div>
+              <div class="detail-row"><div class="detail-label">${isZH?'實驗編號':'Experiment ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary); font-size:13px;">${exp.expId}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'大綱與目的':'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'負責人員':'Experimenter'}</div><div class="detail-value normal-value">${exp.user}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'執行日期':'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
             </div>
-            <div id="uploadStatusTextEx" style="font-size:11px; font-weight:700; margin-top:6px;"></div>
+            <div style="background:#fff; border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px;">
+              <div style="font-weight:700; color:var(--text-muted); font-size:11px; margin-bottom:6px;">${isZH?'狀態歷程點線記錄':'Time Log History'}</div>
+              ${dotLineLogsHtml}
+            </div>
+          </div>
+          <div style="border-top:1px dashed var(--border-color); padding-top:8px;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+              <span>${isZH?'實驗全流程時間軸 (12小時基準)':'Execution Timeline (12h Max)'}</span>
+              <span>${isZH?'實驗總耗時':'Total Duration'}: <strong style="color:var(--primary); font-size:13px;">${timeLogCalculations.totalMins} ${isZH?'分鐘':'mins'}</strong></span>
+            </div>
+            ${timeLogCalculations.barHtml}
           </div>
         </div>
 
+        <div class="expanded-grid">
+          ${ultrasoundPanelHtml}
+
+          <div class="exp-panel">
+            <div class="exp-panel-title">${isZH ? '動物基本參數與生理狀況' : 'Animal Parameters & State'}</div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value normal-value">${ratWeight || '--'} g</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline 劑量':'PTZ / Saline Dose'}</div><div class="detail-value normal-value">${ptzVol} / ${salineVol} uL</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'生理情況標記':'Physiological State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}">${ratStatusText}</div></div>
+          </div>
+
+          <div class="exp-panel">
+            <div class="exp-panel-title">${isZH ? '手術情形' : 'Surgical Conditions'}</div>
+            <div class="detail-row"><div class="detail-label">${isZH?'手術耗時':'Surgery Duration'}</div><div class="detail-value" style="color:var(--danger); font-weight:700;">${surgDurationText}</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgical Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}">${surgeryStatusText}</div></div>
+          </div>
+
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">${isZH ? '電極設置與訊號蒐集' : 'Electrode Setup & Signal Collection'}</div>
+            <div class="expanded-grid" style="margin-top:0;">
+              <div>
+                <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Position'}</div><div class="detail-value normal-value">(${lamdaAP}, ${lamdaML})</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Position'}</div><div class="detail-value normal-value">(${eleAP}, ${eleML}, ${eleDH})</div></div>
+              </div>
+              <div>
+                <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}">${elecStatusText}</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集狀況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}">${signalStatusText}</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">${isZH ? '犧牲與組織保存' : 'Sacrifice & Tissue Preservation'}</div>
+            <div class="expanded-grid" style="margin-top:0;">
+              <div>
+                <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}">${sacMethodText}</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'犧牲狀況':'Sacrifice Condition'}</div><div class="detail-value ${getConditionClass(sacStatusText)}">${sacStatusText}</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'摘除組織':'Excised Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}">${tissueText}</div></div>
+              </div>
+              <div>
+                <div class="detail-row"><div class="detail-label">${isZH?'摘除狀況':'Excision Condition'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}">${tissueStatusText}</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Preservation Method'}</div><div class="detail-value normal-value">${storageText}</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">${isZH ? '備註紀錄' : 'Notes'}</div>
+            <div class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:600; padding:2px 0;">${notesStr}</div>
+          </div>
+
+          <!-- 區塊 7：獨立實驗數據檔案專區 ( Column W 上傳 Zone ) -->
+          <div class="exp-panel full-width">
+            <div class="exp-panel-title">
+              <span>${isZH ? '實驗數據檔案 (Column W)' : 'Experimental Data Files'}</span>
+              ${uploadTagHtml}
+            </div>
+            <div style="padding:4px 0 8px 0; font-size:12px;">
+              <div style="margin-bottom:6px;">${folderLinkHtml}</div>
+              
+              <div id="dropZoneExpanded" class="drop-zone" onclick="document.getElementById('fileInputSecretEx').click();">
+                <div class="drop-zone-text">📁 點擊或將檔案拖曳至此處上傳</div>
+                <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">(限定 .csv, .png, .jpeg，系統將自動歸檔至 [${exp.expId}] 並寫入 W 欄)</div>
+                <input type="file" id="fileInputSecretEx" multiple accept=".csv, .png, .jpeg, .jpg" style="display:none;" onchange="handleDirectFileUpload(this.files, '${exp.expId}')">
+              </div>
+              <div id="uploadStatusTextEx" style="font-size:11px; font-weight:700; margin-top:6px;"></div>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
-  `;
+    `;
 
-  document.getElementById('modalTitle').innerText = isZH ? "完整實驗專案報告 (展開版)" : "Full Experiment Detailed Report";
-  document.getElementById('modalMessage').innerHTML = expandedHtml;
-  document.getElementById('modalBtnArea').innerHTML = `
-    <button class="modal-btn-confirm" onclick="showActiveExpDetail('${exp.expId}')">${isZH?'返回精簡明細':'Back to Summary'}</button>
-    <button class="modal-btn-confirm" style="background:var(--text-secondary);" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
-  `;
+    document.getElementById('modalTitle').innerText = isZH ? "完整實驗專案報告 (展開版)" : "Full Experiment Detailed Report";
+    document.getElementById('modalMessage').innerHTML = expandedHtml;
+    document.getElementById('modalBtnArea').innerHTML = `
+      <button class="modal-btn-confirm" onclick="showActiveExpDetail('${exp.expId}')">${isZH?'返回精簡明細':'Back to Summary'}</button>
+      <button class="modal-btn-confirm" style="background:var(--text-secondary);" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+    `;
 
-  setupDropZoneEventsExpanded(exp.expId);
-}
+    setupDropZoneEventsExpanded(exp.expId);
+  }
 
   /* 3. 展開版拖曳事件監聽 */
   function setupDropZoneEventsExpanded(expId) {
@@ -1567,89 +1556,86 @@ function showFullExpandedView(expId) {
     }, 100);
   }
 
-/* 最終版：多檔案直傳 (支援即時顯示 folderUrl + 完美穿透 Drive 權限) */
-async function handleDirectFileUpload(files, expId) {
-  const statusElem = document.getElementById('uploadStatusTextEx');
-  if (!files || files.length === 0) return;
+  /* 多檔案直傳 */
+  async function handleDirectFileUpload(files, expId) {
+    const statusElem = document.getElementById('uploadStatusTextEx');
+    if (!files || files.length === 0) return;
 
-  const validFiles = [];
-  const allowedExts = ['csv', 'png', 'jpeg', 'jpg'];
+    const validFiles = [];
+    const allowedExts = ['csv', 'png', 'jpeg', 'jpg'];
 
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    const ext = f.name.split('.').pop().toLowerCase();
-    if (allowedExts.includes(ext)) {
-      validFiles.push(f);
-    }
-  }
-
-  if (validFiles.length === 0) {
-    alert("只接受 CSV、PNG 與 JPEG 格式檔案！");
-    return;
-  }
-
-  let latestFolderUrl = "";
-
-  for (let i = 0; i < validFiles.length; i++) {
-    const file = validFiles[i];
-    
-    if (statusElem) {
-      statusElem.innerText = `正在傳送第 (${i + 1}/${validFiles.length}) 個檔案：${file.name}...`;
-      statusElem.style.color = "var(--primary)";
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const ext = f.name.split('.').pop().toLowerCase();
+      if (allowedExts.includes(ext)) {
+        validFiles.push(f);
+      }
     }
 
-    try {
-      const base64 = await readFileAsBase64(file);
-
-      // 使用 text/plain 規避 CORS 預檢，又能接收 GAS 傳回的 JSON 結果
-      const response = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "uploadSingleFile",
-          expId: expId,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          fileData: base64
-        })
-      });
-
-      const resText = await response.text();
-      let resJson = {};
-      try { resJson = JSON.parse(resText); } catch(e) {}
-
-      if (resJson.folderUrl) {
-        latestFolderUrl = resJson.folderUrl;
-      }
-
-    } catch (err) {
-      console.error(`檔案 ${file.name} 上傳失敗:`, err);
-      if (statusElem) {
-        statusElem.innerText = `❌ 檔案 ${file.name} 上傳失敗。`;
-        statusElem.style.color = "var(--danger)";
-      }
+    if (validFiles.length === 0) {
+      alert("只接受 CSV、PNG 與 JPEG 格式檔案！");
       return;
     }
+
+    let latestFolderUrl = "";
+
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      
+      if (statusElem) {
+        statusElem.innerText = `正在傳送第 (${i + 1}/${validFiles.length}) 個檔案：${file.name}...`;
+        statusElem.style.color = "var(--primary)";
+      }
+
+      try {
+        const base64 = await readFileAsBase64(file);
+
+        const response = await fetch(GAS_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "uploadSingleFile",
+            expId: expId,
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            fileData: base64
+          })
+        });
+
+        const resText = await response.text();
+        let resJson = {};
+        try { resJson = JSON.parse(resText); } catch(e) {}
+
+        if (resJson.folderUrl) {
+          latestFolderUrl = resJson.folderUrl;
+        }
+
+      } catch (err) {
+        console.error(`檔案 ${file.name} 上傳失敗:`, err);
+        if (statusElem) {
+          statusElem.innerText = `❌ 檔案 ${file.name} 上傳失敗。`;
+          statusElem.style.color = "var(--danger)";
+        }
+        return;
+      }
+    }
+
+    const targetExp = state.dataCenter.find(d => d.expId === expId);
+    if (targetExp) {
+      if (latestFolderUrl) targetExp.expDataFolder = latestFolderUrl;
+      targetExp.hasDataUpload = true;
+    }
+
+    if (statusElem) {
+      statusElem.innerText = `✅ 全部 ${validFiles.length} 個檔案上傳完成！`;
+      statusElem.style.color = "var(--success)";
+    }
+
+    alert(`成功上傳 ${validFiles.length} 個檔案！\n已存入雲端硬碟 [${expId}] 資料夾並寫入 W 欄。`);
+
+    if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
+    showFullExpandedView(expId);
   }
-
-  // 即時更新前端記憶體與畫面，不需等 5 分鐘 CSV 快取
-  const targetExp = state.dataCenter.find(d => d.expId === expId);
-  if (targetExp) {
-    if (latestFolderUrl) targetExp.expDataFolder = latestFolderUrl;
-    targetExp.hasDataUpload = true;
-  }
-
-  if (statusElem) {
-    statusElem.innerText = `✅ 全部 ${validFiles.length} 個檔案上傳完成！`;
-    statusElem.style.color = "var(--success)";
-  }
-
-  alert(`成功上傳 ${validFiles.length} 個檔案！\n已存入雲端硬碟 [${expId}] 資料夾並寫入 W 欄。`);
-
-  // 刷新展開版畫面
-  if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
-  showFullExpandedView(expId);
-}
 
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
