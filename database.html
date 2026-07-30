@@ -895,8 +895,8 @@
       const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
       const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-      // 🚀 動態解析器防護
-      const extractSmartValue = (kwArr, fallbackKeys = [], defaultText = '--') => {
+      // 🚀 動態解析器強化版 (包含獨立備註文字自動加引號 ( ... ) 串接)
+      const extractSmartValue = (kwArr, fallbackKeys = [], noteKeys = [], defaultText = '--') => {
         let raw = null;
         let inputVal = "";
 
@@ -935,21 +935,36 @@
           resStr = formatBilingualText(String(raw), state.currentLang);
         }
 
+        let addedNotes = [];
         if (inputVal && isValidVal(inputVal)) {
-          resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
+          addedNotes.push(formatBilingualText(String(inputVal), state.currentLang));
         }
+
+        if (Array.isArray(noteKeys)) {
+          noteKeys.forEach(nk => {
+            if (isValidVal(formData[nk])) {
+              addedNotes.push(formatBilingualText(String(formData[nk]), state.currentLang));
+            }
+          });
+        }
+
+        if (addedNotes.length > 0) {
+          resStr += ` (${addedNotes.join(' / ')})`;
+        }
+
         return resStr || defaultText;
       };
 
-      const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], isZH ? '無特殊情況' : 'None');
-      const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], isZH ? '無特殊情況' : 'None');
-      const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], isZH ? '無特殊情況' : 'None');
-      const signalStatusText = formData['signal_status'] || extractSmartValue(['訊號', 'signal'], ['field_7_20'], isZH ? '無特殊情況' : 'None');
-      const sacMethodText = formData['sac_method'] || extractSmartValue(['犧牲方式', 'sacrificemethod'], ['field_3_24'], isZH ? '無' : 'None');
-      const sacStatusText = formData['sac_status'] || extractSmartValue(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], isZH ? '無特殊情況' : 'None');
-      const tissueText = formData['tissue'] || extractSmartValue(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], isZH ? '無' : 'None');
-      const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
-      const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
+      // 將各欄位的獨立備註（例如 field_5_20、field_16_20 等）自動包進去！
+      const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], isZH ? '無特殊情況' : 'None');
+      const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], isZH ? '無特殊情況' : 'None');
+      const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
+      const signalStatusText = formData['signal_status'] || extractSmartValue(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], isZH ? '無特殊情況' : 'None');
+      const sacMethodText = formData['sac_method'] || extractSmartValue(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isZH ? '無' : 'None');
+      const sacStatusText = formData['sac_status'] || extractSmartValue(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], isZH ? '無特殊情況' : 'None');
+      const tissueText = formData['tissue'] || extractSmartValue(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isZH ? '無' : 'None');
+      const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], ['field_24_24'], isZH ? '無特殊情況' : 'None');
+      const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], [], isZH ? '不保存' : 'None');
 
       let timelineBarHtml = '';
       const stages = formData['field_4_20'];
@@ -1010,7 +1025,15 @@
       `;
     }
 
+    // 🚀 整合三大主備註：主備註(field_15_0) / 準備檢查表備註(field_81_8) / 善後備註(field_56_28)
     let userNotes = formData['notes'] || '';
+    if (!userNotes) {
+      const bottomNotes = [];
+      if (formData['field_15_0']) bottomNotes.push(formData['field_15_0']);
+      if (formData['field_81_8']) bottomNotes.push(formData['field_81_8']);
+      if (formData['field_56_28']) bottomNotes.push(formData['field_56_28']);
+      userNotes = bottomNotes.join('\n');
+    }
 
     const htmlContent = `
       <div class="detail-list">
@@ -1337,7 +1360,7 @@
     const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
     const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
 
-    const extractSmartValueEx = (kwArr, fallbackKeys = [], defaultText = '--') => {
+    const extractSmartValueEx = (kwArr, fallbackKeys = [], noteKeys = [], defaultText = '--') => {
       let raw = null;
       let inputVal = "";
 
@@ -1376,13 +1399,27 @@
         resStr = formatBilingualText(String(raw), state.currentLang);
       }
 
+      let addedNotes = [];
       if (inputVal && isValidVal(inputVal)) {
-        resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
+        addedNotes.push(formatBilingualText(String(inputVal), state.currentLang));
       }
+
+      if (Array.isArray(noteKeys)) {
+        noteKeys.forEach(nk => {
+          if (isValidVal(formData[nk])) {
+            addedNotes.push(formatBilingualText(String(formData[nk]), state.currentLang));
+          }
+        });
+      }
+
+      if (addedNotes.length > 0) {
+        resStr += ` (${addedNotes.join(' / ')})`;
+      }
+
       return resStr || defaultText;
     };
 
-    const ratStatusText = formData['rat_status'] || extractSmartValueEx(['生理', 'physiological'], ['field_23_16'], isZH ? '無特殊情況' : 'None');
+    const ratStatusText = formData['rat_status'] || extractSmartValueEx(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], isZH ? '無特殊情況' : 'None');
 
     let surgDurationText = '--';
     if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
@@ -1391,7 +1428,7 @@
       const diffMs = end - start;
       if (!isNaN(diffMs) && diffMs > 0) surgDurationText = `${Math.floor(diffMs / 60000)} ${isZH ? '分鐘' : 'mins'}`;
     }
-    const surgeryStatusText = formData['surgery_status'] || extractSmartValueEx(['手術', 'surgical'], ['field_31_16'], isZH ? '無特殊情況' : 'None');
+    const surgeryStatusText = formData['surgery_status'] || extractSmartValueEx(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], isZH ? '無特殊情況' : 'None');
 
     const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
     const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
@@ -1399,16 +1436,23 @@
     const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
     const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-    const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], isZH ? '無特殊情況' : 'None');
-    const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], isZH ? '無特殊情況' : 'None');
+    const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
+    const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], isZH ? '無特殊情況' : 'None');
 
-    const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], isZH ? '無' : 'None');
-    const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], isZH ? '無特殊情況' : 'None');
-    const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], isZH ? '無' : 'None');
-    const tissueStatusText = formData['tissue_status'] || extractSmartValueEx(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
-    const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValueEx(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
+    const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isZH ? '無' : 'None');
+    const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], isZH ? '無特殊情況' : 'None');
+    const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isZH ? '無' : 'None');
+    const tissueStatusText = formData['tissue_status'] || extractSmartValueEx(['摘除情況', 'excisionstatus'], ['field_17_24'], ['field_24_24'], isZH ? '無特殊情況' : 'None');
+    const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValueEx(['保存', 'preservation'], ['field_24_24', 'field_21_24'], [], isZH ? '不保存' : 'None');
 
-    const notesStr = formData['notes'] || (isZH ? '無' : 'None');
+    let notesStr = formData['notes'] || '';
+    if (!notesStr) {
+      const bottomNotes = [];
+      if (formData['field_15_0']) bottomNotes.push(formData['field_15_0']);
+      if (formData['field_81_8']) bottomNotes.push(formData['field_81_8']);
+      if (formData['field_56_28']) bottomNotes.push(formData['field_56_28']);
+      notesStr = bottomNotes.join('\n') || (isZH ? '無' : 'None');
+    }
 
     const isCompleted = exp.status === '已完成' || exp.status === '實驗完成' || exp.status === '實驗結束' || exp.status === 'Completed';
     const uploadTagHtml = isCompleted 
