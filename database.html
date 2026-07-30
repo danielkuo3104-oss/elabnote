@@ -822,7 +822,17 @@ function filterRecordCenterList() {
 
   let isEditingActiveModal = false;
 
-  /* 1. 精簡明細彈窗 (完美支援 Array 防錯 + 多重 Key 自動救援) */
+  /* 輔助函式：根據文字內容動態回傳對應顏色的 CSS Class */
+function getConditionClass(text) {
+  if (!text) return 'normal-value';
+  const clean = String(text).trim();
+  if (['無特殊情況', '無', '不保存', 'None', '--', '正常'].includes(clean)) {
+    return 'normal-value'; // 深灰色 / 黑色
+  }
+  return 'condition-highlight'; // 亮藍色 (有異常狀況)
+}
+
+/* 1. 精簡明細彈窗 */
 function showActiveExpDetail(expId) {
   state.activeViewingExpId = expId;
   isEditingActiveModal = false;
@@ -895,26 +905,23 @@ function showActiveExpDetail(expId) {
     const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
     const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-    // 🚀 修正版全能動態解析器：自動過濾 false, true, on, off 等布林輔助值
+    // 🚀 全能動態解析器 (徹底防護 false, true, null, undefined)
     const extractSmartValue = (kwArr, fallbackKeys = [], defaultText = '--') => {
       let raw = null;
       let inputVal = "";
 
-      // 輔助檢查：是否為無效字串 (false, true, on, off, null, undefined)
       const isValidVal = (val) => {
         if (val === null || val === undefined || val === false || val === true) return false;
         const str = String(val).trim().toLowerCase();
         return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
       };
 
-      // 1. 關鍵字動態匹配
       const fieldObj = getDynamicFieldValue(formData, kwArr);
       if (fieldObj && isValidVal(fieldObj.val)) {
         raw = fieldObj.val;
         inputVal = formData[`${fieldObj.id}_input`] || "";
       }
 
-      // 2. 保底 Key 搜尋
       if (!isValidVal(raw) && fallbackKeys.length > 0) {
         for (const fbKey of fallbackKeys) {
           if (isValidVal(formData[fbKey])) {
@@ -925,9 +932,7 @@ function showActiveExpDetail(expId) {
         }
       }
 
-      if (!isValidVal(raw)) {
-        return defaultText;
-      }
+      if (!isValidVal(raw)) return defaultText;
 
       let resStr = "";
       if (Array.isArray(raw)) {
@@ -956,7 +961,7 @@ function showActiveExpDetail(expId) {
     const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], isZH ? '無特殊情況' : 'None');
     const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], isZH ? '不保存' : 'None');
 
-    // 🚀 動態繪製訊號時間軸 (來自 field_4_20)
+    // 訊號時間軸 (來自 field_4_20)
     let timelineBarHtml = '';
     const stages = formData['field_4_20'];
     if (Array.isArray(stages) && stages.length > 0) {
@@ -999,14 +1004,14 @@ function showActiveExpDetail(expId) {
           <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
           <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
 
-          <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value normal-value"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value condition-highlight"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
           <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
 
           ${timelineBarHtml}
@@ -1283,7 +1288,7 @@ function showActiveExpDetail(expId) {
     if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   }
 
-  /* 2. 專業展開版 (相容防錯機制) */
+  /* 2. 專業展開版 (重新補齊所有排版與顏色動態切換) */
 function showFullExpandedView(expId) {
   const exp = state.dataCenter.find(d => d.expId === expId);
   if (!exp) return;
@@ -1347,15 +1352,21 @@ function showFullExpandedView(expId) {
     let raw = null;
     let inputVal = "";
 
+    const isValidVal = (val) => {
+      if (val === null || val === undefined || val === false || val === true) return false;
+      const str = String(val).trim().toLowerCase();
+      return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
+    };
+
     const fieldObj = getDynamicFieldValue(formData, kwArr);
-    if (fieldObj && fieldObj.val !== null && fieldObj.val !== undefined) {
+    if (fieldObj && isValidVal(fieldObj.val)) {
       raw = fieldObj.val;
       inputVal = formData[`${fieldObj.id}_input`] || "";
     }
 
-    if ((raw === null || raw === undefined || raw === '') && fallbackKeys.length > 0) {
+    if (!isValidVal(raw) && fallbackKeys.length > 0) {
       for (const fbKey of fallbackKeys) {
-        if (formData[fbKey] !== undefined && formData[fbKey] !== '') {
+        if (isValidVal(formData[fbKey])) {
           raw = formData[fbKey];
           inputVal = formData[`${fbKey}_input`] || "";
           break;
@@ -1363,20 +1374,20 @@ function showFullExpandedView(expId) {
       }
     }
 
-    if (raw === null || raw === undefined || raw === '' || (Array.isArray(raw) && raw.length === 0)) {
-      return defaultText;
-    }
+    if (!isValidVal(raw)) return defaultText;
 
     let resStr = "";
     if (Array.isArray(raw)) {
-      resStr = raw.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
+      const filteredArr = raw.filter(v => isValidVal(v));
+      if (filteredArr.length === 0) return defaultText;
+      resStr = filteredArr.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
     } else if (typeof raw === 'object') {
       resStr = JSON.stringify(raw);
     } else {
       resStr = formatBilingualText(String(raw), state.currentLang);
     }
 
-    if (inputVal) {
+    if (inputVal && isValidVal(inputVal)) {
       resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
     }
     return resStr || defaultText;
@@ -1456,13 +1467,13 @@ function showFullExpandedView(expId) {
           <div class="exp-panel-title">${isZH ? '動物基本參數與生理狀況' : 'Animal Parameters & State'}</div>
           <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value normal-value">${ratWeight || '--'} g</div></div>
           <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline 劑量':'PTZ / Saline Dose'}</div><div class="detail-value normal-value">${ptzVol} / ${salineVol} uL</div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'生理情況標記':'Physiological State'}</div><div class="detail-value condition-highlight">${ratStatusText}</div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'生理情況標記':'Physiological State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}">${ratStatusText}</div></div>
         </div>
 
         <div class="exp-panel">
           <div class="exp-panel-title">${isZH ? '手術情形' : 'Surgical Conditions'}</div>
           <div class="detail-row"><div class="detail-label">${isZH?'手術耗時':'Surgery Duration'}</div><div class="detail-value" style="color:var(--danger); font-weight:700;">${surgDurationText}</div></div>
-          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgical Status'}</div><div class="detail-value condition-highlight">${surgeryStatusText}</div></div>
+          <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgical Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}">${surgeryStatusText}</div></div>
         </div>
 
         <div class="exp-panel full-width">
@@ -1473,8 +1484,8 @@ function showFullExpandedView(expId) {
               <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Position'}</div><div class="detail-value normal-value">(${eleAP}, ${eleML}, ${eleDH})</div></div>
             </div>
             <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value condition-highlight">${elecStatusText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集狀況':'Signal Status'}</div><div class="detail-value condition-highlight">${signalStatusText}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}">${elecStatusText}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集狀況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}">${signalStatusText}</div></div>
             </div>
           </div>
         </div>
@@ -1483,12 +1494,12 @@ function showFullExpandedView(expId) {
           <div class="exp-panel-title">${isZH ? '犧牲與組織保存' : 'Sacrifice & Tissue Preservation'}</div>
           <div class="expanded-grid" style="margin-top:0;">
             <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value condition-highlight">${sacMethodText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'犧牲狀況':'Sacrifice Condition'}</div><div class="detail-value condition-highlight">${sacStatusText}</div></div>
-              <div class="detail-row"><div class="detail-label">${isZH?'摘除組織':'Excised Tissue'}</div><div class="detail-value condition-highlight">${tissueText}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}">${sacMethodText}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'犧牲狀況':'Sacrifice Condition'}</div><div class="detail-value ${getConditionClass(sacStatusText)}">${sacStatusText}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'摘除組織':'Excised Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}">${tissueText}</div></div>
             </div>
             <div>
-              <div class="detail-row"><div class="detail-label">${isZH?'摘除狀況':'Excision Condition'}</div><div class="detail-value condition-highlight">${tissueStatusText}</div></div>
+              <div class="detail-row"><div class="detail-label">${isZH?'摘除狀況':'Excision Condition'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}">${tissueStatusText}</div></div>
               <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Preservation Method'}</div><div class="detail-value normal-value">${storageText}</div></div>
             </div>
           </div>
@@ -1499,6 +1510,7 @@ function showFullExpandedView(expId) {
           <div class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:600; padding:2px 0;">${notesStr}</div>
         </div>
 
+        <!-- 區塊 7：獨立實驗數據檔案專區 ( Column W 上傳 Zone ) -->
         <div class="exp-panel full-width">
           <div class="exp-panel-title">
             <span>${isZH ? '實驗數據檔案 (Column W)' : 'Experimental Data Files'}</span>
