@@ -516,7 +516,7 @@
     currentUser: null,
     isGuest: false,
     currentLang: "ZH",
-    simulatedDate: "2026-07-26",
+    simulatedDate: new Date().toLocaleDateString('sv-SE'), // 取得當日日期 (YYYY-MM-DD 格式)
     membersList: [],
     dataCenter: [],
     formDataCache: {},
@@ -2862,7 +2862,9 @@ function startMakeupExpFormByStatus(targetExp) {
   const userCode = (userObj && userObj.userCode) ? userObj.userCode : "GDC";
 
   const cleanDate = dateStr.replace(/-/g, '');
-  const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : '260726';
+  // 🚀 修正後程式碼：
+  const fallbackYyMMdd = new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
+  const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : fallbackYyMMdd;
 
   let sequence = 1;
   let generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
