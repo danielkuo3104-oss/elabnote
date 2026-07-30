@@ -516,13 +516,16 @@
           }
         });
 
-        // 專案大綱與目的
-        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || '');
-        let purposeName = parsedFormData['selected_purpose_name'];
-        if (!purposeName || purposeName === '不保存') {
-          purposeName = parsedFormData['field_7_4'] || parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || '';
+        // 專案大綱與目的 (修正：嚴格排除「過麻」與犧牲字眼被當成實驗目的)
+        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
+        
+        let rawPurpose = parsedFormData['selected_purpose_name'];
+        if (!rawPurpose || rawPurpose === '不保存' || rawPurpose === '過麻') {
+          // 按順序優先尋找真正的實驗目的欄位
+          rawPurpose = parsedFormData['field_8_0'] || parsedFormData['field_13_0'] || parsedFormData['field_7_4'] || '';
         }
-        purposeName = cleanDisplayLabel(purposeName);
+        
+        let purposeName = cleanDisplayLabel(rawPurpose);
         
         let dynamicInfo = "";
         if (outlineName && purposeName) {
@@ -892,22 +895,29 @@ function showActiveExpDetail(expId) {
     const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
     const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-    // 🚀 全能動態解析器（相容 Array, Object, String 與 Fallback Keys & Input 補全）
+    // 🚀 修正版全能動態解析器：自動過濾 false, true, on, off 等布林輔助值
     const extractSmartValue = (kwArr, fallbackKeys = [], defaultText = '--') => {
       let raw = null;
       let inputVal = "";
 
-      // 1. 先嘗試關鍵字動態匹配
+      // 輔助檢查：是否為無效字串 (false, true, on, off, null, undefined)
+      const isValidVal = (val) => {
+        if (val === null || val === undefined || val === false || val === true) return false;
+        const str = String(val).trim().toLowerCase();
+        return str !== '' && str !== 'false' && str !== 'true' && str !== 'on' && str !== 'off' && str !== 'null' && str !== 'undefined';
+      };
+
+      // 1. 關鍵字動態匹配
       const fieldObj = getDynamicFieldValue(formData, kwArr);
-      if (fieldObj && fieldObj.val !== null && fieldObj.val !== undefined) {
+      if (fieldObj && isValidVal(fieldObj.val)) {
         raw = fieldObj.val;
         inputVal = formData[`${fieldObj.id}_input`] || "";
       }
 
-      // 2. 若沒找到，走 Fallback Keys 保底搜尋
-      if ((raw === null || raw === undefined || raw === '') && fallbackKeys.length > 0) {
+      // 2. 保底 Key 搜尋
+      if (!isValidVal(raw) && fallbackKeys.length > 0) {
         for (const fbKey of fallbackKeys) {
-          if (formData[fbKey] !== undefined && formData[fbKey] !== '') {
+          if (isValidVal(formData[fbKey])) {
             raw = formData[fbKey];
             inputVal = formData[`${fbKey}_input`] || "";
             break;
@@ -915,20 +925,22 @@ function showActiveExpDetail(expId) {
         }
       }
 
-      if (raw === null || raw === undefined || raw === '' || (Array.isArray(raw) && raw.length === 0)) {
+      if (!isValidVal(raw)) {
         return defaultText;
       }
 
       let resStr = "";
       if (Array.isArray(raw)) {
-        resStr = raw.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
+        const filteredArr = raw.filter(v => isValidVal(v));
+        if (filteredArr.length === 0) return defaultText;
+        resStr = filteredArr.map(v => typeof v === 'object' ? JSON.stringify(v) : formatBilingualText(String(v), state.currentLang)).join(', ');
       } else if (typeof raw === 'object') {
         resStr = JSON.stringify(raw);
       } else {
         resStr = formatBilingualText(String(raw), state.currentLang);
       }
 
-      if (inputVal) {
+      if (inputVal && isValidVal(inputVal)) {
         resStr += ` (${formatBilingualText(String(inputVal), state.currentLang)})`;
       }
       return resStr || defaultText;
