@@ -188,13 +188,23 @@
   .custom-modal {
     background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 380px;
     padding: 16px; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); max-height: 85vh; display: flex; flex-direction: column;
+    position: relative;
   }
-  .custom-modal h3 { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
+  .modal-header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .custom-modal h3 { font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; flex: 1; }
+  .btn-modal-cancel-exp {
+    background: #fee2e2; color: var(--danger); border: 1px solid #fca5a5;
+    padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-modal-cancel-exp:active { background: var(--danger); color: #fff; }
+
   .custom-modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; white-space: pre-line; text-align: center; line-height: 1.4; }
   .custom-modal-btns { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
   .modal-btn { flex: 1; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-weight: 600; font-size: 12px; cursor: pointer; text-align: center; white-space: nowrap; }
   .modal-btn-confirm { background: var(--primary); color: #fff; border: none; }
   .modal-btn-cancel { background: var(--bg-main); color: var(--text-secondary); }
+  .modal-btn-danger { background: var(--danger); color: #fff; border: none; }
 
   .detail-list { text-align: left; overflow-y: auto; max-height: 60vh; font-size: 12px; padding: 2px; }
   .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
@@ -392,7 +402,8 @@
 
       <hr style="margin:14px 0 10px 0; border:0; border-top:1px solid var(--border-color);">
       
-      <div id="scheduleSection" onclick="openScheduleCenter()">
+      <!-- 🚀 修改1：點擊前往資料庫 -->
+      <div id="scheduleSection" onclick="openRecordCenter()" style="cursor: pointer;">
         <div id="txtScheduleHeader" style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">未來排程 (最靠近兩筆)</div>
         <div id="scheduleList">
           <div class="schedule-item"><span class="schedule-date-tag">--</span><span class="schedule-info">載入中...</span></div>
@@ -427,7 +438,8 @@
 
   <!-- FAB 選單 -->
   <div id="fabMenuOverlay" class="fab-menu-overlay" onclick="closeFabMenu()">
-    <div class="fab-menu-item" id="menuSchedule" onclick="openScheduleCenter()">排程中心</div>
+    <!-- 🚀 修改1：前往排程中心改成前往資料庫 -->
+    <div class="fab-menu-item" id="menuSchedule" onclick="openRecordCenter()">前往資料庫</div>
     <div class="fab-menu-item" id="menuRecord" onclick="openRecordCenter()">紀錄資料庫</div>
     <div class="fab-menu-item" id="menuProfile" onclick="openEditProfile()">查看個人資訊</div>
     <div class="fab-menu-item" id="menuLogout" style="color:var(--danger);" onclick="performLogout()">登出系統</div>
@@ -454,7 +466,10 @@
 
   <div id="customModalBackdrop" class="custom-modal-backdrop">
     <div class="custom-modal">
-      <h3 id="modalTitle">系統提示</h3>
+      <div class="modal-header-bar">
+        <h3 id="modalTitle">系統提示</h3>
+        <div id="cancelExpBtnContainer"></div>
+      </div>
       <div id="modalMessage">提示內容</div>
       <div id="modalBtnGroup" class="custom-modal-btns">
         <button id="btnModalConfirm" class="modal-btn modal-btn-confirm" onclick="closeCustomModal(true)">確定</button>
@@ -485,6 +500,7 @@
     "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },      
     "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },        
     "實驗結束": { bg: "#334155", text: "#ffffff", border: "#334155" },      
+    "已取消": { bg: "#fef2f2", text: "#dc2626", border: "#fca5a5" },
     "其他": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" }
   };
 
@@ -501,7 +517,8 @@
     "實驗善後": { ZH: "實驗善後", EN: "Cleaning" },
     "已完成": { ZH: "已完成", EN: "Completed" },
     "實驗完成": { ZH: "實驗完成", EN: "Completed" },
-    "實驗結束": { ZH: "實驗結束", EN: "Finished" }
+    "實驗結束": { ZH: "實驗結束", EN: "Finished" },
+    "已取消": { ZH: "已取消", EN: "Cancelled" }
   };
 
   const PRESET_COLORS = [
@@ -704,7 +721,6 @@
     return alertType ? `<div class="desc-alert ${alertType}">${formattedHtml}</div>` : `<div class="field-desc">${formattedHtml}</div>`;
   }
 
-  // 🚀 精準修正 PTZ 與 Saline 藥劑計算與座標邏輯
   function triggerRealtimeFormulaCalculation() {
     const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
     if (!page || !page.fields) return;
@@ -1104,7 +1120,6 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  // 🚀 關鍵修復 1：過濾「過麻」、「不保存」等假目的字眼，保護真正的專案名稱
   async function fetchDataCenterFromSheet() {
     try {
       const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
@@ -1115,7 +1130,7 @@
         "已預約": 1, "準備中": 2, "實驗準備": 2, "準備完成": 3,
         "手術中": 4, "休息中": 5, "訊號蒐集中": 6, "訊號蒐集完成": 7,
         "已死亡": 8, "犧牲中": 8, "實驗善後": 9, "已完成": 10,
-        "實驗完成": 10, "實驗結束": 10
+        "實驗完成": 10, "實驗結束": 10, "已取消": 99
       };
 
       const records = [];
@@ -1141,11 +1156,9 @@
             }
           });
 
-          // 1. 專案大綱與目的 (防止被「過麻」、「不保存」等假目的誤導覆蓋)
           const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
           
           let purposeName = parsedFormData['selected_purpose_name'];
-          // 排除所有干擾的假目的字眼
           if (!purposeName || purposeName === '不保存' || purposeName === '過麻' || purposeName === 'perfusion&decapitation') {
             purposeName = parsedFormData['field_8_0'] || parsedFormData['field_7_4'] || parsedFormData['field_13_0'] || '';
           }
@@ -1160,7 +1173,6 @@
             dynamicInfo = "實驗專案";
           }
 
-          // 2. 狀態優先級比對
           const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
           let finalStatus = statusFromSheet;
           if (existingLocalRecord) {
@@ -1169,7 +1181,6 @@
             finalStatus = currentRank > sheetRank ? existingLocalRecord.status : statusFromSheet;
           }
 
-          // 3. 搜尋 W 欄 (Google Drive 連結)，有連結才判定為「已上傳」
           let expDataFolder = "";
           for (let c = 0; c < row.length; c++) {
             const cellVal = String(row[c] || "").trim();
@@ -1213,7 +1224,7 @@
 
   function renderMainDashboardUI() {
     const isZH = state.currentLang === 'ZH';
-    const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed');
+    const todayExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed' && d.status !== '已取消');
     const todayListContainer = document.getElementById('todayActiveExpList');
     
     if(todayExps.length > 0) {
@@ -1244,7 +1255,7 @@
     }
 
     const futureExps = state.dataCenter
-      .filter(d => new Date(d.date) > new Date(state.simulatedDate))
+      .filter(d => new Date(d.date) > new Date(state.simulatedDate) && d.status !== '已取消')
       .sort((a,b) => new Date(a.date) - new Date(b.date))
       .slice(0, 2);
 
@@ -1305,10 +1316,9 @@
     return 'condition-highlight';
   }
 
-  // 🚀 關鍵修復 2：對齊最新版明細顯示邏輯 (支援手術過程、獨立備註字眼自動串接、體重與坐標提取等)
+  // 🚀 修改2：加入右上角取消按鈕與二階段確認邏輯
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
-    isEditingActiveModal = false;
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
 
@@ -1317,9 +1327,6 @@
     const displayStatus = getStatusText(exp.status, state.currentLang);
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
-
-    const modalDialog = document.getElementById('modalDialogBox');
-    if (modalDialog) modalDialog.classList.remove('expanded-mode');
 
     const isReserved = exp.status === '已預約' || exp.status === 'Reserved';
 
@@ -1377,7 +1384,6 @@
       const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
       const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-      // 智能提取器：能夠把 _input 及獨立狀態文字備註組合顯示成「情況 (備註)」
       const extractSmartValue = (kwArr, fallbackKeys = [], noteKeys = [], defaultText = '--') => {
         let raw = null;
         let inputVal = "";
@@ -1506,7 +1512,6 @@
       `;
     }
 
-    // 🚀 整合三大主備註：主備註(field_15_0) / 準備檢查表備註(field_81_8) / 善後備註(field_56_28)
     let userNotes = formData['notes'] || '';
     if (!userNotes) {
       const bottomNotes = [];
@@ -1536,9 +1541,76 @@
     `;
 
     document.getElementById('modalTitle').innerText = isZH ? "實驗詳細資訊" : "Experiment Details";
+    
+    // 渲染右上角取消實驗按鈕（若非已取消狀態）
+    const cancelBtnContainer = document.getElementById('cancelExpBtnContainer');
+    if (exp.status !== '已取消' && !state.isGuest) {
+      cancelBtnContainer.innerHTML = `<button class="btn-modal-cancel-exp" onclick="requestCancelExperiment('${exp.expId}')">✕ 取消實驗</button>`;
+    } else {
+      cancelBtnContainer.innerHTML = '';
+    }
+
     document.getElementById('modalMessage').innerHTML = htmlContent;
     document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>`;
     document.getElementById('customModalBackdrop').style.display = 'flex';
+  }
+
+  // 🚀 二階段確認取消實驗邏輯
+  function requestCancelExperiment(expId) {
+    const isZH = state.currentLang === 'ZH';
+    // 第一階段確認
+    showCustomConfirm(
+      isZH ? "⚠️ 警告：取消實驗" : "⚠️ Warning: Cancel Experiment",
+      isZH ? `您確定要取消實驗 [${expId}] 嗎？\n此動作將回傳「已取消」狀態，且不可逆！` : `Are you sure to cancel experiment [${expId}]? This is irreversible!`,
+      isZH ? "返回" : "Back",
+      isZH ? "確定取消" : "Confirm Cancel",
+      (confirmedPhase1) => {
+        if (confirmedPhase1) {
+          // 第二階段最終確認
+          showCustomConfirm(
+            isZH ? "🛑 二次確認取消" : "🛑 Double Confirm",
+            isZH ? `請再次確認：確定要將實驗 [${expId}] 狀態永久修改為【已取消】？` : `Final confirmation: Change [${expId}] status to CANCELLED permanently?`,
+            isZH ? "再想想" : "Cancel",
+            isZH ? "確認取消實驗" : "Yes, Cancel It",
+            async (confirmedPhase2) => {
+              if (confirmedPhase2) {
+                await executeCancelExperiment(expId);
+              }
+            }
+          );
+        }
+      }
+    );
+  }
+
+  async function executeCancelExperiment(expId) {
+    const targetExp = state.dataCenter.find(d => d.expId === expId);
+    if (!targetExp) return;
+
+    const cancelStatus = "已取消";
+    targetExp.status = cancelStatus;
+
+    if (!targetExp.formData) targetExp.formData = {};
+    if (!targetExp.formData['_time_logs']) targetExp.formData['_time_logs'] = {};
+    targetExp.formData['_time_logs'][cancelStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
+
+    // 同步寫入後端
+    await syncToGoogleSheet("submitForm", {
+      expId: expId,
+      date: targetExp.date || state.simulatedDate,
+      user: targetExp.user || (state.currentUser ? state.currentUser.name : "Daniel"),
+      status: cancelStatus,
+      formColumnName: "FORM_CANCEL",
+      formJson: JSON.stringify(targetExp.formData),
+      isUpdate: true,
+      formData: targetExp.formData
+    });
+
+    renderMainDashboardUI();
+    renderTimeline();
+    updateDashboardButtons();
+
+    showCustomAlert(state.currentLang === 'ZH' ? "已被取消" : "Cancelled", state.currentLang === 'ZH' ? `實驗 [${expId}] 狀態已更新為【已取消】。` : `Experiment [${expId}] has been cancelled.`);
   }
 
   function renderTimeline() {
@@ -1703,7 +1775,7 @@
     document.getElementById('btnReserveExp').innerText = isZH ? "實驗預約" : "Reserve Exp";
     document.getElementById('btnMakeupExp').innerText = isZH ? "實驗補登" : "Makeup Exp";
     
-    document.getElementById('menuSchedule').innerText = isZH ? "排程中心" : "Schedule Center";
+    document.getElementById('menuSchedule').innerText = isZH ? "前往資料庫" : "Go to Database";
     document.getElementById('menuRecord').innerText = isZH ? "紀錄中心" : "Record Center";
     document.getElementById('menuProfile').innerText = isZH ? "查看個人資訊" : "View Profile";
     document.getElementById('menuLogout').innerText = isZH ? "登出系統" : "Logout";
@@ -1731,7 +1803,7 @@
 
     const pastUnfinishedExps = state.dataCenter.filter(d => {
       const isPast = new Date(d.date) < new Date(todayStr);
-      const isNotCompleted = d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed';
+      const isNotCompleted = d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed' && d.status !== '已取消';
       return isPast && isNotCompleted;
     });
 
@@ -1755,6 +1827,7 @@
 
     document.getElementById('modalTitle').innerText = isZH ? "選擇補登實驗專案" : "Select Makeup Experiment";
     document.getElementById('modalMessage').innerHTML = `<div style="text-align:left;">${optionsHtml}</div>`;
+    document.getElementById('cancelExpBtnContainer').innerHTML = '';
     document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">${isZH?'取消':'Cancel'}</button>`;
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
@@ -1836,7 +1909,7 @@
     if(state.isGuest) return;
     
     const isZH = state.currentLang === 'ZH';
-    const todayActiveExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed');
+    const todayActiveExps = state.dataCenter.filter(d => d.date === state.simulatedDate && d.status !== '已完成' && d.status !== '實驗完成' && d.status !== '實驗結束' && d.status !== 'Completed' && d.status !== '已取消');
 
     if (todayActiveExps.length === 0) {
       showCustomAlert("提示", isZH ? "本日無進行中實驗可進行登錄" : "No active experiments today.");
@@ -1856,6 +1929,7 @@
 
       document.getElementById('modalTitle').innerText = isZH ? "選擇今日實驗編號" : "Select Today Experiment";
       document.getElementById('modalMessage').innerHTML = `<div style="text-align:left;">${optionsHtml}</div>`;
+      document.getElementById('cancelExpBtnContainer').innerHTML = '';
       document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">取消</button>`;
       document.getElementById('customModalBackdrop').style.display = 'flex';
     }
@@ -1944,6 +2018,7 @@
 
       document.getElementById('modalTitle').innerText = isZH ? "選擇明日準備實驗編號" : "Select Tomorrow Experiment";
       document.getElementById('modalMessage').innerHTML = `<div style="text-align:left;">${optionsHtml}</div>`;
+      document.getElementById('cancelExpBtnContainer').innerHTML = '';
       document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">取消</button>`;
       document.getElementById('customModalBackdrop').style.display = 'flex';
     }
@@ -2150,7 +2225,7 @@
         const isMakeupMode = currentFormCtx.isMakeup;
 
         const isUnfinished = (statusStr) => {
-          return !['已完成', '實驗完成', '實驗結束', 'Completed', 'Finished'].includes(statusStr);
+          return !['已完成', '實驗完成', '實驗結束', 'Completed', 'Finished', '已取消'].includes(statusStr);
         };
 
         let activeProjects = [];
@@ -2831,6 +2906,7 @@
 
   function showCustomAlert(title, message) {
     document.getElementById('modalTitle').innerText = title;
+    document.getElementById('cancelExpBtnContainer').innerHTML = '';
     document.getElementById('modalMessage').innerHTML = `<p>${message}</p>`;
     document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">確定</button>`;
     document.getElementById('customModalBackdrop').style.display = 'flex';
@@ -2838,10 +2914,11 @@
 
   function showCustomConfirm(title, messageHtml, cancelText, confirmText, callback) {
     document.getElementById('modalTitle').innerText = title;
+    document.getElementById('cancelExpBtnContainer').innerHTML = '';
     document.getElementById('modalMessage').innerHTML = messageHtml;
     document.getElementById('modalBtnGroup').innerHTML = `
       <button class="modal-btn modal-btn-cancel" onclick="handleConfirmChoice(false)">${cancelText}</button>
-      <button class="modal-btn modal-btn-confirm" onclick="handleConfirmChoice(true)">${confirmText}</button>
+      <button class="modal-btn modal-btn-danger" onclick="handleConfirmChoice(true)">${confirmText}</button>
     `;
     window.confirmCallback = callback;
     document.getElementById('customModalBackdrop').style.display = 'flex';
@@ -2867,8 +2944,6 @@
     document.getElementById('fabMenuOverlay').style.display = 'none';
     document.getElementById('fabBtn').classList.remove('active');
   }
-
-  function openScheduleCenter() { closeFabMenu(); showCustomAlert("排程中心", "開啟排程中心面板。"); }
 
   function openRecordCenter() {
     closeFabMenu();
@@ -3034,6 +3109,7 @@
     }
 
     document.getElementById('modalTitle').innerText = title;
+    document.getElementById('cancelExpBtnContainer').innerHTML = '';
     document.getElementById('modalMessage').innerHTML = contentHtml;
     document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">關閉</button>`;
     document.getElementById('customModalBackdrop').style.display = 'flex';
