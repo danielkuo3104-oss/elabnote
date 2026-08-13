@@ -129,19 +129,20 @@
     .empty-state-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-top: 4px; }
     .empty-state-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
+    /* Modal 彈窗優化：修復按鈕溢出 */
     .custom-modal-backdrop {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5);
       backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 12px;
     }
     .custom-modal {
-      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 440px;
-      padding: 18px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 88vh; display: flex; flex-direction: column;
+      background: var(--card-bg); border-radius: var(--radius-lg); width: 100%; max-width: 460px;
+      padding: 16px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 90vh; display: flex; flex-direction: column;
       transition: max-width 0.25s ease;
     }
-    .custom-modal.expanded-mode { max-width: 720px; }
+    .custom-modal.expanded-mode { max-width: 740px; }
 
-    .custom-modal h3 { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; flex-shrink: 0; }
-    .detail-list { text-align: left; overflow-y: auto; max-height: 68vh; font-size: 12px; padding-right: 4px; flex: 1; -webkit-overflow-scrolling: touch; }
+    .custom-modal h3 { margin-bottom: 8px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; flex-shrink: 0; }
+    .detail-list { text-align: left; overflow-y: auto; max-height: 58vh; font-size: 12px; padding-right: 4px; flex: 1; -webkit-overflow-scrolling: touch; }
     .detail-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); gap: 8px; }
     .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
     .detail-label { font-weight: 700; color: var(--text-muted); font-size: 11px; width: 40%; flex-shrink: 0; word-break: break-word; }
@@ -151,13 +152,14 @@
     .detail-value.normal-value { color: var(--text-primary); font-weight: 600; }
     .detail-value.muted-value { color: var(--text-muted); font-weight: 500; }
 
-    .modal-btn-area { margin-top: 12px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
-    .modal-btn-confirm { background: var(--primary); color: #fff; border: none; padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 600; width: 100%; cursor: pointer; font-size: 13px; }
-    .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-    .modal-btn-export { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+    /* 按鈕容器防溢出 */
+    .modal-btn-area { margin-top: 10px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
+    .modal-btn-confirm { background: var(--primary); color: #fff; border: none; padding: 8px 10px; border-radius: var(--radius-sm); font-weight: 600; width: 100%; cursor: pointer; font-size: 12px; }
+    .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 8px 10px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+    .modal-btn-export { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 8px 10px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 12px; transition: all 0.2s; }
     .modal-btn-export:hover { background: #fde68a; }
 
-    .expanded-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px; }
+    .expanded-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 8px; }
     @media (min-width: 600px) {
       .expanded-grid { grid-template-columns: 1fr 1fr; }
       .expanded-grid .full-width { grid-column: span 2; }
@@ -182,28 +184,32 @@
     .vertical-time-item:last-child { margin-bottom: 0; }
     .vertical-time-dot { position: absolute; left: -14px; top: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 1px var(--primary); }
 
-    .drop-zone { border: 2px dashed var(--border-focus); border-radius: var(--radius-md); padding: 12px; text-align: center; background: #f0f9ff; cursor: pointer; transition: background 0.2s; margin-top: 6px; }
+    .drop-zone { border: 2px dashed var(--border-focus); border-radius: var(--radius-md); padding: 10px; text-align: center; background: #f0f9ff; cursor: pointer; transition: background 0.2s; margin-top: 6px; }
     .drop-zone.dragover { background: #dbeafe; border-color: var(--primary); }
     .drop-zone-text { font-size: 11px; color: var(--primary); font-weight: 700; }
 
-    /* 📄 隱藏報告 Template (專為 html2canvas 渲染 PDF/PNG 設計) */
+    /* 📄 報告 Template (專為 html2canvas 高解析度渲染 PDF/PNG 設計) */
     #reportTemplate {
       position: absolute; left: -9999px; top: -9999px;
       width: 794px; background: #ffffff; padding: 32px;
       color: #0f172a; font-family: "Segoe UI", -apple-system, sans-serif;
       box-sizing: border-box;
     }
-    .rpt-header { border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .rpt-header { border-bottom: 2px solid #0284c7; padding-bottom: 10px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-end; }
     .rpt-header h1 { font-size: 20px; font-weight: 800; color: #0284c7; margin-bottom: 2px; }
-    .rpt-header .rpt-sub { font-size: 12px; color: #64748b; font-weight: 600; }
-    .rpt-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
-    .rpt-meta-item { font-size: 12px; }
+    .rpt-header .rpt-sub { font-size: 11px; color: #64748b; font-weight: 600; }
+    .rpt-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 12px; }
+    .rpt-meta-item { font-size: 11px; }
     .rpt-meta-item strong { color: #334155; }
-    .rpt-section-title { font-size: 13px; font-weight: 800; color: #0284c7; border-left: 4px solid #0284c7; padding-left: 8px; margin: 14px 0 8px 0; }
-    .rpt-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
-    .rpt-table th, .rpt-table td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
-    .rpt-table th { background: #f1f5f9; color: #334155; font-weight: 700; width: 30%; }
-    .rpt-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+    .rpt-section-title { font-size: 12px; font-weight: 800; color: #0284c7; border-left: 4px solid #0284c7; padding-left: 8px; margin: 12px 0 6px 0; }
+    .rpt-table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 10px; }
+    .rpt-table th, .rpt-table td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; }
+    .rpt-table th { background: #f1f5f9; color: #334155; font-weight: 700; width: 28%; }
+    .rpt-footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+
+    /* 彩色時間軸容器 */
+    .rpt-timeline-bar-bg { display: flex; width: 100%; height: 12px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0; margin: 6px 0; }
+    .rpt-timeline-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; font-weight: 600; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -254,12 +260,12 @@
   </div>
 </div>
 
-<!-- 📄 隱藏報告 Template (專用於輸出 PDF / PNG) -->
+<!-- 📄 完整報告 Template (包含時間軸與歷程) -->
 <div id="reportTemplate">
   <div class="rpt-header">
     <div>
       <h1 id="rptHeaderTitle">智慧實驗日誌 - 實驗數據報告</h1>
-      <div class="rpt-sub">Smart E-labnote System - Official Experiment Report</div>
+      <div class="rpt-sub">Smart E-labnote System - Official Detailed Experiment Report</div>
     </div>
     <div style="text-align: right; font-size: 11px; color: #64748b;">
       <div>Report ID: <span id="rptExpId">--</span></div>
@@ -275,6 +281,13 @@
     <div class="rpt-meta-item" style="grid-column: span 2;"><strong id="lblRptInfo">專案與目的 / Purpose：</strong> <span id="rptValInfo"></span></div>
   </div>
 
+  <!-- 1. 狀態歷程時間表記 -->
+  <div class="rpt-section-title" id="rptSecTimeLogs">狀態歷程時間點紀錄 / Time Logs</div>
+  <table class="rpt-table" id="rptTableTimeLogs">
+    <!-- 動態注入時間歷程 -->
+  </table>
+
+  <!-- 2. 超音波與動物參數 -->
   <div class="rpt-section-title" id="rptSec1">超音波與動物參數 / Ultrasound & Animal Parameters</div>
   <table class="rpt-table">
     <tr><th>大鼠體重 / Rat Weight</th><td id="rptValWeight">--</td><th>PTZ / Saline 劑量</th><td id="rptValDose">--</td></tr>
@@ -282,6 +295,7 @@
     <tr><th>電壓 / Voltage</th><td id="rptValVolt">--</td><th>間隔 / Interval</th><td id="rptValInter">--</td></tr>
   </table>
 
+  <!-- 3. 座標與狀態標記 -->
   <div class="rpt-section-title" id="rptSec2">座標與狀態標記 / Coordinates & Status</div>
   <table class="rpt-table">
     <tr><th>Lamda 座標 / Position</th><td id="rptValLamda">--</td><th>電極插入位置 / Electrode</th><td id="rptValElec">--</td></tr>
@@ -289,14 +303,22 @@
     <tr><th>電極狀況 / Electrode St</th><td id="rptValElecSt">--</td><th>訊號狀況 / Signal St</th><td id="rptValSigSt">--</td></tr>
   </table>
 
+  <!-- 4. 訊號蒐集時間軸 (動態區段視覺化) -->
+  <div class="rpt-section-title" id="rptSecSignalTimeline">訊號蒐集時間軸 / Signal Collection Timeline</div>
+  <div id="rptSignalTimelineBox" style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; margin-bottom: 12px;">
+    <!-- 動態繪製進度條與圖例 -->
+  </div>
+
+  <!-- 5. 犧牲與組織處理 -->
   <div class="rpt-section-title" id="rptSec3">犧牲與組織處理 / Sacrifice & Tissue Preservation</div>
   <table class="rpt-table">
     <tr><th>犧牲方式 / Method</th><td id="rptValSacMethod">--</td><th>犧牲狀況 / Condition</th><td id="rptValSacSt">--</td></tr>
     <tr><th>摘除組織 / Tissue</th><td id="rptValTissue">--</td><th>保存方式 / Preservation</th><td id="rptValStorage">--</td></tr>
   </table>
 
+  <!-- 6. 備註紀錄 -->
   <div class="rpt-section-title" id="rptSec4">備註紀錄 / Experiment Notes</div>
-  <div id="rptValNotes" style="font-size: 11px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; white-space: pre-line; min-height: 50px;">無</div>
+  <div id="rptValNotes" style="font-size: 11px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; white-space: pre-line; min-height: 40px;">無</div>
 
   <div class="rpt-footer">
     <span>© DanielGuo. Smart E-labnote Platform</span>
@@ -1119,15 +1141,18 @@
 
     const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
 
+    // 🚀 修復：將按鈕容器縮小優化，防止按鈕溢出
     if (btnGroup) {
       btnGroup.innerHTML = `
-        <button class="modal-btn-export" style="margin-bottom:6px;" onclick="promptExportOptions('${exp.expId}')">${isZH?'📄 輸出實驗報告 (PDF / PNG)':'📄 Export Report (PDF / PNG)'}</button>
-        <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
-        <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
+        <div style="display:flex; gap:6px; width:100%;">
+          <button class="modal-btn-export" style="flex:1;" onclick="promptExportOptions('${exp.expId}')">${isZH?'📄 輸出報告':'📄 Export'}</button>
+          <button class="modal-btn-expand" style="flex:1;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'🔍 專業展開版':'Full Report'}</button>
+        </div>
+        <div style="display:flex; gap:6px; width:100%;">
           <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除':'Delete'}</button>
           <button id="btnToggleEdit" class="modal-btn-expand" style="flex:1; margin-top:0;" onclick="toggleEditMode('${exp.expId}')">${isZH?'修改':'Edit'}</button>
         </div>
-        <button class="modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+        <button class="modal-btn-confirm" style="background:var(--text-secondary);" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
       `;
     }
 
@@ -1197,7 +1222,31 @@
     document.getElementById('lblRptInfo').innerText = isZH ? "專案與目的：" : "Outline & Purpose:";
     document.getElementById('rptValInfo').innerText = formatBilingualText(exp.info, exportLang);
 
-    // 區塊 1
+    // 🚀 新增：狀態歷程時間注入報告
+    document.getElementById('rptSecTimeLogs').innerText = isZH ? "狀態歷程時間點紀錄" : "Time Logs History";
+    const rptTableLogs = document.getElementById('rptTableTimeLogs');
+    let timeLogsMap = formData['_time_logs'] || {};
+    const defaultKeys = ['已預約', '準備中', '準備完成', '手術中', '休息中', '訊號蒐集中', '訊號蒐集完成', '犧牲中', '實驗善後'];
+    const activeKeys = Object.keys(timeLogsMap).length > 0 ? Object.keys(timeLogsMap) : defaultKeys;
+
+    let logRowsHtml = '';
+    for (let i = 0; i < activeKeys.length; i += 2) {
+      const k1 = activeKeys[i];
+      const k2 = activeKeys[i + 1];
+      const t1 = timeLogsMap[k1] || '--';
+      const t2 = k2 ? (timeLogsMap[k2] || '--') : '';
+
+      logRowsHtml += `
+        <tr>
+          <th>${getStatusText(k1, exportLang)}</th>
+          <td>${t1}</td>
+          ${k2 ? `<th>${getStatusText(k2, exportLang)}</th><td>${t2}</td>` : `<th></th><td></td>`}
+        </tr>
+      `;
+    }
+    rptTableLogs.innerHTML = logRowsHtml;
+
+    // 區塊 2：超音波與動物參數
     document.getElementById('rptSec1').innerText = isZH ? "超音波與動物參數" : "Ultrasound & Animal Parameters";
     const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
     const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
@@ -1211,7 +1260,7 @@
     document.getElementById('rptValVolt').innerText = `${formData['volt'] || formData['field_21_0'] || '239'} mV`;
     document.getElementById('rptValInter').innerText = `${formData['inter'] || formData['field_22_0'] || '25'} ms`;
 
-    // 區塊 2
+    // 區塊 3：座標與狀態標記
     document.getElementById('rptSec2').innerText = isZH ? "座標與狀態標記" : "Coordinates & Status";
     const lamdaAP = formData['field_13_16'] || formData['field_9_16'] || '0';
     const lamdaML = formData['field_12_16'] || formData['field_10_16'] || '0';
@@ -1227,18 +1276,49 @@
     document.getElementById('rptValElecSt').innerText = formatBilingualText(formData['elec_status'] || '無特殊情況', exportLang);
     document.getElementById('rptValSigSt').innerText = formatBilingualText(formData['signal_status'] || '無特殊情況', exportLang);
 
-    // 區塊 3
+    // 🚀 新增：訊號蒐集時間軸注入報告
+    document.getElementById('rptSecSignalTimeline').innerText = isZH ? "訊號蒐集時間軸" : "Signal Collection Timeline";
+    const timelineBox = document.getElementById('rptSignalTimelineBox');
+    const stages = formData['field_4_20'];
+
+    if (Array.isArray(stages) && stages.length > 0) {
+      let totalMin = 0;
+      stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
+      if (totalMin > 0) {
+        const colors = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
+        let bars = '';
+        let legends = '';
+        stages.forEach((s, idx) => {
+          const t = parseFloat(s.time) || 0;
+          const pct = ((t / totalMin) * 100).toFixed(1);
+          const c = colors[idx % colors.length];
+          bars += `<div style="width:${pct}%; background:${c}; height:100%;"></div>`;
+          legends += `<span style="color:${c};">■ ${s.name}: ${t}m</span>`;
+        });
+        timelineBox.innerHTML = `
+          <div style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:4px;">${isZH?'總時長':'Total'}: ${totalMin} mins</div>
+          <div class="rpt-timeline-bar-bg">${bars}</div>
+          <div class="rpt-timeline-legend">${legends}</div>
+        `;
+      } else {
+        timelineBox.innerHTML = `<div style="font-size:10.5px; color:#94a3b8;">${isZH?'未設定搜集區段':'No stages defined'}</div>`;
+      }
+    } else {
+      timelineBox.innerHTML = `<div style="font-size:10.5px; color:#94a3b8;">${isZH?'無訊號蒐集動態時間軸資料':'No signal collection timeline data'}</div>`;
+    }
+
+    // 區塊 5：犧牲與組織處理
     document.getElementById('rptSec3').innerText = isZH ? "犧牲與組織處理" : "Sacrifice & Tissue Preservation";
     document.getElementById('rptValSacMethod').innerText = formatBilingualText(formData['sac_method'] || '無', exportLang);
     document.getElementById('rptValSacSt').innerText = formatBilingualText(formData['sac_status'] || '無特殊情況', exportLang);
     document.getElementById('rptValTissue').innerText = formatBilingualText(formData['tissue'] || '無', exportLang);
     document.getElementById('rptValStorage').innerText = formatBilingualText(formData['storage'] || formData['field_21_24'] || '不保存', exportLang);
 
-    // 區塊 4
+    // 區塊 6：備註紀錄
     document.getElementById('rptSec4').innerText = isZH ? "備註紀錄" : "Experiment Notes";
     document.getElementById('rptValNotes').innerText = formData['notes'] || (isZH ? '無' : 'None');
 
-    // 渲染繪圖
+    // 渲染繪圖與匯出
     const templateNode = document.getElementById('reportTemplate');
     
     try {
@@ -1499,7 +1579,7 @@
     if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   }
 
-  /* 2. 專業展開版 */
+  /* 2. 專業展開版 (補回訊號蒐集時間軸) */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1638,6 +1718,33 @@
     const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
     const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], isZH ? '無特殊情況' : 'None');
 
+    // 🚀 修復：展開版補回訊號蒐集動態時間軸
+    let signalTimelineHtml = '';
+    const stages = formData['field_4_20'];
+    if (Array.isArray(stages) && stages.length > 0) {
+      let totalMin = 0;
+      stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
+      if (totalMin > 0) {
+        const colors = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
+        let bars = '';
+        let legends = '';
+        stages.forEach((s, idx) => {
+          const t = parseFloat(s.time) || 0;
+          const pct = ((t / totalMin) * 100).toFixed(1);
+          const c = colors[idx % colors.length];
+          bars += `<div style="width:${pct}%; background:${c};" title="${s.name}: ${t}m"></div>`;
+          legends += `<span style="color:${c};">■ ${s.name}: ${t}m</span>`;
+        });
+        signalTimelineHtml = `
+          <div style="margin-top:8px; padding:8px; background:#fff; border-radius:6px; border:1px solid #e2e8f0;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">${isZH?'訊號蒐集區段時間軸 (總長':'Signal Collection Timeline (Total'}: ${totalMin} min)</div>
+            <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">${bars}</div>
+            <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600; flex-wrap:wrap;">${legends}</div>
+          </div>
+        `;
+      }
+    }
+
     const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isZH ? '無' : 'None');
     const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], isZH ? '無特殊情況' : 'None');
     const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isZH ? '無' : 'None');
@@ -1720,6 +1827,7 @@
                 <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集狀況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}">${signalStatusText}</div></div>
               </div>
             </div>
+            ${signalTimelineHtml}
           </div>
 
           <div class="exp-panel full-width">
