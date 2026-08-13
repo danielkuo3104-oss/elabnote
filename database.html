@@ -298,9 +298,24 @@
   <!-- 3. 座標與狀態標記 -->
   <div class="rpt-section-title" id="rptSec2">座標與狀態標記 / Coordinates & Status</div>
   <table class="rpt-table">
-    <tr><th>Lamda 座標 / Position</th><td id="rptValLamda">--</td><th>電極插入位置 / Electrode</th><td id="rptValElec">--</td></tr>
-    <tr><th>生理狀況 / Rat State</th><td id="rptValRatSt">--</td><th>手術狀況 / Surgical St</th><td id="rptValSurgSt">--</td></tr>
-    <tr><th>電極狀況 / Electrode St</th><td id="rptValElecSt">--</td><th>訊號狀況 / Signal St</th><td id="rptValSigSt">--</td></tr>
+    <tr>
+      <th>Lamda 座標 (AP, ML) / Position</th>
+      <td id="rptValLamda">--</td>
+      <th>電極插入位置 (AP, ML, DV) / Electrode</th>
+      <td id="rptValElec">--</td>
+    </tr>
+    <tr>
+      <th>生理狀況 / Rat State</th>
+      <td id="rptValRatSt">--</td>
+      <th>手術狀況 / Surgical St</th>
+      <td id="rptValSurgSt">--</td>
+    </tr>
+    <tr>
+      <th>電極狀況 / Electrode St</th>
+      <td id="rptValElecSt">--</td>
+      <th>訊號狀況 / Signal St</th>
+      <td id="rptValSigSt">--</td>
+    </tr>
   </table>
 
   <!-- 4. 訊號蒐集時間軸 (動態區段視覺化) -->
@@ -1085,8 +1100,14 @@
             
             <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
 
-            <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div></div>
+            <div class="detail-row">
+              <div class="detail-label">${isZH?'Lamda位置 (AP, ML)':'Lamda Pos (AP, ML)'}</div>
+              <div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">${isZH?'電極插入位置 (AP, ML, DV)':'Electrode Pos (AP, ML, DV)'}</div>
+              <div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div>
+            </div>
 
             <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
