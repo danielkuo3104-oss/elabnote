@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>實驗紀錄資料庫 - 智慧實驗日誌</title>
+  
+  <!-- 引入 PDF 與 繪圖開源函式庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <style>
     :root {
       --bg-main: #f1f5f9;
@@ -133,9 +138,7 @@
       padding: 18px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); max-height: 88vh; display: flex; flex-direction: column;
       transition: max-width 0.25s ease;
     }
-    .custom-modal.expanded-mode {
-      max-width: 720px;
-    }
+    .custom-modal.expanded-mode { max-width: 720px; }
 
     .custom-modal h3 { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; flex-shrink: 0; }
     .detail-list { text-align: left; overflow-y: auto; max-height: 68vh; font-size: 12px; padding-right: 4px; flex: 1; -webkit-overflow-scrolling: touch; }
@@ -151,19 +154,16 @@
     .modal-btn-area { margin-top: 12px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
     .modal-btn-confirm { background: var(--primary); color: #fff; border: none; padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 600; width: 100%; cursor: pointer; font-size: 13px; }
     .modal-btn-expand { background: var(--primary-light); color: var(--primary); border: 1px solid var(--border-focus); padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 13px; transition: all 0.2s; }
-    .modal-btn-expand:hover { background: #dbeafe; }
+    .modal-btn-export { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 10px 12px; border-radius: var(--radius-sm); font-weight: 700; width: 100%; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+    .modal-btn-export:hover { background: #fde68a; }
 
-    .expanded-grid {
-      display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px;
-    }
+    .expanded-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px; }
     @media (min-width: 600px) {
       .expanded-grid { grid-template-columns: 1fr 1fr; }
       .expanded-grid .full-width { grid-column: span 2; }
     }
 
-    .exp-panel {
-      background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 12px;
-    }
+    .exp-panel { background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 12px; }
     .exp-panel-title {
       font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1px solid var(--border-color); padding-bottom: 4px; letter-spacing: 0.3px;
@@ -182,19 +182,28 @@
     .vertical-time-item:last-child { margin-bottom: 0; }
     .vertical-time-dot { position: absolute; left: -14px; top: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); border: 2px solid var(--card-bg); box-shadow: 0 0 0 1px var(--primary); }
 
-    /* 展開版拖曳上傳 Zone 樣式 */
-    .drop-zone {
-      border: 2px dashed var(--border-focus);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      text-align: center;
-      background: #f0f9ff;
-      cursor: pointer;
-      transition: background 0.2s;
-      margin-top: 6px;
-    }
+    .drop-zone { border: 2px dashed var(--border-focus); border-radius: var(--radius-md); padding: 12px; text-align: center; background: #f0f9ff; cursor: pointer; transition: background 0.2s; margin-top: 6px; }
     .drop-zone.dragover { background: #dbeafe; border-color: var(--primary); }
     .drop-zone-text { font-size: 11px; color: var(--primary); font-weight: 700; }
+
+    /* 📄 隱藏報告 Template (專為 html2canvas 渲染 PDF/PNG 設計) */
+    #reportTemplate {
+      position: absolute; left: -9999px; top: -9999px;
+      width: 794px; background: #ffffff; padding: 32px;
+      color: #0f172a; font-family: "Segoe UI", -apple-system, sans-serif;
+      box-sizing: border-box;
+    }
+    .rpt-header { border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .rpt-header h1 { font-size: 20px; font-weight: 800; color: #0284c7; margin-bottom: 2px; }
+    .rpt-header .rpt-sub { font-size: 12px; color: #64748b; font-weight: 600; }
+    .rpt-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 16px; }
+    .rpt-meta-item { font-size: 12px; }
+    .rpt-meta-item strong { color: #334155; }
+    .rpt-section-title { font-size: 13px; font-weight: 800; color: #0284c7; border-left: 4px solid #0284c7; padding-left: 8px; margin: 14px 0 8px 0; }
+    .rpt-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
+    .rpt-table th, .rpt-table td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+    .rpt-table th { background: #f1f5f9; color: #334155; font-weight: 700; width: 30%; }
+    .rpt-footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; }
   </style>
 </head>
 <body>
@@ -234,6 +243,7 @@
   </div>
 </div>
 
+<!-- Modal 彈窗 -->
 <div id="customModalBackdrop" class="custom-modal-backdrop">
   <div class="custom-modal" id="modalDialogBox">
     <h3 id="modalTitle">實驗詳細資訊</h3>
@@ -241,6 +251,56 @@
     <div id="modalBtnArea" class="modal-btn-area">
       <button class="modal-btn-confirm" onclick="closeCustomModal()">關閉</button>
     </div>
+  </div>
+</div>
+
+<!-- 📄 隱藏報告 Template (專用於輸出 PDF / PNG) -->
+<div id="reportTemplate">
+  <div class="rpt-header">
+    <div>
+      <h1 id="rptHeaderTitle">智慧實驗日誌 - 實驗數據報告</h1>
+      <div class="rpt-sub">Smart E-labnote System - Official Experiment Report</div>
+    </div>
+    <div style="text-align: right; font-size: 11px; color: #64748b;">
+      <div>Report ID: <span id="rptExpId">--</span></div>
+      <div>Date: <span id="rptGenDate">--</span></div>
+    </div>
+  </div>
+
+  <div class="rpt-meta-grid">
+    <div class="rpt-meta-item"><strong id="lblRptExpId">實驗編號 / ID：</strong> <span id="rptValExpId"></span></div>
+    <div class="rpt-meta-item"><strong id="lblRptStatus">當前狀態 / Status：</strong> <span id="rptValStatus"></span></div>
+    <div class="rpt-meta-item"><strong id="lblRptUser">負責人員 / Owner：</strong> <span id="rptValUser"></span></div>
+    <div class="rpt-meta-item"><strong id="lblRptDate">實驗日期 / Date：</strong> <span id="rptValDate"></span></div>
+    <div class="rpt-meta-item" style="grid-column: span 2;"><strong id="lblRptInfo">專案與目的 / Purpose：</strong> <span id="rptValInfo"></span></div>
+  </div>
+
+  <div class="rpt-section-title" id="rptSec1">超音波與動物參數 / Ultrasound & Animal Parameters</div>
+  <table class="rpt-table">
+    <tr><th>大鼠體重 / Rat Weight</th><td id="rptValWeight">--</td><th>PTZ / Saline 劑量</th><td id="rptValDose">--</td></tr>
+    <tr><th>刺激頻率 / Frequency</th><td id="rptValFreq">--</td><th>週期數 / Cycles</th><td id="rptValCycle">--</td></tr>
+    <tr><th>電壓 / Voltage</th><td id="rptValVolt">--</td><th>間隔 / Interval</th><td id="rptValInter">--</td></tr>
+  </table>
+
+  <div class="rpt-section-title" id="rptSec2">座標與狀態標記 / Coordinates & Status</div>
+  <table class="rpt-table">
+    <tr><th>Lamda 座標 / Position</th><td id="rptValLamda">--</td><th>電極插入位置 / Electrode</th><td id="rptValElec">--</td></tr>
+    <tr><th>生理狀況 / Rat State</th><td id="rptValRatSt">--</td><th>手術狀況 / Surgical St</th><td id="rptValSurgSt">--</td></tr>
+    <tr><th>電極狀況 / Electrode St</th><td id="rptValElecSt">--</td><th>訊號狀況 / Signal St</th><td id="rptValSigSt">--</td></tr>
+  </table>
+
+  <div class="rpt-section-title" id="rptSec3">犧牲與組織處理 / Sacrifice & Tissue Preservation</div>
+  <table class="rpt-table">
+    <tr><th>犧牲方式 / Method</th><td id="rptValSacMethod">--</td><th>犧牲狀況 / Condition</th><td id="rptValSacSt">--</td></tr>
+    <tr><th>摘除組織 / Tissue</th><td id="rptValTissue">--</td><th>保存方式 / Preservation</th><td id="rptValStorage">--</td></tr>
+  </table>
+
+  <div class="rpt-section-title" id="rptSec4">備註紀錄 / Experiment Notes</div>
+  <div id="rptValNotes" style="font-size: 11px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; white-space: pre-line; min-height: 50px;">無</div>
+
+  <div class="rpt-footer">
+    <span>© DanielGuo. Smart E-labnote Platform</span>
+    <span>Signature: ______________________</span>
   </div>
 </div>
 
@@ -262,7 +322,7 @@
     "犧牲中": { bg: "#f3e8ff", text: "#7c3aed", border: "#d8b4fe" },        
     "實驗善後": { bg: "#faf5ff", text: "#a855f7", border: "#e9d5ff" },      
     "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },      
-    "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },      
+    "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },        
     "其他": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" }
   };
 
@@ -895,7 +955,6 @@
       const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
       const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
 
-      // 🚀 動態解析器強化版 (包含獨立備註文字自動加引號 ( ... ) 串接)
       const extractSmartValue = (kwArr, fallbackKeys = [], noteKeys = [], defaultText = '--') => {
         let raw = null;
         let inputVal = "";
@@ -955,7 +1014,6 @@
         return resStr || defaultText;
       };
 
-      // 將各欄位的獨立備註（例如 field_5_20、field_16_20 等）自動包進去！
       const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], isZH ? '無特殊情況' : 'None');
       const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], isZH ? '無特殊情況' : 'None');
       const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
@@ -1025,7 +1083,6 @@
       `;
     }
 
-    // 🚀 整合三大主備註：主備註(field_15_0) / 準備檢查表備註(field_81_8) / 善後備註(field_56_28)
     let userNotes = formData['notes'] || '';
     if (!userNotes) {
       const bottomNotes = [];
@@ -1064,6 +1121,7 @@
 
     if (btnGroup) {
       btnGroup.innerHTML = `
+        <button class="modal-btn-export" style="margin-bottom:6px;" onclick="promptExportOptions('${exp.expId}')">${isZH?'📄 輸出實驗報告 (PDF / PNG)':'📄 Export Report (PDF / PNG)'}</button>
         <button class="modal-btn-expand" style="margin-bottom:6px;" onclick="showFullExpandedView('${exp.expId}')">${isZH?'檢視完整數據與細節 (專業展開版)':'View Full Detailed Report'}</button>
         <div style="display:flex; gap:8px; width:100%; margin-bottom:6px;">
           <button class="modal-btn-confirm" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; flex:1;" onclick="deleteActiveExp('${exp.expId}')">${isZH?'刪除':'Delete'}</button>
@@ -1074,6 +1132,147 @@
     }
 
     document.getElementById('customModalBackdrop').style.display = 'flex';
+  }
+
+  /* 📄 4. 實驗報告輸出彈窗與繪圖生成邏輯 */
+  function promptExportOptions(expId) {
+    const isZH = state.currentLang === 'ZH';
+    
+    const html = `
+      <div style="text-align:left; font-size:12px; display:flex; flex-direction:column; gap:12px; padding:6px 0;">
+        <div>
+          <label style="font-weight:700; color:var(--text-secondary); display:block; margin-bottom:6px;">1. 選擇報告語言 / Language:</label>
+          <select id="selRptLang" class="form-control">
+            <option value="ZH" ${isZH?'selected':''}>繁體中文 (Traditional Chinese)</option>
+            <option value="EN" ${!isZH?'selected':''}>English</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-weight:700; color:var(--text-secondary); display:block; margin-bottom:6px;">2. 選擇輸出格式 / Export Format:</label>
+          <select id="selRptFormat" class="form-control">
+            <option value="PDF">PDF 文件 (.pdf)</option>
+            <option value="PNG">PNG 圖片 (.png)</option>
+          </select>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('modalTitle').innerText = isZH ? "輸出實驗數據報告" : "Export Experiment Report";
+    document.getElementById('modalMessage').innerHTML = html;
+    
+    const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
+    btnGroup.innerHTML = `
+      <button class="modal-btn-confirm" style="background:var(--success);" onclick="generateExperimentReport('${expId}')">${isZH?'開始生成並下載':'Generate & Download'}</button>
+      <button class="modal-btn-confirm" style="background:var(--bg-main); color:var(--text-secondary); border:1px solid var(--border-color);" onclick="showActiveExpDetail('${expId}')">${isZH?'返回':'Back'}</button>
+    `;
+  }
+
+  async function generateExperimentReport(expId) {
+    const exp = state.dataCenter.find(d => d.expId === expId);
+    if (!exp) return;
+
+    const exportLang = document.getElementById('selRptLang').value;
+    const exportFormat = document.getElementById('selRptFormat').value;
+    const isZH = exportLang === 'ZH';
+
+    const formData = exp.formData || {};
+
+    // 填寫報告模板數據
+    document.getElementById('rptHeaderTitle').innerText = isZH ? "智慧實驗日誌 - 實驗數據報告" : "Smart E-labnote - Experiment Report";
+    document.getElementById('rptExpId').innerText = exp.expId;
+    document.getElementById('rptGenDate').innerText = new Date().toLocaleDateString('sv-SE');
+
+    document.getElementById('lblRptExpId').innerText = isZH ? "實驗編號：" : "Experiment ID:";
+    document.getElementById('rptValExpId').innerText = exp.expId;
+
+    document.getElementById('lblRptStatus').innerText = isZH ? "當前狀態：" : "Current Status:";
+    document.getElementById('rptValStatus').innerText = getStatusText(exp.status, exportLang);
+
+    document.getElementById('lblRptUser').innerText = isZH ? "負責人員：" : "Owner:";
+    document.getElementById('rptValUser').innerText = exp.user;
+
+    document.getElementById('lblRptDate').innerText = isZH ? "實驗日期：" : "Experiment Date:";
+    document.getElementById('rptValDate').innerText = exp.date;
+
+    document.getElementById('lblRptInfo').innerText = isZH ? "專案與目的：" : "Outline & Purpose:";
+    document.getElementById('rptValInfo').innerText = formatBilingualText(exp.info, exportLang);
+
+    // 區塊 1
+    document.getElementById('rptSec1').innerText = isZH ? "超音波與動物參數" : "Ultrasound & Animal Parameters";
+    const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
+    const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
+    const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
+
+    document.getElementById('rptValWeight').innerText = ratWeight ? `${ratWeight} g` : '--';
+    document.getElementById('rptValDose').innerText = `${ptzVol} / ${salineVol} uL`;
+    document.getElementById('rptValFreq').innerText = `${formData['freq'] || formData['field_19_0'] || '3.5'} HZ`;
+    document.getElementById('rptValCycle').innerText = `${formData['cycle'] || formData['field_20_0'] || '2000'} times`;
+    document.getElementById('rptValVolt').innerText = `${formData['volt'] || formData['field_21_0'] || '239'} mV`;
+    document.getElementById('rptValInter').innerText = `${formData['inter'] || formData['field_22_0'] || '25'} ms`;
+
+    // 區塊 2
+    document.getElementById('rptSec2').innerText = isZH ? "座標與狀態標記" : "Coordinates & Status";
+    const lamdaAP = formData['field_13_16'] || formData['field_9_16'] || '0';
+    const lamdaML = formData['field_12_16'] || formData['field_10_16'] || '0';
+    const eleAP = formData['field_15_16'] || formData['field_20_16'] || '0';
+    const eleML = formData['field_16_16'] || formData['field_19_16'] || '0';
+    const eleDH = formData['field_17_16'] || formData['field_21_16'] || '0';
+
+    document.getElementById('rptValLamda').innerText = `(${lamdaAP}, ${lamdaML})`;
+    document.getElementById('rptValElec').innerText = `(${eleAP}, ${eleML}, ${eleDH})`;
+
+    document.getElementById('rptValRatSt').innerText = formatBilingualText(formData['rat_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValSurgSt').innerText = formatBilingualText(formData['surgery_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValElecSt').innerText = formatBilingualText(formData['elec_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValSigSt').innerText = formatBilingualText(formData['signal_status'] || '無特殊情況', exportLang);
+
+    // 區塊 3
+    document.getElementById('rptSec3').innerText = isZH ? "犧牲與組織處理" : "Sacrifice & Tissue Preservation";
+    document.getElementById('rptValSacMethod').innerText = formatBilingualText(formData['sac_method'] || '無', exportLang);
+    document.getElementById('rptValSacSt').innerText = formatBilingualText(formData['sac_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValTissue').innerText = formatBilingualText(formData['tissue'] || '無', exportLang);
+    document.getElementById('rptValStorage').innerText = formatBilingualText(formData['storage'] || formData['field_21_24'] || '不保存', exportLang);
+
+    // 區塊 4
+    document.getElementById('rptSec4').innerText = isZH ? "備註紀錄" : "Experiment Notes";
+    document.getElementById('rptValNotes').innerText = formData['notes'] || (isZH ? '無' : 'None');
+
+    // 渲染繪圖
+    const templateNode = document.getElementById('reportTemplate');
+    
+    try {
+      const canvas = await html2canvas(templateNode, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      if (exportFormat === 'PNG') {
+        const imgData = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `Report_${exp.expId}_${exportLang}.png`;
+        link.href = imgData;
+        link.click();
+      } else if (exportFormat === 'PDF') {
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`Report_${exp.expId}_${exportLang}.pdf`);
+      }
+
+      alert(isZH ? "實驗報告已成功生成並下載！" : "Report generated successfully!");
+      showActiveExpDetail(expId);
+
+    } catch (err) {
+      console.error("生成報告失敗：", err);
+      alert(isZH ? "生成報告失敗，請稍後重試。" : "Failed to generate report.");
+      showActiveExpDetail(expId);
+    }
   }
 
   function toggleEditMode(expId) {
@@ -1543,7 +1742,7 @@
             <div class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:600; padding:2px 0;">${notesStr}</div>
           </div>
 
-          <!-- 區塊 7：獨立實驗數據檔案專區 ( Column W 上傳 Zone ) -->
+          <!-- Column W 上傳 Zone -->
           <div class="exp-panel full-width">
             <div class="exp-panel-title">
               <span>${isZH ? '實驗數據檔案 (Column W)' : 'Experimental Data Files'}</span>
@@ -1568,6 +1767,7 @@
     document.getElementById('modalTitle').innerText = isZH ? "完整實驗專案報告 (展開版)" : "Full Experiment Detailed Report";
     document.getElementById('modalMessage').innerHTML = expandedHtml;
     document.getElementById('modalBtnArea').innerHTML = `
+      <button class="modal-btn-export" style="margin-bottom:6px;" onclick="promptExportOptions('${exp.expId}')">${isZH?'📄 輸出實驗報告 (PDF / PNG)':'📄 Export Report (PDF / PNG)'}</button>
       <button class="modal-btn-confirm" onclick="showActiveExpDetail('${exp.expId}')">${isZH?'返回精簡明細':'Back to Summary'}</button>
       <button class="modal-btn-confirm" style="background:var(--text-secondary);" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
     `;
