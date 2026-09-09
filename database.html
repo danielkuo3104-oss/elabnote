@@ -377,7 +377,7 @@
     "實驗善後": { ZH: "實驗善後", EN: "Cleaning" },
     "已完成": { ZH: "已完成", EN: "Completed" },
     "實驗完成": { ZH: "實驗完成", EN: "Completed" },
-    "已取消": { ZH: "已取消", EN: "Cancelled" } /* 新增已取消英文對照 */
+    "已取消": { ZH: "已取消", EN: "Cancelled" }
   };
 
   let state = {
@@ -388,6 +388,19 @@
     isStatsCollapsed: false,
     activeViewingExpId: null
   };
+
+  // 格式化 6 碼日期 yyMMdd (例如 2026-09-09 -> 260909)
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '';
+    const match = String(dateStr).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (match) {
+      const yy = match[1].slice(2);
+      const mm = match[2].padStart(2, '0');
+      const dd = match[3].padStart(2, '0');
+      return `${yy}${mm}${dd}`;
+    }
+    return '';
+  }
 
   window.addEventListener('DOMContentLoaded', async () => {
     const savedUser = localStorage.getItem('elabnote_user');
@@ -624,13 +637,25 @@
           
           let purposeName = cleanDisplayLabel(rawPurpose);
           
+          // 🚀 核心修改：如果沒填寫大綱，直接使用「日期+實驗專案」
           let dynamicInfo = "";
           if (outlineName && purposeName) {
             dynamicInfo = `${outlineName} - ${purposeName}`;
-          } else if (outlineName || purposeName) {
-            dynamicInfo = outlineName || purposeName;
+          } else if (outlineName) {
+            dynamicInfo = outlineName;
           } else {
-            dynamicInfo = "實驗專案";
+            // 從多處來源尋找可用日期以拼出 6 碼格式 (例如 260909)
+            let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
+            if (!dateCandidate && parsedFormData['_time_logs']) {
+              const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
+              if (firstLogTime) dateCandidate = firstLogTime;
+            }
+            if (!dateCandidate) {
+              dateCandidate = new Date().toLocaleDateString('sv-SE');
+            }
+
+            const shortD = formatShortDate(dateCandidate) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
+            dynamicInfo = `${shortD}實驗專案`;
           }
 
           let expDataFolder = "";
@@ -1164,7 +1189,7 @@
 
     const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
 
-    // 🚀 修復：將按鈕容器縮小優化，防止按鈕溢出
+    // 修復：將按鈕容器縮小優化，防止按鈕溢出
     if (btnGroup) {
       btnGroup.innerHTML = `
         <div style="display:flex; gap:6px; width:100%;">
@@ -1245,7 +1270,7 @@
     document.getElementById('lblRptInfo').innerText = isZH ? "專案與目的：" : "Outline & Purpose:";
     document.getElementById('rptValInfo').innerText = formatBilingualText(exp.info, exportLang);
 
-    // 🚀 新增：狀態歷程時間注入報告
+    // 狀態歷程時間注入報告
     document.getElementById('rptSecTimeLogs').innerText = isZH ? "狀態歷程時間點紀錄" : "Time Logs History";
     const rptTableLogs = document.getElementById('rptTableTimeLogs');
     let timeLogsMap = formData['_time_logs'] || {};
@@ -1299,7 +1324,7 @@
     document.getElementById('rptValElecSt').innerText = formatBilingualText(formData['elec_status'] || '無特殊情況', exportLang);
     document.getElementById('rptValSigSt').innerText = formatBilingualText(formData['signal_status'] || '無特殊情況', exportLang);
 
-    // 🚀 新增：訊號蒐集時間軸注入報告
+    // 訊號蒐集時間軸注入報告
     document.getElementById('rptSecSignalTimeline').innerText = isZH ? "訊號蒐集時間軸" : "Signal Collection Timeline";
     const timelineBox = document.getElementById('rptSignalTimelineBox');
     const stages = formData['field_4_20'];
@@ -1530,8 +1555,17 @@
     const targetIndex = state.dataCenter.findIndex(d => d.expId === expId);
     if (targetIndex !== -1) {
       state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(exp.formData));
-      const outlineStr = exp.formData['outline_select_val'] || 'Vortex gut–brain stimulation';
-      state.dataCenter[targetIndex].info = `${outlineStr} - ${safePurposeName}`;
+      
+      // 🚀 核心修改：儲存時同步確保無大綱時使用「日期+實驗專案」
+      const outlineStr = cleanDisplayLabel(exp.formData['outline_select_val'] || exp.formData['field_4_4'] || exp.formData['field_5_0'] || '');
+      if (outlineStr && safePurposeName) {
+        state.dataCenter[targetIndex].info = `${outlineStr} - ${safePurposeName}`;
+      } else if (outlineStr) {
+        state.dataCenter[targetIndex].info = outlineStr;
+      } else {
+        const shortD = formatShortDate(exp.date) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
+        state.dataCenter[targetIndex].info = `${shortD}實驗專案`;
+      }
     }
 
     const btnEdit = document.getElementById('btnToggleEdit');
@@ -1602,7 +1636,7 @@
     if (typeof filterRecordCenterList === 'function') filterRecordCenterList();
   }
 
-  /* 2. 專業展開版 (補回訊號蒐集時間軸) */
+  /* 2. 專業展開版 */
   function showFullExpandedView(expId) {
     const exp = state.dataCenter.find(d => d.expId === expId);
     if (!exp) return;
@@ -1741,7 +1775,6 @@
     const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
     const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], isZH ? '無特殊情況' : 'None');
 
-    // 🚀 修復：展開版補回訊號蒐集動態時間軸
     let signalTimelineHtml = '';
     const stages = formData['field_4_20'];
     if (Array.isArray(stages) && stages.length > 0) {
