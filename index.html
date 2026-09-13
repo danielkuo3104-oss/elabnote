@@ -2129,10 +2129,22 @@
     const sb = document.getElementById('formSidebar');
     const isLockedForm = ["FORM_003", "FORM_004", "FORM_005"].includes(currentFormCtx.formId);
 
-    sb.innerHTML = currentFormCtx.pages.map((p, idx) => {
-      const isActive = idx === currentFormCtx.currentPageIdx;
+    // 判斷是否為「僅新增專案（參數不輸入）」
+    const isNoParamsProject = currentFormCtx.formId === "FORM_001_1" && currentFormCtx.data['exp_select_val'] === 'NEW_PROJECT_ONLY';
+
+    // 若選了僅新增專案，直接過濾掉 Page 2
+    const displayPages = currentFormCtx.pages.filter((p, idx) => {
+      if (isNoParamsProject && (p.title.includes('Page 2') || p.title.includes('超音波') || idx === 1)) {
+        return false;
+      }
+      return true;
+    });
+
+    sb.innerHTML = displayPages.map((p, idx) => {
+      const realIdx = currentFormCtx.pages.indexOf(p);
+      const isActive = realIdx === currentFormCtx.currentPageIdx;
       const lockedClass = (isLockedForm && !isActive) ? 'locked' : '';
-      const clickHandler = isLockedForm ? '' : `onclick="jumpToFormPage(${idx})"`;
+      const clickHandler = isLockedForm ? '' : `onclick="jumpToFormPage(${realIdx})"`;
       return `
         <div class="sidebar-bookmark ${isActive ? 'active' : ''} ${lockedClass}" ${clickHandler}>
           ${p.title}
