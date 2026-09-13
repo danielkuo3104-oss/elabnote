@@ -85,7 +85,6 @@
     100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
   }
 
-  /* 今日進行中項目卡片 */
   .active-exp-card {
     background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md);
     padding: 12px 14px; margin-bottom: 10px; position: relative; cursor: pointer; transition: all 0.2s ease;
@@ -103,7 +102,6 @@
   .exp-meta-bar { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); gap: 8px; flex-wrap: wrap; }
   .exp-code-tag { font-family: ui-monospace, monospace; color: var(--text-muted); font-size: 11px; background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-color); word-break: break-all; }
 
-  /* 未來排程 */
   .schedule-item { display: flex; align-items: center; margin-top: 10px; font-size: 12px; color: var(--text-secondary); cursor: pointer; gap: 8px; width: 100%; }
   .schedule-date-tag { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace; flex-shrink: 0; }
   .schedule-info { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--text-primary); }
@@ -122,7 +120,6 @@
   .btn-reserve { background: #ffffff; color: var(--text-primary); border-color: var(--border-color); }
   .btn-makeup { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
-  /* 時間軸歷史紀錄 */
   .timeline-container { position: relative; padding-left: 20px; margin-top: 12px; margin-bottom: 12px; }
   .timeline-line { position: absolute; left: 5px; top: 12px; bottom: 8px; width: 2px; background: var(--border-color); }
   .timeline-item { position: relative; margin-bottom: 12px; cursor: pointer; }
@@ -180,7 +177,6 @@
     width: 150px; text-align: center; border: 1px solid var(--border-color);
   }
 
-  /* Modal - 緊湊排版 */
   .custom-modal-backdrop {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.4);
     backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; z-index: 999; padding: 16px;
@@ -419,7 +415,6 @@
 
     <div class="section-divider">實驗歷史紀錄 / HISTORY LOG</div>
 
-    <!-- 白色外框：點擊空白處跳轉資料庫 -->
     <div class="timeline-card-wrapper" onclick="window.location.href='database.html'" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px; margin-top: 12px; box-shadow: var(--shadow-sm); cursor: pointer;">
       <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px;" id="txtHistoryHeaderTitle">最近歷史紀錄</div>
       
@@ -531,7 +526,7 @@
     currentUser: null,
     isGuest: false,
     currentLang: "ZH",
-    simulatedDate: new Date().toLocaleDateString('sv-SE'), // YYYY-MM-DD
+    simulatedDate: new Date().toLocaleDateString('sv-SE'),
     membersList: [],
     dataCenter: [],
     formDataCache: {},
@@ -541,7 +536,6 @@
     activeSelectedExpId: null
   };
 
-  // 格式化 6 碼日期 yyMMdd (例如 2026-09-09 -> 260909)
   function formatShortDate(dateStr) {
     if (!dateStr) return '';
     const match = String(dateStr).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
@@ -554,7 +548,6 @@
     return '';
   }
 
-  // 頁面載入時優先檢查登入記憶
   window.addEventListener('DOMContentLoaded', async () => {
     checkSession();
     applyLanguage();
@@ -1175,14 +1168,12 @@
           }
           purposeName = cleanDisplayLabel(purposeName);
           
-          // 🚀 核心修改：如果沒填寫大綱，直接使用「日期+實驗專案」
           let dynamicInfo = "";
           if (outlineName && purposeName) {
             dynamicInfo = `${outlineName} - ${purposeName}`;
           } else if (outlineName) {
             dynamicInfo = outlineName;
           } else {
-            // 從多處來源尋找可用日期以拼出 6 碼格式 (例如 260909)
             let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
             if (!dateCandidate && parsedFormData['_time_logs']) {
               const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
@@ -2093,7 +2084,7 @@
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
 
-    if (expId === 'NEW_PROJECT' || expId === 'NEW_PAST_PROJECT') {
+    if (expId === 'NEW_PROJECT' || expId === 'NEW_PAST_PROJECT' || expId === 'NEW_PROJECT_ONLY') {
       delete currentFormCtx.data['outline_select_val'];
       delete currentFormCtx.data['selected_purpose_name'];
       delete currentFormCtx.data['notes'];
@@ -2235,6 +2226,7 @@
         const isZH = state.currentLang === 'ZH';
         const newProjText = isZH ? "➕ 新增實驗專案" : "➕ New Experiment Project";
         const newPastProjText = isZH ? "➕ 新增過去專案 (補登)" : "➕ New Past Project (Makeup)";
+        const newProjOnlyText = isZH ? "➕ 僅新增專案（參數不輸入）" : "➕ Project Only (No Parameters)";
         
         const isTodayLogin = currentFormCtx.formId === "FORM_001_1" && !currentFormCtx.isMakeup;
         const isMakeupMode = currentFormCtx.isMakeup;
@@ -2262,7 +2254,10 @@
 
         let topOptionHtml = '';
         if (isMakeupMode) {
-          topOptionHtml = `<option value="NEW_PAST_PROJECT">${newPastProjText}</option>`;
+          topOptionHtml = `
+            <option value="NEW_PAST_PROJECT" ${currentExpValue === 'NEW_PAST_PROJECT' ? 'selected' : ''}>${newPastProjText}</option>
+            <option value="NEW_PROJECT_ONLY" ${currentExpValue === 'NEW_PROJECT_ONLY' ? 'selected' : ''}>${newProjOnlyText}</option>
+          `;
         } else if (!isTodayLogin) {
           topOptionHtml = `<option value="NEW_PROJECT">${newProjText}</option>`;
         }
@@ -2466,8 +2461,12 @@
     const specialForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
     const btnNext = document.getElementById('btnFormNext');
     
+    const isNoParamsProject = currentFormCtx.data['exp_select_val'] === 'NEW_PROJECT_ONLY';
+
     if (specialForms.includes(currentFormCtx.formId)) {
       btnNext.innerText = state.currentLang === 'ZH' ? '提交與檢查' : 'Submit & Verify';
+    } else if (isNoParamsProject && currentFormCtx.formId === "FORM_001_1") {
+      btnNext.innerText = state.currentLang === 'ZH' ? '提交專案' : 'Submit Project';
     } else {
       const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
       const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
@@ -2596,6 +2595,12 @@
           currentFormCtx.data[f.id] = el.value;
         }
       });
+    }
+
+    // 若為「僅新增專案（參數不輸入）」，在第一頁填寫完成後直接跳過參數頁面進行提交
+    if (currentFormCtx.formId === "FORM_001_1" && currentFormCtx.data['exp_select_val'] === 'NEW_PROJECT_ONLY') {
+      checkFormAndSubmit();
+      return;
     }
 
     const targetDirectForms = ["FORM_002_1", "FORM_002_2", "FORM_006"];
@@ -2839,7 +2844,7 @@
     let isUpdateMode = false;
     
     const isReservation = currentFormCtx.formId === "FORM_001_2";
-    const isNewProject = selectedExpSelectVal === 'NEW_PROJECT' || selectedExpSelectVal === 'NEW_PAST_PROJECT' || !selectedExpSelectVal;
+    const isNewProject = selectedExpSelectVal === 'NEW_PROJECT' || selectedExpSelectVal === 'NEW_PAST_PROJECT' || selectedExpSelectVal === 'NEW_PROJECT_ONLY' || !selectedExpSelectVal;
     
     if (!isReservation && !isNewProject && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
       finalExpId = selectedExpSelectVal;
@@ -2857,6 +2862,15 @@
       currentFormCtx.data['_time_logs'][targetStatus] = "--";
     } else {
       currentFormCtx.data['_time_logs'][targetStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
+    }
+
+    // 若選擇「僅新增專案（參數不輸入）」，清除超音波參數，不進行上傳
+    if (selectedExpSelectVal === 'NEW_PROJECT_ONLY') {
+      const paramKeys = ['freq', 'cycle', 'volt', 'inter', 'field_19_0', 'field_20_0', 'field_21_0', 'field_22_0'];
+      paramKeys.forEach(k => {
+        delete currentFormCtx.data[k];
+      });
+      currentFormCtx.data['_no_parameters'] = true;
     }
 
     const rawFormId = currentFormCtx.formId; 
@@ -2908,7 +2922,7 @@
     state.isSubmitting = false;
     closeFormPage();
 
-    if (completedMakeup && targetStatus !== '實驗完成' && targetStatus !== '已完成') {
+    if (completedMakeup && targetStatus !== '實驗完成' && targetStatus !== '已完成' && selectedExpSelectVal !== 'NEW_PROJECT_ONLY') {
       const updatedExp = state.dataCenter.find(d => d.expId === finalExpId);
       if (updatedExp) {
         setTimeout(() => {
@@ -3154,7 +3168,6 @@
       });
     }
   }
-  
 </script>
 </body>
 </html>
