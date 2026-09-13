@@ -360,7 +360,7 @@
     "實驗善後": { bg: "#faf5ff", text: "#a855f7", border: "#e9d5ff" },      
     "實驗完成": { bg: "#334155", text: "#ffffff", border: "#334155" },      
     "已完成": { bg: "#334155", text: "#ffffff", border: "#334155" },        
-    "已取消": { bg: "#fee2e2", text: "#dc2626", border: "#fca5a5" }, /* 鮮明淡紅底深紅字 */
+    "已取消": { bg: "#fee2e2", text: "#dc2626", border: "#fca5a5" },
     "其他": { bg: "#f1f5f9", text: "#64748b", border: "#cbd5e1" }
   };
 
@@ -389,7 +389,6 @@
     activeViewingExpId: null
   };
 
-  // 格式化 6 碼日期 yyMMdd (例如 2026-09-09 -> 260909)
   function formatShortDate(dateStr) {
     if (!dateStr) return '';
     const match = String(dateStr).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
@@ -637,14 +636,12 @@
           
           let purposeName = cleanDisplayLabel(rawPurpose);
           
-          // 🚀 核心修改：如果沒填寫大綱，直接使用「日期+實驗專案」
           let dynamicInfo = "";
           if (outlineName && purposeName) {
             dynamicInfo = `${outlineName} - ${purposeName}`;
           } else if (outlineName) {
             dynamicInfo = outlineName;
           } else {
-            // 從多處來源尋找可用日期以拼出 6 碼格式 (例如 260909)
             let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
             if (!dateCandidate && parsedFormData['_time_logs']) {
               const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
@@ -1001,25 +998,38 @@
     let filledDataSectionHtml = '';
 
     if (!isReserved) {
-      const freqVal = formData['freq'] !== undefined ? formData['freq'] : (formData['field_19_0'] !== undefined ? formData['field_19_0'] : '3.5');
-      const cycleVal = formData['cycle'] !== undefined ? formData['cycle'] : (formData['field_20_0'] !== undefined ? formData['field_20_0'] : '2000');
-      const voltVal = formData['volt'] !== undefined ? formData['volt'] : (formData['field_21_0'] !== undefined ? formData['field_21_0'] : '239');
-      const interVal = formData['inter'] !== undefined ? formData['inter'] : (formData['field_22_0'] !== undefined ? formData['field_22_0'] : '25');
+      const isNoParams = !!formData['_no_parameters'];
 
+      // 1. 超音波參數：若無參數則全部為 '--'
+      const freqVal = (!isNoParams && (formData['freq'] !== undefined ? formData['freq'] : formData['field_19_0'])) || '--';
+      const cycleVal = (!isNoParams && (formData['cycle'] !== undefined ? formData['cycle'] : formData['field_20_0'])) || '--';
+      const voltVal = (!isNoParams && (formData['volt'] !== undefined ? formData['volt'] : formData['field_21_0'])) || '--';
+      const interVal = (!isNoParams && (formData['inter'] !== undefined ? formData['inter'] : formData['field_22_0'])) || '--';
+
+      // 2. 體重與 PTZ
       const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
       const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
       
-      const calculatedPTZ = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
-      const calculatedSaline = ratWeight > 0 ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
+      const calculatedPTZ = (!isNoParams && ratWeight > 0) ? (ratWeight * ptzDose).toFixed(1) : '--';
+      const calculatedSaline = (!isNoParams && ratWeight > 0) ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
+      const ratWeightDisp = (!isNoParams && ratWeight > 0) ? ratWeight : '--';
 
-      const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
-      const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
+      // 3. 座標位置：若無輸入，一律顯示 '--'
+      const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : formData['field_9_16'];
+      const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : formData['field_10_16'];
+      const lamdaPosText = (!isNoParams && lamdaAP !== undefined && lamdaML !== undefined && (lamdaAP !== '' || lamdaML !== '')) 
+        ? `(${lamdaAP || 0}, ${lamdaML || 0})` 
+        : '--';
 
-      const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_20_16'] || '0');
-      const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
-      const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
+      const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : formData['field_20_16'];
+      const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : formData['field_19_16'];
+      const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : formData['field_21_16'];
+      const elePosText = (!isNoParams && (eleAP !== undefined || eleML !== undefined || eleDH !== undefined) && (eleAP !== '' || eleML !== '' || eleDH !== ''))
+        ? `(${eleAP || 0}, ${eleML || 0}, ${eleDH || 0})` 
+        : '--';
 
       const extractSmartValue = (kwArr, fallbackKeys = [], noteKeys = [], defaultText = '--') => {
+        if (isNoParams) return '--';
         let raw = null;
         let inputVal = "";
 
@@ -1078,19 +1088,20 @@
         return resStr || defaultText;
       };
 
-      const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], isZH ? '無特殊情況' : 'None');
-      const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], isZH ? '無特殊情況' : 'None');
-      const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
-      const signalStatusText = formData['signal_status'] || extractSmartValue(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], isZH ? '無特殊情況' : 'None');
-      const sacMethodText = formData['sac_method'] || extractSmartValue(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isZH ? '無' : 'None');
-      const sacStatusText = formData['sac_status'] || extractSmartValue(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], isZH ? '無特殊情況' : 'None');
-      const tissueText = formData['tissue'] || extractSmartValue(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isZH ? '無' : 'None');
-      const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], ['field_24_24'], isZH ? '無特殊情況' : 'None');
-      const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], [], isZH ? '不保存' : 'None');
+      const defaultStateText = isNoParams ? '--' : (isZH ? '無特殊情況' : 'None');
+      const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], defaultStateText);
+      const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], defaultStateText);
+      const elecStatusText = formData['elec_status'] || extractSmartValue(['電極', 'electrode'], ['field_37_16'], [], defaultStateText);
+      const signalStatusText = formData['signal_status'] || extractSmartValue(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], defaultStateText);
+      const sacMethodText = formData['sac_method'] || extractSmartValue(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isNoParams ? '--' : (isZH ? '無' : 'None'));
+      const sacStatusText = formData['sac_status'] || extractSmartValue(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], defaultStateText);
+      const tissueText = formData['tissue'] || extractSmartValue(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isNoParams ? '--' : (isZH ? '無' : 'None'));
+      const tissueStatusText = formData['tissue_status'] || extractSmartValue(['摘除情況', 'excisionstatus'], ['field_17_24'], ['field_24_24'], defaultStateText);
+      const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValue(['保存', 'preservation'], ['field_24_24', 'field_21_24'], [], isNoParams ? '--' : (isZH ? '不保存' : 'None'));
 
       let timelineBarHtml = '';
       const stages = formData['field_4_20'];
-      if (Array.isArray(stages) && stages.length > 0) {
+      if (!isNoParams && Array.isArray(stages) && stages.length > 0) {
         let totalMin = 0;
         stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
         if (totalMin > 0) {
@@ -1119,32 +1130,32 @@
           <div class="detail-label" style="width:100%; margin-bottom:6px; font-size:12px; font-weight:800; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:4px;">${isZH ? '填寫數據明細' : 'Field Data Details'}</div>
           <div id="editableFieldsContainer" class="detail-value" style="text-align:left; width:100%; padding:4px 0;">
             
-            <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeight || '--'}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal}</span><input type="number" step="0.1" class="edit-mode-input form-control" id="edit_freq" value="${freqVal==='--'?'':freqVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal}</span><input type="number" class="edit-mode-input form-control" id="edit_cycle" value="${cycleVal==='--'?'':cycleVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal}</span><input type="number" class="edit-mode-input form-control" id="edit_volt" value="${voltVal==='--'?'':voltVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span><input type="number" class="edit-mode-input form-control" id="edit_inter" value="${interVal==='--'?'':interVal}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeightDisp}</span><input type="number" class="edit-mode-input form-control" id="edit_weight" value="${ratWeight||''}" style="display:none; width:90px; padding:2px 6px; font-size:11px; text-align:right;"></div></div>
             
             <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
 
             <div class="detail-row">
               <div class="detail-label">${isZH?'Lamda位置 (AP, ML)':'Lamda Pos (AP, ML)'}</div>
-              <div class="detail-value normal-value"><span class="view-mode-text">(${lamdaAP}, ${lamdaML})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div>
+              <div class="detail-value normal-value"><span class="view-mode-text">${lamdaPosText}</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_lamdaAP" value="${lamdaAP||''}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_lamdaML" value="${lamdaML||''}" style="width:45px; padding:2px 4px; font-size:11px; text-align:center;"></div></div>
             </div>
             <div class="detail-row">
               <div class="detail-label">${isZH?'電極插入位置 (AP, ML, DV)':'Electrode Pos (AP, ML, DV)'}</div>
-              <div class="detail-value normal-value"><span class="view-mode-text">(${eleAP}, ${eleML}, ${eleDH})</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div>
+              <div class="detail-value normal-value"><span class="view-mode-text">${elePosText}</span><div class="edit-mode-input" style="display:none; gap:4px; justify-content:flex-end;"><input type="text" class="form-control" id="edit_eleAP" value="${eleAP||''}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleML" value="${eleML||''}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"><input type="text" class="form-control" id="edit_eleDH" value="${eleDH||''}" style="width:35px; padding:2px 2px; font-size:11px; text-align:center;"></div></div>
             </div>
 
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText}</textarea></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText}" style="display:none; width:100%;"></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_rat_status" value="${ratStatusText==='--'?'':ratStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_surgery_status" value="${surgeryStatusText==='--'?'':surgeryStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${elecStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_elec_status" value="${elecStatusText==='--'?'':elecStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${signalStatusText}</span><textarea class="edit-mode-input form-control" id="edit_signal_status" rows="2" style="display:none; width:100%; font-size:11px;">${signalStatusText==='--'?'':signalStatusText}</textarea></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${sacMethodText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_method" value="${sacMethodText==='--'?'':sacMethodText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${sacStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_sac_status" value="${sacStatusText==='--'?'':sacStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${tissueText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue" value="${tissueText==='--'?'':tissueText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${tissueStatusText}</span><input type="text" class="edit-mode-input form-control" id="edit_tissue_status" value="${tissueStatusText==='--'?'':tissueStatusText}" style="display:none; width:100%;"></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span><input type="text" class="edit-mode-input form-control" id="edit_storage" value="${storageText==='--'?'':storageText}" style="display:none; width:100%;"></div></div>
 
             ${timelineBarHtml}
 
@@ -1189,7 +1200,6 @@
 
     const btnGroup = document.getElementById('modalBtnArea') || document.getElementById('modalBtnGroup');
 
-    // 修復：將按鈕容器縮小優化，防止按鈕溢出
     if (btnGroup) {
       btnGroup.innerHTML = `
         <div style="display:flex; gap:6px; width:100%;">
@@ -1249,6 +1259,7 @@
     const isZH = exportLang === 'ZH';
 
     const formData = exp.formData || {};
+    const isNoParams = !!formData['_no_parameters'];
 
     // 填寫報告模板數據
     document.getElementById('rptHeaderTitle').innerText = isZH ? "智慧實驗日誌 - 實驗數據報告" : "Smart E-labnote - Experiment Report";
@@ -1298,38 +1309,44 @@
     document.getElementById('rptSec1').innerText = isZH ? "超音波與動物參數" : "Ultrasound & Animal Parameters";
     const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
     const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
-    const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
-    const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
+    const ptzVol = (!isNoParams && ratWeight > 0) ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const salineVol = (!isNoParams && ratWeight > 0) ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
 
-    document.getElementById('rptValWeight').innerText = ratWeight ? `${ratWeight} g` : '--';
-    document.getElementById('rptValDose').innerText = `${ptzVol} / ${salineVol} uL`;
-    document.getElementById('rptValFreq').innerText = `${formData['freq'] || formData['field_19_0'] || '3.5'} HZ`;
-    document.getElementById('rptValCycle').innerText = `${formData['cycle'] || formData['field_20_0'] || '2000'} times`;
-    document.getElementById('rptValVolt').innerText = `${formData['volt'] || formData['field_21_0'] || '239'} mV`;
-    document.getElementById('rptValInter').innerText = `${formData['inter'] || formData['field_22_0'] || '25'} ms`;
+    document.getElementById('rptValWeight').innerText = (!isNoParams && ratWeight > 0) ? `${ratWeight} g` : '--';
+    document.getElementById('rptValDose').innerText = (!isNoParams && ratWeight > 0) ? `${ptzVol} / ${salineVol} uL` : '--';
+    
+    const freqVal = (!isNoParams && (formData['freq'] || formData['field_19_0'])) ? `${formData['freq'] || formData['field_19_0']} HZ` : '--';
+    const cycleVal = (!isNoParams && (formData['cycle'] || formData['field_20_0'])) ? `${formData['cycle'] || formData['field_20_0']} times` : '--';
+    const voltVal = (!isNoParams && (formData['volt'] || formData['field_21_0'])) ? `${formData['volt'] || formData['field_21_0']} mV` : '--';
+    const interVal = (!isNoParams && (formData['inter'] || formData['field_22_0'])) ? `${formData['inter'] || formData['field_22_0']} ms` : '--';
+
+    document.getElementById('rptValFreq').innerText = freqVal;
+    document.getElementById('rptValCycle').innerText = cycleVal;
+    document.getElementById('rptValVolt').innerText = voltVal;
+    document.getElementById('rptValInter').innerText = interVal;
 
     // 區塊 3：座標與狀態標記
     document.getElementById('rptSec2').innerText = isZH ? "座標與狀態標記" : "Coordinates & Status";
-    const lamdaAP = formData['field_13_16'] || formData['field_9_16'] || '0';
-    const lamdaML = formData['field_12_16'] || formData['field_10_16'] || '0';
-    const eleAP = formData['field_15_16'] || formData['field_20_16'] || '0';
-    const eleML = formData['field_16_16'] || formData['field_19_16'] || '0';
-    const eleDH = formData['field_17_16'] || formData['field_21_16'] || '0';
+    const lamdaAP = formData['field_13_16'] || formData['field_9_16'];
+    const lamdaML = formData['field_12_16'] || formData['field_10_16'];
+    const eleAP = formData['field_15_16'] || formData['field_20_16'];
+    const eleML = formData['field_16_16'] || formData['field_19_16'];
+    const eleDH = formData['field_17_16'] || formData['field_21_16'];
 
-    document.getElementById('rptValLamda').innerText = `(${lamdaAP}, ${lamdaML})`;
-    document.getElementById('rptValElec').innerText = `(${eleAP}, ${eleML}, ${eleDH})`;
+    document.getElementById('rptValLamda').innerText = (!isNoParams && (lamdaAP || lamdaML)) ? `(${lamdaAP||0}, ${lamdaML||0})` : '--';
+    document.getElementById('rptValElec').innerText = (!isNoParams && (eleAP || eleML || eleDH)) ? `(${eleAP||0}, ${eleML||0}, ${eleDH||0})` : '--';
 
-    document.getElementById('rptValRatSt').innerText = formatBilingualText(formData['rat_status'] || '無特殊情況', exportLang);
-    document.getElementById('rptValSurgSt').innerText = formatBilingualText(formData['surgery_status'] || '無特殊情況', exportLang);
-    document.getElementById('rptValElecSt').innerText = formatBilingualText(formData['elec_status'] || '無特殊情況', exportLang);
-    document.getElementById('rptValSigSt').innerText = formatBilingualText(formData['signal_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValRatSt').innerText = isNoParams ? '--' : formatBilingualText(formData['rat_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValSurgSt').innerText = isNoParams ? '--' : formatBilingualText(formData['surgery_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValElecSt').innerText = isNoParams ? '--' : formatBilingualText(formData['elec_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValSigSt').innerText = isNoParams ? '--' : formatBilingualText(formData['signal_status'] || '無特殊情況', exportLang);
 
     // 訊號蒐集時間軸注入報告
     document.getElementById('rptSecSignalTimeline').innerText = isZH ? "訊號蒐集時間軸" : "Signal Collection Timeline";
     const timelineBox = document.getElementById('rptSignalTimelineBox');
     const stages = formData['field_4_20'];
 
-    if (Array.isArray(stages) && stages.length > 0) {
+    if (!isNoParams && Array.isArray(stages) && stages.length > 0) {
       let totalMin = 0;
       stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
       if (totalMin > 0) {
@@ -1357,10 +1374,10 @@
 
     // 區塊 5：犧牲與組織處理
     document.getElementById('rptSec3').innerText = isZH ? "犧牲與組織處理" : "Sacrifice & Tissue Preservation";
-    document.getElementById('rptValSacMethod').innerText = formatBilingualText(formData['sac_method'] || '無', exportLang);
-    document.getElementById('rptValSacSt').innerText = formatBilingualText(formData['sac_status'] || '無特殊情況', exportLang);
-    document.getElementById('rptValTissue').innerText = formatBilingualText(formData['tissue'] || '無', exportLang);
-    document.getElementById('rptValStorage').innerText = formatBilingualText(formData['storage'] || formData['field_21_24'] || '不保存', exportLang);
+    document.getElementById('rptValSacMethod').innerText = isNoParams ? '--' : formatBilingualText(formData['sac_method'] || '無', exportLang);
+    document.getElementById('rptValSacSt').innerText = isNoParams ? '--' : formatBilingualText(formData['sac_status'] || '無特殊情況', exportLang);
+    document.getElementById('rptValTissue').innerText = isNoParams ? '--' : formatBilingualText(formData['tissue'] || '無', exportLang);
+    document.getElementById('rptValStorage').innerText = isNoParams ? '--' : formatBilingualText(formData['storage'] || formData['field_21_24'] || '不保存', exportLang);
 
     // 區塊 6：備註紀錄
     document.getElementById('rptSec4').innerText = isZH ? "備註紀錄" : "Experiment Notes";
@@ -1556,7 +1573,6 @@
     if (targetIndex !== -1) {
       state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(exp.formData));
       
-      // 🚀 核心修改：儲存時同步確保無大綱時使用「日期+實驗專案」
       const outlineStr = cleanDisplayLabel(exp.formData['outline_select_val'] || exp.formData['field_4_4'] || exp.formData['field_5_0'] || '');
       if (outlineStr && safePurposeName) {
         state.dataCenter[targetIndex].info = `${outlineStr} - ${safePurposeName}`;
@@ -1646,6 +1662,7 @@
     const displayStatus = getStatusText(exp.status, state.currentLang);
     const displayInfo = formatBilingualText(exp.info, state.currentLang);
     const formData = exp.formData || {};
+    const isNoParams = !!formData['_no_parameters'];
 
     const modalDialog = document.getElementById('modalDialogBox');
     modalDialog.classList.add('expanded-mode');
@@ -1676,27 +1693,29 @@
       dotLineLogsHtml = `<div style="font-size:11px; color:var(--text-muted); padding:4px 0;">${isZH ? '尚無詳細歷程時間' : 'No time logs'}</div>`;
     }
 
-    const freqVal = formData['field_19_0'] !== undefined ? formData['field_19_0'] : (formData['freq'] !== undefined ? formData['freq'] : '3.5');
-    const cycleVal = formData['field_20_0'] !== undefined ? formData['field_20_0'] : (formData['cycle'] !== undefined ? formData['cycle'] : '2000');
-    const voltVal = formData['field_21_0'] !== undefined ? formData['field_21_0'] : (formData['volt'] !== undefined ? formData['volt'] : '239');
-    const interVal = formData['field_22_0'] !== undefined ? formData['field_22_0'] : (formData['inter'] !== undefined ? formData['inter'] : '25');
+    const freqVal = (!isNoParams && (formData['field_19_0'] !== undefined ? formData['field_19_0'] : formData['freq'])) || '--';
+    const cycleVal = (!isNoParams && (formData['field_20_0'] !== undefined ? formData['field_20_0'] : formData['cycle'])) || '--';
+    const voltVal = (!isNoParams && (formData['field_21_0'] !== undefined ? formData['field_21_0'] : formData['volt'])) || '--';
+    const interVal = (!isNoParams && (formData['field_22_0'] !== undefined ? formData['field_22_0'] : formData['inter'])) || '--';
 
     const ultrasoundPanelHtml = `
       <div class="exp-panel">
         <div class="exp-panel-title">${isZH ? '超音波刺激參數' : 'Ultrasound Parameters'}</div>
-        <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'}</div><div class="detail-value normal-value">${freqVal} HZ</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value">${cycleVal} times</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'}</div><div class="detail-value normal-value">${voltVal} mV</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'}</div><div class="detail-value normal-value">${interVal} ms</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'}</div><div class="detail-value normal-value">${freqVal === '--' ? '--' : freqVal + ' HZ'}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value">${cycleVal === '--' ? '--' : cycleVal + ' times'}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'}</div><div class="detail-value normal-value">${voltVal === '--' ? '--' : voltVal + ' mV'}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'}</div><div class="detail-value normal-value">${interVal === '--' ? '--' : interVal + ' ms'}</div></div>
       </div>
     `;
 
     const ratWeight = parseFloat(formData['field_5_16'] || formData['field_3_16'] || formData['rat_weight'] || 0);
     const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
-    const ptzVol = ratWeight > 0 ? (ratWeight * ptzDose).toFixed(1) : '--';
-    const salineVol = ratWeight > 0 ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
+    const ptzVol = (!isNoParams && ratWeight > 0) ? (ratWeight * ptzDose).toFixed(1) : '--';
+    const salineVol = (!isNoParams && ratWeight > 0) ? Math.max(0, 700 - ratWeight * ptzDose).toFixed(1) : '--';
+    const ratWeightDisp = (!isNoParams && ratWeight > 0) ? `${ratWeight} g` : '--';
 
     const extractSmartValueEx = (kwArr, fallbackKeys = [], noteKeys = [], defaultText = '--') => {
+      if (isNoParams) return '--';
       let raw = null;
       let inputVal = "";
 
@@ -1755,29 +1774,37 @@
       return resStr || defaultText;
     };
 
-    const ratStatusText = formData['rat_status'] || extractSmartValueEx(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], isZH ? '無特殊情況' : 'None');
+    const defaultStateText = isNoParams ? '--' : (isZH ? '無特殊情況' : 'None');
+    const ratStatusText = formData['rat_status'] || extractSmartValueEx(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], defaultStateText);
 
     let surgDurationText = '--';
-    if (formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
+    if (!isNoParams && formData['_time_logs'] && formData['_time_logs']['手術中'] && (formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡'])) {
       const start = new Date(formData['_time_logs']['手術中']);
       const end = new Date(formData['_time_logs']['休息中'] || formData['_time_logs']['已死亡']);
       const diffMs = end - start;
       if (!isNaN(diffMs) && diffMs > 0) surgDurationText = `${Math.floor(diffMs / 60000)} ${isZH ? '分鐘' : 'mins'}`;
     }
-    const surgeryStatusText = formData['surgery_status'] || extractSmartValueEx(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], isZH ? '無特殊情況' : 'None');
+    const surgeryStatusText = formData['surgery_status'] || extractSmartValueEx(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], defaultStateText);
 
-    const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : (formData['field_9_16'] || '0');
-    const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : (formData['field_10_16'] || '0');
-    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : (formData['field_20_16'] || '0');
-    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : (formData['field_19_16'] || '0');
-    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : (formData['field_21_16'] || '0');
+    const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : formData['field_9_16'];
+    const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : formData['field_10_16'];
+    const eleAP = formData['field_15_16'] !== undefined ? formData['field_15_16'] : formData['field_20_16'];
+    const eleML = formData['field_16_16'] !== undefined ? formData['field_16_16'] : formData['field_19_16'];
+    const eleDH = formData['field_17_16'] !== undefined ? formData['field_17_16'] : formData['field_21_16'];
 
-    const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], [], isZH ? '無特殊情況' : 'None');
-    const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], isZH ? '無特殊情況' : 'None');
+    const lamdaPosText = (!isNoParams && (lamdaAP !== undefined || lamdaML !== undefined) && (lamdaAP !== '' || lamdaML !== '')) 
+      ? `(${lamdaAP || 0}, ${lamdaML || 0})` 
+      : '--';
+    const elePosText = (!isNoParams && (eleAP !== undefined || eleML !== undefined || eleDH !== undefined) && (eleAP !== '' || eleML !== '' || eleDH !== ''))
+      ? `(${eleAP || 0}, ${eleML || 0}, ${eleDH || 0})` 
+      : '--';
+
+    const elecStatusText = formData['elec_status'] || extractSmartValueEx(['電極', 'electrode'], ['field_37_16'], [], defaultStateText);
+    const signalStatusText = formData['signal_status'] || extractSmartValueEx(['訊號', 'signal'], ['field_7_20'], ['field_5_20', 'field_16_20'], defaultStateText);
 
     let signalTimelineHtml = '';
     const stages = formData['field_4_20'];
-    if (Array.isArray(stages) && stages.length > 0) {
+    if (!isNoParams && Array.isArray(stages) && stages.length > 0) {
       let totalMin = 0;
       stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
       if (totalMin > 0) {
@@ -1801,11 +1828,11 @@
       }
     }
 
-    const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isZH ? '無' : 'None');
-    const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], isZH ? '無特殊情況' : 'None');
-    const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isZH ? '無' : 'None');
-    const tissueStatusText = formData['tissue_status'] || extractSmartValueEx(['摘除情況', 'excisionstatus'], ['field_17_24'], ['field_24_24'], isZH ? '無特殊情況' : 'None');
-    const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValueEx(['保存', 'preservation'], ['field_24_24', 'field_21_24'], [], isZH ? '不保存' : 'None');
+    const sacMethodText = formData['sac_method'] || extractSmartValueEx(['犧牲方式', 'sacrificemethod'], ['field_3_24'], ['field_7_24'], isNoParams ? '--' : (isZH ? '無' : 'None'));
+    const sacStatusText = formData['sac_status'] || extractSmartValueEx(['犧牲情況', 'sacrificestatus'], ['field_7_24', 'field_9_24'], ['field_12_24'], defaultStateText);
+    const tissueText = formData['tissue'] || extractSmartValueEx(['摘除組織', 'tissue'], ['field_12_24', 'field_14_24'], [], isNoParams ? '--' : (isZH ? '無' : 'None'));
+    const tissueStatusText = formData['tissue_status'] || extractSmartValueEx(['摘除情況', 'excisionstatus'], ['field_17_24'], ['field_24_24'], defaultStateText);
+    const storageText = formData['storage'] || formData['field_21_24'] || extractSmartValueEx(['保存', 'preservation'], ['field_24_24', 'field_21_24'], [], isNoParams ? '--' : (isZH ? '不保存' : 'None'));
 
     let notesStr = formData['notes'] || '';
     if (!notesStr) {
@@ -1860,7 +1887,7 @@
 
           <div class="exp-panel">
             <div class="exp-panel-title">${isZH ? '動物基本參數與生理狀況' : 'Animal Parameters & State'}</div>
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value normal-value">${ratWeight || '--'} g</div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'}</div><div class="detail-value normal-value">${ratWeightDisp}</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'PTZ / Saline 劑量':'PTZ / Saline Dose'}</div><div class="detail-value normal-value">${ptzVol} / ${salineVol} uL</div></div>
             <div class="detail-row"><div class="detail-label">${isZH?'生理情況標記':'Physiological State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}">${ratStatusText}</div></div>
           </div>
@@ -1875,8 +1902,8 @@
             <div class="exp-panel-title">${isZH ? '電極設置與訊號蒐集' : 'Electrode Setup & Signal Collection'}</div>
             <div class="expanded-grid" style="margin-top:0;">
               <div>
-                <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Position'}</div><div class="detail-value normal-value">(${lamdaAP}, ${lamdaML})</div></div>
-                <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Position'}</div><div class="detail-value normal-value">(${eleAP}, ${eleML}, ${eleDH})</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'Lamda 座標':'Lamda Position'}</div><div class="detail-value normal-value">${lamdaPosText}</div></div>
+                <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Position'}</div><div class="detail-value normal-value">${elePosText}</div></div>
               </div>
               <div>
                 <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}">${elecStatusText}</div></div>
