@@ -1848,12 +1848,10 @@
     
     if (expId === 'NEW_PAST_PROJECT') {
       state.activeSelectedExpId = null;
-      openForm('FORM_001_1', true, null);
+      openForm('FORM_001_1', true, { exp_select_val: 'NEW_PAST_PROJECT' });
     } else if (expId === 'NEW_PROJECT_ONLY') {
       state.activeSelectedExpId = null;
-      openForm('FORM_001_1', true, null);
-      currentFormCtx.data['exp_select_val'] = 'NEW_PROJECT_ONLY';
-      renderFormCurrentPage();
+      openForm('FORM_001_1', true, { exp_select_val: 'NEW_PROJECT_ONLY' });
     } else {
       state.activeSelectedExpId = expId;
       const exp = state.dataCenter.find(d => d.expId === expId);
@@ -2129,18 +2127,17 @@
     const sb = document.getElementById('formSidebar');
     const isLockedForm = ["FORM_003", "FORM_004", "FORM_005"].includes(currentFormCtx.formId);
 
-    // 判斷是否為「僅新增專案（參數不輸入）」
     const isNoParamsProject = currentFormCtx.formId === "FORM_001_1" && currentFormCtx.data['exp_select_val'] === 'NEW_PROJECT_ONLY';
 
-    // 若選了僅新增專案，直接過濾掉 Page 2
+    // 若為僅新增專案（不輸參數），只保留第一頁
     const displayPages = currentFormCtx.pages.filter((p, idx) => {
-      if (isNoParamsProject && (p.title.includes('Page 2') || p.title.includes('超音波') || idx === 1)) {
+      if (isNoParamsProject && idx > 0) {
         return false;
       }
       return true;
     });
 
-    sb.innerHTML = displayPages.map((p, idx) => {
+    sb.innerHTML = displayPages.map((p) => {
       const realIdx = currentFormCtx.pages.indexOf(p);
       const isActive = realIdx === currentFormCtx.currentPageIdx;
       const lockedClass = (isLockedForm && !isActive) ? 'locked' : '';
