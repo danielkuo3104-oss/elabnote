@@ -1814,11 +1814,16 @@
     });
 
     const newPastOptText = isZH ? "➕ 新增過去專案 (補登)" : "➕ New Past Project (Makeup)";
+    const newOnlyProjText = isZH ? "➕ 僅新增專案（參數不輸入）" : "➕ New Project Only (No Parameters)";
 
     let optionsHtml = `
       <div class="option-card" onclick="selectMakeupExp('NEW_PAST_PROJECT')">
         <input type="radio" name="selMakeupExp" id="exp_NEW_PAST" ${state.activeSelectedExpId === 'NEW_PAST_PROJECT' ? 'checked' : ''}>
         <label for="exp_NEW_PAST" style="font-weight:700; color:var(--primary);">${newPastOptText}</label>
+      </div>
+      <div class="option-card" onclick="selectMakeupExp('NEW_PROJECT_ONLY')">
+        <input type="radio" name="selMakeupExp" id="exp_NEW_ONLY" ${state.activeSelectedExpId === 'NEW_PROJECT_ONLY' ? 'checked' : ''}>
+        <label for="exp_NEW_ONLY" style="font-weight:700; color:#0d9488;">${newOnlyProjText}</label>
       </div>
     `;
 
@@ -1844,6 +1849,11 @@
     if (expId === 'NEW_PAST_PROJECT') {
       state.activeSelectedExpId = null;
       openForm('FORM_001_1', true, null);
+    } else if (expId === 'NEW_PROJECT_ONLY') {
+      state.activeSelectedExpId = null;
+      openForm('FORM_001_1', true, null);
+      currentFormCtx.data['exp_select_val'] = 'NEW_PROJECT_ONLY';
+      renderFormCurrentPage();
     } else {
       state.activeSelectedExpId = expId;
       const exp = state.dataCenter.find(d => d.expId === expId);
