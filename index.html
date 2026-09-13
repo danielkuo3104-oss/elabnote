@@ -2822,6 +2822,9 @@
       btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
     }
 
+    let selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
+    const isNoParamsProject = selectedExpSelectVal === 'NEW_PROJECT_ONLY';
+
     let targetStatus = "準備中";
     let isDeceasedSelected = false;
 
@@ -2832,7 +2835,10 @@
       }
     });
     
-    if (isDeceasedSelected) {
+    // 若為「僅新增專案（參數不輸入）」，狀態直達「實驗完成」
+    if (isNoParamsProject) {
+      targetStatus = "實驗完成";
+    } else if (isDeceasedSelected) {
       targetStatus = "已死亡";
     } else if (currentFormCtx.formId === "FORM_001_1") {
       targetStatus = "準備中";
@@ -2883,12 +2889,10 @@
       currentFormCtx.data['_time_logs'][targetStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
     }
 
-    // 若選擇「僅新增專案（參數不輸入）」，清除超音波參數，不進行上傳
-    if (selectedExpSelectVal === 'NEW_PROJECT_ONLY') {
+    // 若選擇「僅新增專案（參數不輸入）」，清空超音波參數
+    if (isNoParamsProject) {
       const paramKeys = ['freq', 'cycle', 'volt', 'inter', 'field_19_0', 'field_20_0', 'field_21_0', 'field_22_0'];
-      paramKeys.forEach(k => {
-        delete currentFormCtx.data[k];
-      });
+      paramKeys.forEach(k => delete currentFormCtx.data[k]);
       currentFormCtx.data['_no_parameters'] = true;
     }
 
@@ -2941,7 +2945,8 @@
     state.isSubmitting = false;
     closeFormPage();
 
-    if (completedMakeup && targetStatus !== '實驗完成' && targetStatus !== '已完成' && selectedExpSelectVal !== 'NEW_PROJECT_ONLY') {
+    // 如果是 isNoParamsProject，在此處不會觸發 startMakeupExpFormByStatus
+    if (completedMakeup && targetStatus !== '實驗完成' && targetStatus !== '已完成' && !isNoParamsProject) {
       const updatedExp = state.dataCenter.find(d => d.expId === finalExpId);
       if (updatedExp) {
         setTimeout(() => {
@@ -2956,10 +2961,7 @@
     renderTimeline();
     updateDashboardButtons();
 
-    const msg = isUpdateMode 
-      ? `實驗編號 [${finalExpId}] 紀錄已更新！\n狀態更新為：[${targetStatus}]` 
-      : `新實驗專案建立成功！\n實驗編號：[${finalExpId}]\n狀態：[${targetStatus}]`;
-
+    const msg = `新實驗專案建立成功！\n實驗編號：[${finalExpId}]\n狀態：[${targetStatus}]`;
     showCustomAlert(state.currentLang==='ZH'?"提交成功":"Submitted Successfully", msg);
   }
 
