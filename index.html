@@ -1027,10 +1027,8 @@
     }
   }
 
-  // 為 FORM_001_1 / FORM_001_2 注入超音波控制與自訂大綱選項
   function injectUltrasoundAndCustomFields(pages, formId) {
     pages.forEach(p => {
-      // 1. 確保大綱選單包含「自訂大綱」
       p.fields.forEach(f => {
         if (f.type === "outline_select" && f.options) {
           const hasCustom = f.options.some(opt => (typeof opt === 'string' ? opt : opt.name).includes("自訂"));
@@ -1038,7 +1036,6 @@
             f.options.push({ name: "自訂 / Custom", hasInput: true });
           }
         }
-        // 2. 目的如果是 radio，確保包含「自訂 / Other」選項
         if (f.type === "radio" && f.options) {
           const hasOther = f.options.some(opt => (typeof opt === 'string' ? opt : opt.name).includes("自訂") || (typeof opt === 'string' ? opt : opt.name).includes("其他"));
           if (!hasOther) {
@@ -1047,7 +1044,6 @@
         }
       });
 
-      // 3. 在【超音波訊號參數】區段前插入「不使用超音波」勾選欄位，並將參數關聯至 ultrasound 群組
       let secIdx = p.fields.findIndex(f => f.type === "section" && f.label && f.label.includes("超音波"));
       if (secIdx !== -1) {
         const hasDisableUltraField = p.fields.some(f => f.id === "chk_no_ultrasound");
@@ -1060,7 +1056,6 @@
             desc: "[info] 勾選後將關閉並略過下方超音波參數填寫"
           });
         }
-        // 將該區段後面的參數欄位標記 belongGroup: 'ultrasound'
         for (let i = secIdx + 2; i < p.fields.length; i++) {
           if (p.fields[i].type === "section") break;
           p.fields[i].belongGroup = "ultrasound";
@@ -1433,14 +1428,12 @@
       const isNoParams = !!formData['_no_parameters'];
       const isNoUltra = !!formData['no_ultrasound'] || !!formData['chk_no_ultrasound'];
 
-      // 1. 超音波參數：若勾選不使用超音波，一律顯示「無 (未啟用)」
       const ultraDisabledText = isZH ? '無 (未啟用)' : 'None (Disabled)';
       const freqVal = (!isNoParams && !isNoUltra && (formData['freq'] !== undefined ? formData['freq'] : formData['field_21_0'])) || (isNoUltra ? ultraDisabledText : '--');
       const cycleVal = (!isNoParams && !isNoUltra && (formData['cycle'] !== undefined ? formData['cycle'] : formData['field_22_0'])) || (isNoUltra ? ultraDisabledText : '--');
       const voltVal = (!isNoParams && !isNoUltra && (formData['volt'] !== undefined ? formData['volt'] : formData['field_23_0'])) || (isNoUltra ? ultraDisabledText : '--');
       const interVal = (!isNoParams && !isNoUltra && (formData['inter'] !== undefined ? formData['inter'] : formData['field_24_0'])) || (isNoUltra ? ultraDisabledText : '--');
 
-      // 2. 體重與 PTZ
       const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
       const ptzDose = parseFloat(formData['field_4_16'] || 1.0);
       
@@ -1448,7 +1441,6 @@
       const calculatedSaline = (!isNoParams && ratWeight > 0) ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
       const ratWeightDisp = (!isNoParams && ratWeight > 0) ? ratWeight : '--';
 
-      // 3. 座標位置
       const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : formData['field_9_16'];
       const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : formData['field_10_16'];
       const lamdaPosText = (!isNoParams && lamdaAP !== undefined && lamdaML !== undefined && (lamdaAP !== '' || lamdaML !== '')) 
@@ -1522,7 +1514,6 @@
         return resStr || defaultText;
       };
 
-      // 4. 生理、手術、電極、訊號、犧牲狀況
       const defaultStateText = isNoParams ? '--' : (isZH ? '無特殊情況' : 'None');
       const ratStatusText = formData['rat_status'] || extractSmartValue(['生理', 'physiological'], ['field_23_16'], ['field_44_16'], defaultStateText);
       const surgeryStatusText = formData['surgery_status'] || extractSmartValue(['手術', 'surgical'], ['field_31_16'], ['field_47_16'], defaultStateText);
@@ -2226,6 +2217,20 @@
 
     let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
 
+    // 關鍵更新：在事前準備檢查表 (FORM_002_1 / FORM_002_2) 頂部注入「本次為延伸實驗」按鈕
+    if (currentFormCtx.formId === "FORM_002_1" || currentFormCtx.formId === "FORM_002_2") {
+      const isZH = state.currentLang === 'ZH';
+      html += `
+        <div style="background:#ecfdf5; border:1.5px dashed #059669; border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:var(--shadow-sm);">
+          <div>
+            <div style="font-size:13px; font-weight:800; color:#065f46;">🧬 ${isZH ? '同隻大鼠接續操作？' : 'Same Rat Secondary Operation?'}</div>
+            <div style="font-size:11px; color:#047857; margin-top:2px; line-height:1.4;">${isZH ? '若本實驗為延伸實驗，可免填事前檢查與手術，直接進入訊號蒐集' : 'Skip pre-check & surgery, jump directly to Signal Collection'}</div>
+          </div>
+          <button type="button" class="btn-action btn-today" style="flex-shrink:0; padding:8px 12px; font-size:12px; font-weight:800; background:#059669; color:#fff; border:none; box-shadow:var(--shadow-sm);" onclick="openExtendedExpSelector()">${isZH ? '本次為延伸實驗 ↗' : 'Extended Exp ↗'}</button>
+        </div>
+      `;
+    }
+
     if (page.title.includes('表單與耗材登記') || page.title.includes('Page 3')) {
       const r = getUsageReportData();
       const doorO2Text = `O2：${r.o2Initial}→${r.o2Remain}`;
@@ -2408,10 +2413,11 @@
         `;
       }
       else if (field.type === "note") {
+        const noteVal = currentFormCtx.data[field.id] || currentFormCtx.data['notes'] || val;
         html += `
           <div class="form-group" style="${disabledStyle}">
             <label>${field.label}</label>
-            <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${val}</textarea>
+            <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${noteVal}</textarea>
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -2576,19 +2582,128 @@
     btnNext.disabled = state.isSubmitting;
   }
 
+  // 延伸實驗選擇器：彈出歷史實驗選單
+  function openExtendedExpSelector() {
+    const isZH = state.currentLang === 'ZH';
+    const currentExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
+
+    // 候選實驗：排除已取消與本實驗自身
+    const candidateExps = state.dataCenter.filter(d => {
+      return d.status !== '已取消' && d.expId !== currentExpId;
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (candidateExps.length === 0) {
+      showCustomAlert("提示", isZH ? "目前資料庫中無其他歷史實驗可作為延伸來源" : "No other experiments available to extend from.");
+      return;
+    }
+
+    let listHtml = candidateExps.map(exp => {
+      const styleObj = getStatusStyle(exp.status);
+      const displayStatus = getStatusText(exp.status, state.currentLang);
+      const displayInfo = formatBilingualText(exp.info, state.currentLang);
+
+      return `
+        <div class="option-card" style="display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:10px 12px; margin-bottom:8px; cursor:pointer;" onclick="selectExtendedParentExp('${exp.expId}')">
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+            <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace; font-size:12px;">${exp.expId}</span>
+            <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; font-size:10px; padding:2px 6px;">${displayStatus}</span>
+          </div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-primary); line-height:1.3; text-align:left;">
+            ${displayInfo || (isZH ? '實驗專案' : 'Experiment Project')}
+          </div>
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:11px; color:var(--text-muted); margin-top:2px;">
+            <span>📅 日期：${exp.date}</span>
+            <span>👤 負責人：${exp.user}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('modalTitle').innerText = isZH ? "選擇欲延伸的原實驗專案" : "Select Parent Experiment";
+    document.getElementById('cancelExpBtnContainer').innerHTML = '';
+    document.getElementById('modalMessage').innerHTML = `
+      <div style="text-align:left; font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
+        ${isZH ? '請選擇本隻大鼠先前已進行的實驗專案（將自動把原專案之日期、大綱與目的記錄至備註）：' : 'Select the previous experiment conducted on this rat (will automatically log date, outline & purpose into notes):'}
+      </div>
+      <div style="max-height:55vh; overflow-y:auto; padding:2px;">
+        ${listHtml}
+      </div>
+    `;
+    document.getElementById('modalBtnGroup').innerHTML = `
+      <button class="modal-btn modal-btn-cancel" onclick="closeCustomModal()">${isZH ? '取消' : 'Cancel'}</button>
+    `;
+    document.getElementById('customModalBackdrop').style.display = 'flex';
+  }
+
+  // 選定原實驗後：寫入備註、承接老鼠數據、略過檢查與手術直接跳轉 FORM_004
+  async function selectExtendedParentExp(parentExpId) {
+    closeCustomModal();
+    const isZH = state.currentLang === 'ZH';
+    const parentExp = state.dataCenter.find(d => d.expId === parentExpId);
+    if (!parentExp) return;
+
+    const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
+    const extNoteText = isZH 
+      ? `【延伸實驗】延伸自實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
+      : `【Extended Exp】Extended from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
+
+    // 1. 自動寫入備註
+    const curNote = currentFormCtx.data['notes'] || '';
+    if (!curNote.includes(parentExp.expId)) {
+      currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
+    }
+    currentFormCtx.data['_extended_from'] = parentExp.expId;
+    currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
+
+    // 2. 承接原老鼠之生理、體重或座標數據（若原實驗有填）
+    if (parentExp.formData) {
+      const pData = parentExp.formData;
+      const inheritKeys = [
+        'rat_weight', 'field_5_16', 'field_3_16',
+        'field_13_16', 'field_12_16', 'field_9_16', 'field_10_16',
+        'field_15_16', 'field_16_16', 'field_17_16', 'field_20_16', 'field_19_16', 'field_21_16',
+        'field_4_16', 'field_23_16', 'field_31_16', 'field_37_16', 'chk_no_ultrasound', 'no_ultrasound'
+      ];
+      inheritKeys.forEach(k => {
+        if (pData[k] !== undefined && currentFormCtx.data[k] === undefined) {
+          currentFormCtx.data[k] = pData[k];
+        }
+      });
+    }
+
+    // 3. 狀態設定為【訊號蒐集中】，同步後端並直接開啟 FORM_004
+    const curExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
+    const targetStatus = "訊號蒐集中";
+
+    let targetExpInMemory = state.dataCenter.find(d => d.expId === curExpId);
+    if (targetExpInMemory) {
+      targetExpInMemory.status = targetStatus;
+      targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
+    }
+
+    await syncInterimStatus(targetStatus);
+
+    // 直接跳轉開啟 FORM_004 (腦訊號蒐集)
+    openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
+
+    showCustomAlert(
+      isZH ? "已進入延伸實驗" : "Extended Experiment Activated",
+      isZH 
+        ? `已成功設定為延伸實驗！\n原實驗：[${parentExp.expId}] (${parentExp.date} - ${parentInfo})\n已自動記入備註，並略過事前檢查與手術，直接開啟【腦訊號蒐集 (FORM_004)】。`
+        : `Successfully set as extended experiment!\nParent: [${parentExp.expId}]\nNotes updated and entered Signal Collection directly.`
+    );
+  }
+
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
     const selectedOption = sel.options[sel.selectedIndex];
     let outlineIdx = parseInt(selectedOption.getAttribute('data-idx') || 0);
-  
-    // 若選擇自訂大綱，Index 就是「既有選單項目數量（不含自訂本身）」
-    // 自動換算成對應英文字母 (A=65, B=66, C=67...)
     const outlineCode = String.fromCharCode(65 + outlineIdx);
-  
+
     currentFormCtx.data['outline_select_val'] = val;
     currentFormCtx.data['outline_code'] = outlineCode;
     saveFormFieldData(fieldId, val, '實驗大綱');
-  
+
     renderFormCurrentPage();
   }
 
@@ -2597,14 +2712,11 @@
     saveFormFieldData(fieldId, cleanedOptName, '實驗目的');
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
-  
-    // purposeIdx 本身就是該選項在清單中的真實順序 (1-based)
-    // 自動格式化為 2 碼 (如 01, 02, 09, 10, 11...)
+
     const pCode = String(purposeIdx).padStart(2, '0');
-  
     currentFormCtx.data['purpose_code'] = pCode;
     currentFormCtx.data['selected_purpose_name'] = cleanedOptName;
-  
+
     renderFormCurrentPage();
   }
 
@@ -2979,7 +3091,6 @@
       currentFormCtx.data['_time_logs'][targetStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
     }
 
-    // 處理自訂大綱與目的之文字覆寫，確保回傳至 Google Sheet 存檔
     if (currentFormCtx.data['custom_outline_val']) {
       currentFormCtx.data['outline_select_val'] = currentFormCtx.data['custom_outline_val'];
     }
@@ -2987,7 +3098,6 @@
       currentFormCtx.data['selected_purpose_name'] = currentFormCtx.data['custom_purpose_val'];
     }
 
-    // 若勾選不使用超音波，清理參數欄位
     if (currentFormCtx.data['chk_no_ultrasound'] || currentFormCtx.data['no_ultrasound']) {
       currentFormCtx.data['no_ultrasound'] = true;
       const ultraKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
