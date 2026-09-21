@@ -278,6 +278,10 @@
     activeViewingExpId: null
   };
 
+  // 記憶進入修改模式前的原始值（暴力比對備援）
+  let originalOutline = "";
+  let originalPurpose = "";
+
   function formatShortDate(dateStr) {
     if (!dateStr) return '';
     const match = String(dateStr).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
@@ -555,7 +559,6 @@
             expDataFolder = String(row[22] || "").trim();
           }
 
-          // 核心修正：確認 W 欄不為空，且不是純文字 placeholder
           const isFolderValid = expDataFolder.startsWith("http");
 
           records.push({
@@ -831,6 +834,54 @@
     return 'condition-highlight';
   }
 
+  // 從已解析表單提取可用的大綱與目的選項清單
+  function getAvailableOutlinesAndPurposes() {
+    const outlines = new Set();
+    const purposes = new Set();
+
+    // 1. 從歷史資料庫中提取出現過的所有大綱與目的
+    state.dataCenter.forEach(d => {
+      const fd = d.formData || {};
+      const out = cleanDisplayLabel(fd['outline_select_val'] || fd['field_4_4'] || fd['field_5_0'] || '');
+      let pur = fd['selected_purpose_name'] || fd['field_8_0'] || fd['field_13_0'] || fd['field_7_4'] || '';
+      pur = cleanDisplayLabel(pur);
+
+      if (out && !out.includes("自訂")) outlines.add(out);
+      if (pur && !pur.includes("自訂") && !pur.includes("其他") && pur !== '不保存' && pur !== '過麻') {
+        purposes.add(pur);
+      }
+    });
+
+    // 2. 預設常見項目補充
+    if (outlines.size === 0) {
+      outlines.add("Vortex gut-brain / 腸腦軸刺激");
+    }
+    if (purposes.size === 0) {
+      ["VUS Mapping w/ PTZ", "VUS刺激 / VUS stimulation", "健康控制組 / Healthy control", "PTZ控制組 / PTZ control", "Balloon", "FUS刺激 / FUS stimulation"].forEach(p => purposes.add(p));
+    }
+
+    return {
+      outlines: Array.from(outlines),
+      purposes: Array.from(purposes)
+    };
+  }
+
+  function handleEditOutlineSelectChange(val) {
+    const customInp = document.getElementById('edit_custom_outline_input');
+    if (customInp) {
+      customInp.style.display = (val === '__CUSTOM__') ? 'block' : 'none';
+      if (val === '__CUSTOM__') customInp.focus();
+    }
+  }
+
+  function handleEditPurposeSelectChange(val) {
+    const customInp = document.getElementById('edit_custom_purpose_input');
+    if (customInp) {
+      customInp.style.display = (val === '__CUSTOM__') ? 'block' : 'none';
+      if (val === '__CUSTOM__') customInp.focus();
+    }
+  }
+
   function showActiveExpDetail(expId) {
     state.activeViewingExpId = expId;
     isEditingActiveModal = false;
@@ -1057,11 +1108,62 @@
       userNotes = bottomNotes.join('\n');
     }
 
+    // 準備大綱與目的之編輯下拉結構
+    const optPool = getAvailableOutlinesAndPurposes();
+    const curOutlineVal = cleanDisplayLabel(formData['outline_select_val'] || formData['field_4_4'] || formData['field_5_0'] || '');
+    let curPurposeVal = formData['selected_purpose_name'] || formData['field_8_0'] || formData['field_13_0'] || formData['field_7_4'] || '';
+    curPurposeVal = cleanDisplayLabel(curPurposeVal);
+
+    // 儲存至暫存變數以備暴力比對
+    originalOutline = curOutlineVal;
+    originalPurpose = curPurposeVal;
+
+    const isCustomOutline = curOutlineVal && !optPool.outlines.includes(curOutlineVal);
+    const isCustomPurpose = curPurposeVal && !optPool.purposes.includes(curPurposeVal);
+
+    const outlineSelectHtml = `
+      <div class="edit-mode-input" style="display:none; flex-direction:column; gap:4px; width:100%;">
+        <select class="form-control" id="edit_outline_select" style="padding:4px 8px; font-size:11px;" onchange="handleEditOutlineSelectChange(this.value)">
+          ${optPool.outlines.map(o => `<option value="${o}" ${o === curOutlineVal ? 'selected' : ''}>${formatBilingualText(o, state.currentLang)}</option>`).join('')}
+          <option value="__CUSTOM__" ${isCustomOutline ? 'selected' : ''}>➕ ${isZH?'自訂大綱 / Custom Outline':'Custom Outline'}</option>
+        </select>
+        <input type="text" class="form-control" id="edit_custom_outline_input" placeholder="${isZH?'請輸入自訂大綱...':'Enter custom outline...'}" value="${isCustomOutline ? curOutlineVal : ''}" style="display:${isCustomOutline ? 'block' : 'none'}; padding:4px 8px; font-size:11px; margin-top:2px;">
+      </div>
+    `;
+
+    const purposeSelectHtml = `
+      <div class="edit-mode-input" style="display:none; flex-direction:column; gap:4px; width:100%;">
+        <select class="form-control" id="edit_purpose_select" style="padding:4px 8px; font-size:11px;" onchange="handleEditPurposeSelectChange(this.value)">
+          ${optPool.purposes.map(p => `<option value="${p}" ${p === curPurposeVal ? 'selected' : ''}>${formatBilingualText(p, state.currentLang)}</option>`).join('')}
+          <option value="__CUSTOM__" ${isCustomPurpose ? 'selected' : ''}>➕ ${isZH?'自訂目的 / Custom Purpose':'Custom Purpose'}</option>
+        </select>
+        <input type="text" class="form-control" id="edit_custom_purpose_input" placeholder="${isZH?'請輸入自訂目的...':'Enter custom purpose...'}" value="${isCustomPurpose ? curPurposeVal : ''}" style="display:${isCustomPurpose ? 'block' : 'none'}; padding:4px 8px; font-size:11px; margin-top:2px;">
+      </div>
+    `;
+
     const htmlContent = `
       <div class="detail-list">
         <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
         <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
+        
+        <!-- 大綱可修改列 -->
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '實驗大綱' : 'Outline'}</div>
+          <div class="detail-value normal-value">
+            <span class="view-mode-text">${formatBilingualText(curOutlineVal || '--', state.currentLang)}</span>
+            ${outlineSelectHtml}
+          </div>
+        </div>
+
+        <!-- 目的可修改列 -->
+        <div class="detail-row">
+          <div class="detail-label">${isZH ? '實驗目的' : 'Purpose'}</div>
+          <div class="detail-value normal-value">
+            <span class="view-mode-text">${formatBilingualText(curPurposeVal || '--', state.currentLang)}</span>
+            ${purposeSelectHtml}
+          </div>
+        </div>
+
         <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
         <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
         ${surgeryDurationHtml}
@@ -1141,10 +1243,51 @@
 
     if (!exp.formData) exp.formData = {};
 
-    let safePurposeName = exp.formData['selected_purpose_name'];
-    if (!safePurposeName || safePurposeName === '不保存') {
-      safePurposeName = exp.formData['field_7_4'] || exp.formData['field_8_0'] || '健康控制組 / Healthy control group';
+    // 1. 取得新大綱文字（支援自訂）
+    const selOutline = document.getElementById('edit_outline_select');
+    const customOutlineInp = document.getElementById('edit_custom_outline_input');
+    let newOutlineVal = originalOutline;
+
+    if (selOutline) {
+      if (selOutline.value === '__CUSTOM__' && customOutlineInp && customOutlineInp.value.trim()) {
+        newOutlineVal = cleanDisplayLabel(customOutlineInp.value.trim());
+        exp.formData['custom_outline_val'] = newOutlineVal;
+      } else if (selOutline.value !== '__CUSTOM__') {
+        newOutlineVal = cleanDisplayLabel(selOutline.value);
+        delete exp.formData['custom_outline_val'];
+      }
     }
+
+    // 2. 取得新目的文字（支援自訂）
+    const selPurpose = document.getElementById('edit_purpose_select');
+    const customPurposeInp = document.getElementById('edit_custom_purpose_input');
+    let newPurposeVal = originalPurpose;
+
+    if (selPurpose) {
+      if (selPurpose.value === '__CUSTOM__' && customPurposeInp && customPurposeInp.value.trim()) {
+        newPurposeVal = cleanDisplayLabel(customPurposeInp.value.trim());
+        exp.formData['custom_purpose_val'] = newPurposeVal;
+      } else if (selPurpose.value !== '__CUSTOM__') {
+        newPurposeVal = cleanDisplayLabel(selPurpose.value);
+        delete exp.formData['custom_purpose_val'];
+      }
+    }
+
+    // 3. 暴力比對與乾淨替換：比對舊值與新值
+    exp.formData['outline_select_val'] = newOutlineVal;
+    exp.formData['selected_purpose_name'] = newPurposeVal;
+
+    // 遍歷所有鍵值，凡是等於舊大綱的欄位，暴力替換為新大綱；等於舊目的的，暴力替換為新目的
+    Object.keys(exp.formData).forEach(k => {
+      if (typeof exp.formData[k] === 'string') {
+        if (originalOutline && exp.formData[k].trim() === originalOutline) {
+          exp.formData[k] = newOutlineVal;
+        }
+        if (originalPurpose && exp.formData[k].trim() === originalPurpose) {
+          exp.formData[k] = newPurposeVal;
+        }
+      }
+    });
 
     const timeLogInputs = document.querySelectorAll('.time-log-input');
     if (!exp.formData['_time_logs']) exp.formData['_time_logs'] = {};
@@ -1227,8 +1370,6 @@
       exp.formData['field_21_24'] = storageVal;
     }
 
-    exp.formData['selected_purpose_name'] = safePurposeName;
-
     const oldNotes = exp.formData['notes'] || '';
     const appendInput = document.getElementById('inputAppendNote');
     const appendVal = appendInput ? appendInput.value.trim() : '';
@@ -1250,15 +1391,15 @@
 
     exp.formData['notes'] = updatedNotes;
 
+    // 4. 更新前端記憶體與展示標題
     const targetIndex = state.dataCenter.findIndex(d => d.expId === expId);
     if (targetIndex !== -1) {
       state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(exp.formData));
       
-      const outlineStr = cleanDisplayLabel(exp.formData['outline_select_val'] || exp.formData['field_4_4'] || exp.formData['field_5_0'] || '');
-      if (outlineStr && safePurposeName) {
-        state.dataCenter[targetIndex].info = `${outlineStr} - ${safePurposeName}`;
-      } else if (outlineStr) {
-        state.dataCenter[targetIndex].info = outlineStr;
+      if (newOutlineVal && newPurposeVal) {
+        state.dataCenter[targetIndex].info = `${newOutlineVal} - ${newPurposeVal}`;
+      } else if (newOutlineVal) {
+        state.dataCenter[targetIndex].info = newOutlineVal;
       } else {
         const shortD = formatShortDate(exp.date) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
         state.dataCenter[targetIndex].info = `${shortD}實驗專案`;
@@ -1278,6 +1419,7 @@
         status: exp.status,
         date: exp.date,
         user: exp.user,
+        formData: exp.formData,
         formJson: JSON.stringify(exp.formData)
       };
 
@@ -1288,7 +1430,7 @@
         body: JSON.stringify(payload)
       });
 
-      alert(isZH ? "修改已成功儲存並同步至雲端！" : "Successfully saved!");
+      alert(isZH ? "大綱、目的與數據修改已成功儲存並同步至雲端！" : "Successfully saved!");
     } catch (err) {
       console.error("雲端同步失敗：", err);
       alert(isZH ? "本地已更新，但雲端同步失敗。" : "Failed to sync with cloud.");
@@ -1475,7 +1617,7 @@
     const lamdaPosText = (!isNoParams && (lamdaAP !== undefined || lamdaML !== undefined) && (lamdaAP !== '' || lamdaML !== '')) 
       ? `(${lamdaAP || 0}, ${lamdaML || 0})` 
       : '--';
-    const elePosText = (!isNoParams && (eleAP !== undefined || eleML !== undefined || eleDH !== undefined) && (eleAP !== '' || eleML !== '' || eleDH !== ''))
+    const elePosText = (!isNoParams && (eleAP !== undefined || eleML !== undefined || eleDH !== undefined) && (eleAP !== '' || eleML !== '' || eleDH !== '')) 
       ? `(${eleAP || 0}, ${eleML || 0}, ${eleDH || 0})` 
       : '--';
 
@@ -1672,7 +1814,6 @@
     }, 100);
   }
 
-  /* 核心修正：多檔案直傳與嚴格校驗 */
   async function handleDirectFileUpload(files, expId) {
     const statusElem = document.getElementById('uploadStatusTextEx');
     if (!files || files.length === 0) return;
@@ -1707,7 +1848,6 @@
       try {
         const base64 = await readFileAsBase64(file);
 
-        // 封裝成標準 JSON 字串
         const payloadString = JSON.stringify({
           action: "uploadSingleFile",
           expId: expId,
@@ -1716,7 +1856,6 @@
           fileData: base64
         });
 
-        // 關鍵：使用純 text/plain，不觸發瀏覽器的 OPTIONS 預檢阻擋
         const response = await fetch(GAS_API_URL, {
           method: "POST",
           headers: { "Content-Type": "text/plain" },
@@ -1745,7 +1884,6 @@
       }
     }
 
-    // 只有所有檔案都確實上傳成功，才標記已上傳
     if (uploadSuccessCount === validFiles.length && uploadSuccessCount > 0) {
       const targetExp = state.dataCenter.find(d => d.expId === expId);
       if (targetExp) {
@@ -1766,7 +1904,6 @@
     }
   }
 
-  /* 核心修正：主動向 Google Drive 回檢是否有檔案 */
   async function verifyRealUploadStatus(expId) {
     const isZH = state.currentLang === 'ZH';
     const statusElem = document.getElementById('uploadStatusTextEx');
