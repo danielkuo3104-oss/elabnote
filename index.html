@@ -655,6 +655,10 @@
       .replace(/\[unit:[^\]]+\]/gi, '')
       .replace(/\[placeholder:[^\]]+\]/gi, '')
       .replace(/\[default:[^\]]+\]/gi, '')
+      .replace(/\[disable_group:[^\]]+\]/gi, '')
+      .replace(/\[group:[^\]]+\]/gi, '')
+      .replace(/\[depends_on:[^\]]+\]/gi, '')
+      .replace(/\[goto:[^\]]+\]/gi, '')
       .trim();
   }
 
@@ -731,7 +735,7 @@
 
     const allInputs = document.querySelectorAll('#formContent input.form-control, #formContent input[type="number"]');
 
-    if (currentFormCtx.currentPageIdx === 0) {
+    if (currentFormCtx.currentPageIdx === 0 && currentFormCtx.formId !== "FORM_001_1" && currentFormCtx.formId !== "FORM_001_2") {
       let weight = allInputs.length > 0 ? (parseFloat(allInputs[0].value) || 0) : 0;
       let dose = allInputs.length > 1 ? (parseFloat(allInputs[1].value) || 1) : 1;
       let formulaIndex = 0;
@@ -756,7 +760,7 @@
       return;
     }
 
-    if (currentFormCtx.currentPageIdx === 1) {
+    if (currentFormCtx.currentPageIdx === 1 && currentFormCtx.formId === "FORM_003") {
       const valArr = Array.from(allInputs).map(inp => parseFloat(inp.value) || 0);
 
       const lamdaML = valArr[2] || 0;
@@ -1010,10 +1014,59 @@
         parsedForms[formId] = pages;
       });
 
+      // 同步為 FORM_001_1 與 FORM_001_2 注入「不使用超音波」與「自訂大綱」支援
+      ["FORM_001_1", "FORM_001_2"].forEach(fId => {
+        if (parsedForms[fId]) {
+          injectUltrasoundAndCustomFields(parsedForms[fId], fId);
+        }
+      });
+
       state.dynamicForms = parsedForms;
     } catch (err) {
       console.error("動態解析表單失敗:", err);
     }
+  }
+
+  // 為 FORM_001_1 / FORM_001_2 注入超音波控制與自訂大綱選項
+  function injectUltrasoundAndCustomFields(pages, formId) {
+    pages.forEach(p => {
+      // 1. 確保大綱選單包含「自訂大綱」
+      p.fields.forEach(f => {
+        if (f.type === "outline_select" && f.options) {
+          const hasCustom = f.options.some(opt => (typeof opt === 'string' ? opt : opt.name).includes("自訂"));
+          if (!hasCustom) {
+            f.options.push({ name: "自訂 / Custom", hasInput: true });
+          }
+        }
+        // 2. 目的如果是 radio，確保包含「自訂 / Other」選項
+        if (f.type === "radio" && f.options) {
+          const hasOther = f.options.some(opt => (typeof opt === 'string' ? opt : opt.name).includes("自訂") || (typeof opt === 'string' ? opt : opt.name).includes("其他"));
+          if (!hasOther) {
+            f.options.push({ name: "其他 (自訂目的) / Other", hasInput: true, action: { type: "submit" } });
+          }
+        }
+      });
+
+      // 3. 在【超音波訊號參數】區段前插入「不使用超音波」勾選欄位，並將參數關聯至 ultrasound 群組
+      let secIdx = p.fields.findIndex(f => f.type === "section" && f.label && f.label.includes("超音波"));
+      if (secIdx !== -1) {
+        const hasDisableUltraField = p.fields.some(f => f.id === "chk_no_ultrasound");
+        if (!hasDisableUltraField) {
+          p.fields.splice(secIdx + 1, 0, {
+            id: "chk_no_ultrasound",
+            label: "不使用超音波 (關閉以下超音波參數)",
+            type: "checkbox",
+            disableGroup: "ultrasound",
+            desc: "[info] 勾選後將關閉並略過下方超音波參數填寫"
+          });
+        }
+        // 將該區段後面的參數欄位標記 belongGroup: 'ultrasound'
+        for (let i = secIdx + 2; i < p.fields.length; i++) {
+          if (p.fields[i].type === "section") break;
+          p.fields[i].belongGroup = "ultrasound";
+        }
+      }
+    });
   }
 
   async function refreshDashboard(showBlur = true) {
@@ -1378,12 +1431,14 @@
 
     if (!isReserved) {
       const isNoParams = !!formData['_no_parameters'];
+      const isNoUltra = !!formData['no_ultrasound'] || !!formData['chk_no_ultrasound'];
 
-      // 1. 超音波參數：若為純新增專案或未填，一律為 '--'
-      const freqVal = (!isNoParams && (formData['freq'] !== undefined ? formData['freq'] : formData['field_19_0'])) || '--';
-      const cycleVal = (!isNoParams && (formData['cycle'] !== undefined ? formData['cycle'] : formData['field_20_0'])) || '--';
-      const voltVal = (!isNoParams && (formData['volt'] !== undefined ? formData['volt'] : formData['field_21_0'])) || '--';
-      const interVal = (!isNoParams && (formData['inter'] !== undefined ? formData['inter'] : formData['field_22_0'])) || '--';
+      // 1. 超音波參數：若勾選不使用超音波，一律顯示「無 (未啟用)」
+      const ultraDisabledText = isZH ? '無 (未啟用)' : 'None (Disabled)';
+      const freqVal = (!isNoParams && !isNoUltra && (formData['freq'] !== undefined ? formData['freq'] : formData['field_21_0'])) || (isNoUltra ? ultraDisabledText : '--');
+      const cycleVal = (!isNoParams && !isNoUltra && (formData['cycle'] !== undefined ? formData['cycle'] : formData['field_22_0'])) || (isNoUltra ? ultraDisabledText : '--');
+      const voltVal = (!isNoParams && !isNoUltra && (formData['volt'] !== undefined ? formData['volt'] : formData['field_23_0'])) || (isNoUltra ? ultraDisabledText : '--');
+      const interVal = (!isNoParams && !isNoUltra && (formData['inter'] !== undefined ? formData['inter'] : formData['field_24_0'])) || (isNoUltra ? ultraDisabledText : '--');
 
       // 2. 體重與 PTZ
       const ratWeight = parseFloat(formData['rat_weight'] || formData['field_5_16'] || formData['field_3_16'] || 0);
@@ -1393,7 +1448,7 @@
       const calculatedSaline = (!isNoParams && ratWeight > 0) ? Math.max(0, 700 - (ratWeight * ptzDose)).toFixed(1) : '--';
       const ratWeightDisp = (!isNoParams && ratWeight > 0) ? ratWeight : '--';
 
-      // 3. 座標位置：若無輸入，一律顯示 '--' 而非 (0, 0)
+      // 3. 座標位置
       const lamdaAP = formData['field_13_16'] !== undefined ? formData['field_13_16'] : formData['field_9_16'];
       const lamdaML = formData['field_12_16'] !== undefined ? formData['field_12_16'] : formData['field_10_16'];
       const lamdaPosText = (!isNoParams && lamdaAP !== undefined && lamdaML !== undefined && (lamdaAP !== '' || lamdaML !== '')) 
@@ -1806,13 +1861,8 @@
     document.getElementById('btnFormPrev').innerText = isZH ? "上一頁" : "Previous";
 
     const histTitle = document.getElementById('txtHistoryHeaderTitle');
-    const histLink = document.getElementById('txtHistoryHeaderLink');
-
     if (histTitle) {
       histTitle.innerText = isZH ? "最近歷史紀錄" : "RECENT LOGS";
-    }
-    if (histLink) {
-      histLink.innerText = isZH ? "進入完整歷史資料庫 ↗" : "Full Database ↗";
     }
   }
 
@@ -1931,7 +1981,7 @@
   }
 
   let currentFormCtx = {
-    formId: '', pages: [], currentPageIdx: 0, data: {}, isMakeup: false, selectedAction: null, selectedStatusTag: null
+    formId: '', pages: [], currentPageIdx: 0, data: {}, isMakeup: false, selectedAction: null, selectedStatusTag: null, disabledGroups: {}
   };
 
   function handleTodayExperiment() {
@@ -2067,16 +2117,15 @@
     currentFormCtx.isMakeup = isMakeup;
     currentFormCtx.selectedAction = null;
     currentFormCtx.selectedStatusTag = null;
+    currentFormCtx.disabledGroups = {};
 
     let fullPages = getFormStructure(formId);
 
-    // 取得預設或傳入的 exp_select_val
     let initialExpVal = "";
     if (savedRecordData && savedRecordData.exp_select_val) {
       initialExpVal = savedRecordData.exp_select_val;
     }
 
-    // 關鍵修復：如果是 NEW_PROJECT_ONLY，表單頁結構直接裁切掉 Page 2
     if (formId === "FORM_001_1" && initialExpVal === "NEW_PROJECT_ONLY") {
       fullPages = [fullPages[0]];
     }
@@ -2086,6 +2135,9 @@
 
     if (savedRecordData && typeof savedRecordData === 'object') {
       currentFormCtx.data = JSON.parse(JSON.stringify(savedRecordData));
+      if (currentFormCtx.data['chk_no_ultrasound'] || currentFormCtx.data['no_ultrasound']) {
+        currentFormCtx.disabledGroups['ultrasound'] = true;
+      }
     } else {
       currentFormCtx.data = {}; 
     }
@@ -2104,7 +2156,6 @@
     currentFormCtx.data['exp_select_val'] = expId;
     saveFormFieldData('exp_select_val', expId);
 
-    // 切換為「僅新增專案」時動態裁剪頁面為 1 頁，切回其他則恢復完整頁面結構
     if (currentFormCtx.formId === "FORM_001_1") {
       const fullPages = getFormStructure("FORM_001_1");
       if (expId === "NEW_PROJECT_ONLY") {
@@ -2118,6 +2169,8 @@
     if (expId === 'NEW_PROJECT' || expId === 'NEW_PAST_PROJECT' || expId === 'NEW_PROJECT_ONLY') {
       delete currentFormCtx.data['outline_select_val'];
       delete currentFormCtx.data['selected_purpose_name'];
+      delete currentFormCtx.data['custom_outline_val'];
+      delete currentFormCtx.data['custom_purpose_val'];
       delete currentFormCtx.data['notes'];
       state.activeSelectedExpId = null;
     } else {
@@ -2127,6 +2180,8 @@
         const savedData = existingRecord.formData || {};
 
         if (savedData['outline_select_val']) currentFormCtx.data['outline_select_val'] = savedData['outline_select_val'];
+        if (savedData['custom_outline_val']) currentFormCtx.data['custom_outline_val'] = savedData['custom_outline_val'];
+        if (savedData['custom_purpose_val']) currentFormCtx.data['custom_purpose_val'] = savedData['custom_purpose_val'];
         if (savedData['notes']) currentFormCtx.data['notes'] = savedData['notes'];
 
         const targetPurpose = cleanDisplayLabel(savedData['selected_purpose_name'] || '');
@@ -2175,7 +2230,6 @@
       const r = getUsageReportData();
       const doorO2Text = `O2：${r.o2Initial}→${r.o2Remain}`;
       const doorIsoText = `Isoflurane：${r.isoInitial}→${r.isoRemain}`;
-
       const naclOnlyVal = `${r.userName}, ${r.formattedDate}, 9g`;
       const isoOnlyVal = `${r.userName}, ${r.formattedDate}, ${r.isoUsed}g`;
 
@@ -2226,7 +2280,7 @@
     page.fields.forEach(field => {
       if (field.dependsOn) {
         const selectedOutline = currentFormCtx.data['outline_select_val'];
-        if (selectedOutline !== field.dependsOn) return;
+        if (selectedOutline !== field.dependsOn && !String(selectedOutline).includes("自訂")) return;
       }
 
       let isGroupDisabled = false;
@@ -2312,6 +2366,7 @@
         `;
       }
       else if (field.type === "outline_select") {
+        const isCustomOutline = (currentFormCtx.data['outline_select_val'] || '').includes("自訂");
         html += `
           <div class="form-group">
             <label>${field.label}</label>
@@ -2324,6 +2379,11 @@
                 return `<option value="${optName}" data-idx="${idx}" ${selected}>${displayOptName}</option>`;
               }).join('')}
             </select>
+            ${isCustomOutline ? `
+              <div style="margin-top:8px;">
+                <input type="text" class="form-control" id="inputCustomOutline" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂大綱名稱...' : 'Enter custom outline...'}" value="${currentFormCtx.data['custom_outline_val'] || ''}" oninput="saveFormFieldData('custom_outline_val', this.value)">
+              </div>
+            ` : ''}
           </div>
         `;
       }
@@ -2402,12 +2462,19 @@
           const optId = `${field.id}_opt_${idx}`;
           const radioClick = `selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})`;
 
+          const isCustomPurpose = cleanOptName.includes("自訂") || cleanOptName.includes("其他");
+
           html += `
             <div class="option-card ${isSelected ? 'selected' : ''}" onclick="${radioClick}">
               <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${radioClick};">
               <label for="${optId}">${displayOptName}</label>
             </div>
-            ${(opt.hasInput && isSelected) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(isSelected && isCustomPurpose) ? `
+              <div style="margin: -4px 0 8px 0;">
+                <input type="text" class="form-control" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂目的名稱...' : 'Enter custom purpose...'}" value="${currentFormCtx.data['custom_purpose_val'] || ''}" oninput="saveFormFieldData('custom_purpose_val', this.value)">
+              </div>
+            ` : ''}
+            ${(opt.hasInput && isSelected && !isCustomPurpose) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -2514,7 +2581,11 @@
     const selectedOption = sel.options[sel.selectedIndex];
     const outlineIdx = selectedOption.getAttribute('data-idx') || 0;
 
-    const outlineCode = String.fromCharCode(65 + parseInt(outlineIdx));
+    let outlineCode = String.fromCharCode(65 + parseInt(outlineIdx));
+    if (val.includes("自訂")) {
+      outlineCode = "Z";
+    }
+
     currentFormCtx.data['outline_select_val'] = val;
     currentFormCtx.data['outline_code'] = outlineCode;
     saveFormFieldData(fieldId, val, '實驗大綱');
@@ -2528,7 +2599,12 @@
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
 
-    currentFormCtx.data['purpose_code'] = String(purposeIdx).padStart(2, '0');
+    let pCode = String(purposeIdx).padStart(2, '0');
+    if (cleanedOptName.includes("自訂") || cleanedOptName.includes("其他")) {
+      pCode = "99";
+    }
+
+    currentFormCtx.data['purpose_code'] = pCode;
     currentFormCtx.data['selected_purpose_name'] = cleanedOptName;
 
     renderFormCurrentPage();
@@ -2537,6 +2613,10 @@
   function toggleOptionCheckbox(fieldId, label, disableGroupTag = '') {
     const currentVal = !currentFormCtx.data[fieldId];
     saveFormFieldData(fieldId, currentVal, label);
+
+    if (fieldId === 'chk_no_ultrasound') {
+      currentFormCtx.data['no_ultrasound'] = currentVal;
+    }
 
     if (disableGroupTag && String(disableGroupTag).trim() !== '') {
       const cleanTag = String(disableGroupTag).trim().toLowerCase();
@@ -2901,8 +2981,23 @@
       currentFormCtx.data['_time_logs'][targetStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
     }
 
+    // 處理自訂大綱與目的之文字覆寫，確保回傳至 Google Sheet 存檔
+    if (currentFormCtx.data['custom_outline_val']) {
+      currentFormCtx.data['outline_select_val'] = currentFormCtx.data['custom_outline_val'];
+    }
+    if (currentFormCtx.data['custom_purpose_val']) {
+      currentFormCtx.data['selected_purpose_name'] = currentFormCtx.data['custom_purpose_val'];
+    }
+
+    // 若勾選不使用超音波，清理參數欄位
+    if (currentFormCtx.data['chk_no_ultrasound'] || currentFormCtx.data['no_ultrasound']) {
+      currentFormCtx.data['no_ultrasound'] = true;
+      const ultraKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
+      ultraKeys.forEach(k => delete currentFormCtx.data[k]);
+    }
+
     if (isNoParamsProject) {
-      const paramKeys = ['freq', 'cycle', 'volt', 'inter', 'field_19_0', 'field_20_0', 'field_21_0', 'field_22_0'];
+      const paramKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
       paramKeys.forEach(k => delete currentFormCtx.data[k]);
       currentFormCtx.data['_no_parameters'] = true;
     }
@@ -3174,7 +3269,7 @@
               <a href="https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit?gid=1065265371#gid=1065265371" target="_blank" style="color:var(--primary); font-size:11px; font-weight:600; text-decoration:none;">開啟連結 ↗</a>
             </div>
             <div style="display:flex; gap:6px;">
-              <input type="text" id="copyIso" class="form-control" value="${isoOnlyVal}" readonly style="font-family:ui-monospace, monospace; font-weight:600; background:#f1f5f9; color:var(--text-primary);">
+              <input type="text" id="copyIso" class="form-control" value="${isoUsed}" readonly style="font-family:ui-monospace, monospace; font-weight:600; background:#f1f5f9; color:var(--text-primary);">
               <button class="modal-btn modal-btn-cancel" style="flex-shrink:0; width:65px; background:#fff;" onclick="copyTextToClipboard('copyIso')">複製</button>
             </div>
           </div>
