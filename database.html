@@ -1707,16 +1707,20 @@
       try {
         const base64 = await readFileAsBase64(file);
 
+        // 封裝成標準 JSON 字串
+        const payloadString = JSON.stringify({
+          action: "uploadSingleFile",
+          expId: expId,
+          fileName: file.name,
+          mimeType: file.type || "image/jpeg",
+          fileData: base64
+        });
+
+        // 關鍵：使用純 text/plain，不觸發瀏覽器的 OPTIONS 預檢阻擋
         const response = await fetch(GAS_API_URL, {
           method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({
-            action: "uploadSingleFile",
-            expId: expId,
-            fileName: file.name,
-            mimeType: file.type || "application/octet-stream",
-            fileData: base64
-          })
+          headers: { "Content-Type": "text/plain" },
+          body: payloadString
         });
 
         const resText = await response.text();
@@ -1727,7 +1731,7 @@
           uploadSuccessCount++;
           if (resJson.folderUrl) latestFolderUrl = resJson.folderUrl;
         } else {
-          throw new Error(resJson.message || "後端返回錯誤");
+          throw new Error(resJson.message || "後端處理失敗");
         }
 
       } catch (err) {
@@ -1736,7 +1740,7 @@
           statusElem.innerText = `❌ 檔案 ${file.name} 上傳失敗：${err.message}`;
           statusElem.style.color = "var(--danger)";
         }
-        alert(`檔案 [${file.name}] 上傳失敗！請確認權限與網路連線後重試。`);
+        alert(`檔案 [${file.name}] 上傳失敗！請檢查後端回應。`);
         return;
       }
     }
