@@ -1173,92 +1173,92 @@
   }
 
   async function fetchDataCenterFromSheet() {
-  try {
-    const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-    const csvText = await res.text();
-    const rows = parseCSV(csvText);
+    try {
+      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
 
-    const records = [];
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (row[0] || row[1]) {
-        const expId = row[0] ? row[0].trim() : '未編號';
-        const date = row[1] ? row[1].trim() : '';
-        const user = row[2] ? row[2].trim() : '';
-        
-        // 【核心修正】：100% 依據試算表 D 欄 (第 4 欄，index 為 3) 的真實文字，不再進行任何本地 Rank 覆蓋
-        const statusFromSheet = row[3] ? row[3].trim() : '其他';
+      const records = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row[0] || row[1]) {
+          const expId = row[0] ? row[0].trim() : '未編號';
+          const date = row[1] ? row[1].trim() : '';
+          const user = row[2] ? row[2].trim() : '';
+          
+          // 100% 依據試算表 D 欄的真實文字，不再進行任何本地 Rank 覆蓋[cite: 4]
+          const statusFromSheet = row[3] ? row[3].trim() : '其他';
 
-        let parsedFormData = {};
-        const jsonCols = [4, 6, 8, 10, 12];
-        jsonCols.forEach(colIdx => {
-          if (row[colIdx]) {
-            let rawJsonStr = row[colIdx].trim();
-            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
-              rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+          let parsedFormData = {};
+          const jsonCols = [4, 6, 8, 10, 12];
+          jsonCols.forEach(colIdx => {
+            if (row[colIdx]) {
+              let rawJsonStr = row[colIdx].trim();
+              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
+                rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
+              }
+              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+                try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
+              }
             }
-            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
-              try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
+          });
+
+          const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
+
+          let purposeName = parsedFormData['selected_purpose_name'];
+          if (!purposeName || purposeName === '不保存' || purposeName === '過麻' || purposeName === 'perfusion&decapitation') {
+            purposeName = parsedFormData['field_8_0'] || parsedFormData['field_7_4'] || parsedFormData['field_13_0'] || '';
+          }
+          purposeName = cleanDisplayLabel(purposeName);
+
+          let dynamicInfo = "";
+          if (outlineName && purposeName) {
+            dynamicInfo = `${outlineName} - ${purposeName}`;
+          } else if (outlineName) {
+            dynamicInfo = outlineName;
+          } else {
+            let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
+            if (!dateCandidate && parsedFormData['_time_logs']) {
+              const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
+              if (firstLogTime) dateCandidate = firstLogTime;
+            }
+            if (!dateCandidate) dateCandidate = state.simulatedDate;
+
+            const shortD = formatShortDate(dateCandidate) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
+            dynamicInfo = `${shortD}實驗專案`;
+          }
+
+          let expDataFolder = "";
+          for (let c = 0; c < row.length; c++) {
+            const cellVal = String(row[c] || "").trim();
+            if (cellVal.includes("drive.google.com")) {
+              expDataFolder = cellVal;
+              break;
             }
           }
-        });
-
-        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
-
-        let purposeName = parsedFormData['selected_purpose_name'];
-        if (!purposeName || purposeName === '不保存' || purposeName === '過麻' || purposeName === 'perfusion&decapitation') {
-          purposeName = parsedFormData['field_8_0'] || parsedFormData['field_7_4'] || parsedFormData['field_13_0'] || '';
-        }
-        purposeName = cleanDisplayLabel(purposeName);
-
-        let dynamicInfo = "";
-        if (outlineName && purposeName) {
-          dynamicInfo = `${outlineName} - ${purposeName}`;
-        } else if (outlineName) {
-          dynamicInfo = outlineName;
-        } else {
-          let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
-          if (!dateCandidate && parsedFormData['_time_logs']) {
-            const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
-            if (firstLogTime) dateCandidate = firstLogTime;
+          if (!expDataFolder && row.length > 22) {
+            expDataFolder = String(row[22] || "").trim();
           }
-          if (!dateCandidate) dateCandidate = state.simulatedDate;
 
-          const shortD = formatShortDate(dateCandidate) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
-          dynamicInfo = `${shortD}實驗專案`;
+          const isFolderValid = expDataFolder.startsWith("http");
+
+          records.push({
+            expId: expId,
+            date: date,
+            user: user,
+            status: statusFromSheet,
+            info: dynamicInfo,
+            formData: parsedFormData,
+            expDataFolder: expDataFolder,
+            hasDataUpload: isFolderValid
+          });
         }
-
-        let expDataFolder = "";
-        for (let c = 0; c < row.length; c++) {
-          const cellVal = String(row[c] || "").trim();
-          if (cellVal.includes("drive.google.com")) {
-            expDataFolder = cellVal;
-            break;
-          }
-        }
-        if (!expDataFolder && row.length > 22) {
-          expDataFolder = String(row[22] || "").trim();
-        }
-
-        const isFolderValid = expDataFolder.startsWith("http");
-
-        records.push({
-          expId: expId,
-          date: date,
-          user: user,
-          status: statusFromSheet, // 直接讀取 D 欄，完全忠實反映工作表狀態
-          info: dynamicInfo,
-          formData: parsedFormData,
-          expDataFolder: expDataFolder,
-          hasDataUpload: isFolderValid
-        });
       }
+      state.dataCenter = records;
+    } catch (err) {
+      console.error("同步資料中心失敗:", err);
     }
-    state.dataCenter = records;
-  } catch (err) {
-    console.error("同步資料中心失敗:", err);
   }
-}
 
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
@@ -1609,8 +1609,91 @@
     }
 
     document.getElementById('modalMessage').innerHTML = htmlContent;
-    document.getElementById('modalBtnGroup').innerHTML = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>`;
+
+    // 關鍵更新：若大鼠尚未完成或犧牲，提供「標示為延伸受試體（不犧牲並結案）」按鈕
+    const isFinished = ['已完成', '實驗完成', '實驗結束', '已取消', '已死亡'].includes(exp.status);
+    let modalBtnsHtml = '';
+
+    if (!isFinished && !state.isGuest) {
+      modalBtnsHtml = `
+        <button class="modal-btn" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; font-weight:700; flex:1.2;" onclick="markExpAsExtendedTarget('${exp.expId}')">🧬 ${isZH ? '標示延伸對象(不犧牲)' : 'Mark Extended (No Sac)'}</button>
+        <button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>
+      `;
+    } else {
+      modalBtnsHtml = `<button class="modal-btn modal-btn-confirm" onclick="closeCustomModal()">${isZH ? '關閉' : 'Close'}</button>`;
+    }
+
+    document.getElementById('modalBtnGroup').innerHTML = modalBtnsHtml;
     document.getElementById('customModalBackdrop').style.display = 'flex';
+  }
+
+  // 快捷接口：將當前大鼠標記為被延伸對象，不走犧牲保存，直接推進為【實驗完成】
+  async function markExpAsExtendedTarget(expId) {
+    const isZH = state.currentLang === 'ZH';
+    const targetExp = state.dataCenter.find(d => d.expId === expId);
+    if (!targetExp) return;
+
+    showCustomConfirm(
+      isZH ? "🧬 標記為延伸受試體" : "🧬 Mark as Extended Target",
+      isZH 
+        ? `確定要將實驗 [${expId}] 的大鼠標示為【保留延伸】嗎？\n此操作將跳過犧牲與保存階段，自動將狀態更新為【實驗完成】，並記錄於備註。`
+        : `Confirm to mark [${expId}] rat as extended target? Will skip sacrifice and mark as COMPLETED.`,
+      isZH ? "取消" : "Cancel",
+      isZH ? "確定完成" : "Confirm",
+      async (confirmed) => {
+        if (!confirmed) return;
+
+        closeCustomModal();
+        const completedStatus = "實驗完成";
+        const tagNote = isZH 
+          ? `【保留延伸】本受試體保留予接續實驗，不執行犧牲與摘除組織保存。`
+          : `【Retained for Extension】This rat is retained for secondary experiment; sacrifice skipped.`;
+
+        if (!targetExp.formData) targetExp.formData = {};
+        
+        // 1. 合併備註
+        const oldNote = targetExp.formData['notes'] || '';
+        if (!oldNote.includes('【保留延伸】')) {
+          targetExp.formData['notes'] = oldNote ? `${oldNote}\n${tagNote}` : tagNote;
+        }
+
+        // 2. 標記不犧牲與不保存
+        targetExp.formData['sac_method'] = isZH ? '保留不犧牲(延伸)' : 'Retained (Extended)';
+        targetExp.formData['sac_status'] = isZH ? '良好(未犧牲)' : 'Healthy (Unsacrificed)';
+        targetExp.formData['tissue'] = isZH ? '無(保留本體)' : 'None';
+        targetExp.formData['tissue_status'] = '--';
+        targetExp.formData['storage'] = isZH ? '不保存' : 'None';
+        targetExp.formData['_retained_for_extension'] = true;
+
+        if (!targetExp.formData['_time_logs']) targetExp.formData['_time_logs'] = {};
+        targetExp.formData['_time_logs'][completedStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
+
+        targetExp.status = completedStatus;
+
+        // 3. 呼叫後端更新
+        await syncToGoogleSheet("submitForm", {
+          expId: targetExp.expId,
+          date: targetExp.date || state.simulatedDate,
+          user: targetExp.user || (state.currentUser ? state.currentUser.name : "Daniel"),
+          status: completedStatus,
+          formColumnName: "FORM_005",
+          formJson: JSON.stringify(targetExp.formData),
+          isUpdate: true,
+          formData: targetExp.formData
+        });
+
+        renderMainDashboardUI();
+        renderTimeline();
+        updateDashboardButtons();
+
+        showCustomAlert(
+          isZH ? "標示成功" : "Marked Successfully",
+          isZH 
+            ? `實驗 [${expId}] 已成功標示為延伸受試體！\n狀態已切換為【實驗完成】，後續可直接由新專案進行延伸承接。`
+            : `[${expId}] marked as extended subject and set to COMPLETED.`
+        );
+      }
+    );
   }
 
   function requestCancelExperiment(expId) {
@@ -2204,7 +2287,7 @@
 
     let html = `<h4 style="margin-bottom:16px; font-size:14px; color:var(--text-primary); font-weight:700;">${page.title}</h4>`;
 
-    // 關鍵更新：在事前準備檢查表 (FORM_002_1 / FORM_002_2) 頂部注入「本次為延伸實驗」按鈕
+    // 1. 在事前準備檢查表 (FORM_002_1 / FORM_002_2) 頂部注入「本次為延伸實驗」按鈕
     if (currentFormCtx.formId === "FORM_002_1" || currentFormCtx.formId === "FORM_002_2") {
       const isZH = state.currentLang === 'ZH';
       html += `
@@ -2214,6 +2297,21 @@
             <div style="font-size:11px; color:#047857; margin-top:2px; line-height:1.4;">${isZH ? '若本實驗為延伸實驗，可免填事前檢查與手術，直接進入訊號蒐集' : 'Skip pre-check & surgery, jump directly to Signal Collection'}</div>
           </div>
           <button type="button" class="btn-action btn-today" style="flex-shrink:0; padding:8px 12px; font-size:12px; font-weight:800; background:#059669; color:#fff; border:none; box-shadow:var(--shadow-sm);" onclick="openExtendedExpSelector()">${isZH ? '本次為延伸實驗 ↗' : 'Extended Exp ↗'}</button>
+        </div>
+      `;
+    }
+
+    // 2. 關鍵更新：在 FORM_005 (犧牲與組織保存) 頂部注入「被延伸標示（不犧牲，直接完成）」接口
+    if (currentFormCtx.formId === "FORM_005") {
+      const isZH = state.currentLang === 'ZH';
+      const curExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
+      html += `
+        <div style="background:#fffbeb; border:1.5px dashed #d97706; border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:var(--shadow-sm);">
+          <div>
+            <div style="font-size:13px; font-weight:800; color:#b45309;">⚠️ ${isZH ? '本隻大鼠後續將被延伸使用？' : 'Rat will be used for extension?'}</div>
+            <div style="font-size:11px; color:#92400e; margin-top:2px; line-height:1.4;">${isZH ? '若此大鼠保留予下次延伸實驗，點此可免除犧牲與保存，直接以【實驗完成】結案' : 'Skip sacrifice and tissue excision, close as Completed.'}</div>
+          </div>
+          <button type="button" class="btn-action btn-makeup" style="flex-shrink:0; padding:8px 12px; font-size:12px; font-weight:800; background:#d97706; color:#fff; border:none; box-shadow:var(--shadow-sm);" onclick="markExpAsExtendedTarget('${curExpId}')">${isZH ? '標示延伸對象 ↗' : 'Skip & Finish ↗'}</button>
         </div>
       `;
     }
@@ -2569,12 +2667,10 @@
     btnNext.disabled = state.isSubmitting;
   }
 
-  // 延伸實驗選擇器：彈出歷史實驗選單
   function openExtendedExpSelector() {
     const isZH = state.currentLang === 'ZH';
     const currentExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
 
-    // 候選實驗：排除已取消與本實驗自身
     const candidateExps = state.dataCenter.filter(d => {
       return d.status !== '已取消' && d.expId !== currentExpId;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2610,7 +2706,7 @@
     document.getElementById('cancelExpBtnContainer').innerHTML = '';
     document.getElementById('modalMessage').innerHTML = `
       <div style="text-align:left; font-size:12px; color:var(--text-secondary); margin-bottom:8px;">
-        ${isZH ? '請選擇本隻大鼠先前已進行的實驗專案（將自動把原專案之日期、大綱與目的記錄至備註）：' : 'Select the previous experiment conducted on this rat (will automatically log date, outline & purpose into notes):'}
+        ${isZH ? '請選擇本隻大鼠先前已進行的實驗專案（將自動把原專案之日期、大綱與目的記錄至備註）：' : 'Select the previous experiment conducted on this rat:'}
       </div>
       <div style="max-height:55vh; overflow-y:auto; padding:2px;">
         ${listHtml}
@@ -2622,84 +2718,77 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  // 選定被承接的原實驗後：更新「當前實驗」，維持「原實驗」不變，直通 FORM_004
-async function selectExtendedParentExp(parentExpId) {
-  closeCustomModal();
-  const isZH = state.currentLang === 'ZH';
-  const parentExp = state.dataCenter.find(d => d.expId === parentExpId);
-  if (!parentExp) return;
+  async function selectExtendedParentExp(parentExpId) {
+    closeCustomModal();
+    const isZH = state.currentLang === 'ZH';
+    const parentExp = state.dataCenter.find(d => d.expId === parentExpId);
+    if (!parentExp) return;
 
-  // 1. 保留「當前實驗」的真實編號（受修改方），絕不可覆蓋成 parentExpId！
-  const currentExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
-  if (!currentExpId) {
-    showCustomAlert("錯誤", isZH ? "找不到當前進行中實驗編號！" : "Current Exp ID missing!");
-    return;
-  }
+    const currentExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
+    if (!currentExpId) {
+      showCustomAlert("錯誤", isZH ? "找不到當前進行中實驗編號！" : "Current Exp ID missing!");
+      return;
+    }
 
-  const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
-  const extNoteText = isZH 
-    ? `【延伸操作】接續原實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
-    : `【Extended Operation】Continued from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
+    const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
+    const extNoteText = isZH 
+      ? `【延伸操作】接續原實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
+      : `【Extended Operation】Continued from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
 
-  // 2. 備註寫入「當前實驗」
-  const curNote = currentFormCtx.data['notes'] || '';
-  if (!curNote.includes(parentExp.expId)) {
-    currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
-  }
-  currentFormCtx.data['_extended_from'] = parentExp.expId;
-  currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
+    const curNote = currentFormCtx.data['notes'] || '';
+    if (!curNote.includes(parentExp.expId)) {
+      currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
+    }
+    currentFormCtx.data['_extended_from'] = parentExp.expId;
+    currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
 
-  // 3. 從被承接的實驗繼承生理數據、開腦座標、電極位置至「當前實驗」
-  if (parentExp.formData) {
-    const pData = parentExp.formData;
-    const inheritKeys = [
-      'rat_weight', 'field_5_16', 'field_3_16',
-      'field_13_16', 'field_12_16', 'field_9_16', 'field_10_16',
-      'field_15_16', 'field_16_16', 'field_17_16', 'field_20_16', 'field_19_16', 'field_21_16',
-      'field_4_16', 'field_23_16', 'field_31_16', 'field_37_16', 'chk_no_ultrasound', 'no_ultrasound'
-    ];
-    inheritKeys.forEach(k => {
-      if (pData[k] !== undefined && currentFormCtx.data[k] === undefined) {
-        currentFormCtx.data[k] = pData[k];
-      }
+    if (parentExp.formData) {
+      const pData = parentExp.formData;
+      const inheritKeys = [
+        'rat_weight', 'field_5_16', 'field_3_16',
+        'field_13_16', 'field_12_16', 'field_9_16', 'field_10_16',
+        'field_15_16', 'field_16_16', 'field_17_16', 'field_20_16', 'field_19_16', 'field_21_16',
+        'field_4_16', 'field_23_16', 'field_31_16', 'field_37_16', 'chk_no_ultrasound', 'no_ultrasound'
+      ];
+      inheritKeys.forEach(k => {
+        if (pData[k] !== undefined && currentFormCtx.data[k] === undefined) {
+          currentFormCtx.data[k] = pData[k];
+        }
+      });
+    }
+
+    const targetStatus = "訊號蒐集中";
+    const activeUser = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+    const targetExpInMemory = state.dataCenter.find(d => d.expId === currentExpId);
+
+    await syncToGoogleSheet("submitForm", {
+      expId: currentExpId,
+      date: currentFormCtx.data['date'] || (targetExpInMemory ? targetExpInMemory.date : state.simulatedDate),
+      user: activeUser,
+      status: targetStatus,
+      formColumnName: "FORM_004",
+      formJson: JSON.stringify(currentFormCtx.data),
+      isUpdate: true,
+      formData: currentFormCtx.data
     });
+
+    if (targetExpInMemory) {
+      targetExpInMemory.status = targetStatus;
+      targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
+    }
+
+    openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
+
+    renderMainDashboardUI();
+    renderTimeline();
+
+    showCustomAlert(
+      isZH ? "已設定為延伸實驗" : "Extended Experiment Activated",
+      isZH 
+        ? `當前實驗 [${currentExpId}] 已成功關聯原實驗 [${parentExp.expId}]！\n已更新備註並略過事前檢查與手術，直接進入【腦訊號蒐集】。`
+        : `Current experiment [${currentExpId}] extended from [${parentExp.expId}]. Entered Signal Collection directly.`
+    );
   }
-
-  // 4. 更新「當前實驗」狀態為【訊號蒐集中】，送出時以 currentExpId 為準
-  const targetStatus = "訊號蒐集中";
-  const activeUser = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
-  const targetExpInMemory = state.dataCenter.find(d => d.expId === currentExpId);
-
-  await syncToGoogleSheet("submitForm", {
-    expId: currentExpId, // 正確定位：更新當前實驗
-    date: currentFormCtx.data['date'] || (targetExpInMemory ? targetExpInMemory.date : state.simulatedDate),
-    user: activeUser,
-    status: targetStatus,
-    formColumnName: "FORM_004",
-    formJson: JSON.stringify(currentFormCtx.data),
-    isUpdate: true, // 更新當前實驗那一列
-    formData: currentFormCtx.data
-  });
-
-  // 5. 更新記憶體中「當前實驗」的狀態，原實驗保持原封不動
-  if (targetExpInMemory) {
-    targetExpInMemory.status = targetStatus;
-    targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
-  }
-
-  // 6. 帶著繼承的資料直接開啟腦訊號蒐集 (FORM_004)
-  openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
-
-  renderMainDashboardUI();
-  renderTimeline();
-
-  showCustomAlert(
-    isZH ? "已設定為延伸實驗" : "Extended Experiment Activated",
-    isZH 
-      ? `當前實驗 [${currentExpId}] 已成功關聯原實驗 [${parentExp.expId}]！\n已更新備註並略過事前檢查與手術，直接進入【腦訊號蒐集】。`
-      : `Current experiment [${currentExpId}] extended from [${parentExp.expId}]. Entered Signal Collection directly.`
-  );
-}
 
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
@@ -3077,11 +3166,9 @@ async function selectExtendedParentExp(parentExpId) {
     let finalExpId = "";
     let isUpdateMode = false;
 
-    // 尋找 submitFormFinal 中的這一段判斷：
     const isReservation = currentFormCtx.formId === "FORM_001_2";
     const isNewProject = selectedExpSelectVal === 'NEW_PROJECT' || selectedExpSelectVal === 'NEW_PAST_PROJECT' || selectedExpSelectVal === 'NEW_PROJECT_ONLY' || !selectedExpSelectVal;
-    
-    // 修改比對條件：允許結尾帶有 -2, -3 的延伸編號（如 /^[A-Z]\d{8,12}(-\d+)?$/）
+
     if (!isReservation && !isNewProject && selectedExpSelectVal.match(/^[A-Z]\d{8,12}(-\d+)?$/)) {
       finalExpId = selectedExpSelectVal;
       isUpdateMode = true;
@@ -3386,7 +3473,7 @@ async function selectExtendedParentExp(parentExpId) {
               <a href="https://docs.google.com/spreadsheets/d/1gjmznxvsYOxakoa3bsjLy2OQSS9inLX3Y9vQGvdSH1E/edit?gid=1065265371#gid=1065265371" target="_blank" style="color:var(--primary); font-size:11px; font-weight:600; text-decoration:none;">開啟連結 ↗</a>
             </div>
             <div style="display:flex; gap:6px;">
-              <input type="text" id="copyIso" class="form-control" value="${isoUsed}" readonly style="font-family:ui-monospace, monospace; font-weight:600; background:#f1f5f9; color:var(--text-primary);">
+              <input type="text" id="copyIso" class="form-control" value="${isoOnlyVal}" readonly style="font-family:ui-monospace, monospace; font-weight:600; background:#f1f5f9; color:var(--text-primary);">
               <button class="modal-btn modal-btn-cancel" style="flex-shrink:0; width:65px; background:#fff;" onclick="copyTextToClipboard('copyIso')">複製</button>
             </div>
           </div>
