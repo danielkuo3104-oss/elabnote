@@ -1173,105 +1173,92 @@
   }
 
   async function fetchDataCenterFromSheet() {
-    try {
-      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+  try {
+    const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
+    const csvText = await res.text();
+    const rows = parseCSV(csvText);
 
-      const STATUS_RANK = {
-        "已預約": 1, "準備中": 2, "實驗準備": 2, "準備完成": 3,
-        "手術中": 4, "休息中": 5, "訊號蒐集中": 6, "訊號蒐集完成": 7,
-        "已死亡": 8, "犧牲中": 8, "實驗善後": 9, "已完成": 10,
-        "實驗完成": 10, "實驗結束": 10, "已取消": 99
-      };
+    const records = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row[0] || row[1]) {
+        const expId = row[0] ? row[0].trim() : '未編號';
+        const date = row[1] ? row[1].trim() : '';
+        const user = row[2] ? row[2].trim() : '';
+        
+        // 【核心修正】：100% 依據試算表 D 欄 (第 4 欄，index 為 3) 的真實文字，不再進行任何本地 Rank 覆蓋
+        const statusFromSheet = row[3] ? row[3].trim() : '其他';
 
-      const records = [];
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row[0] || row[1]) {
-          const expId = row[0] ? row[0].trim() : '未編號';
-          const date = row[1] ? row[1].trim() : '';
-          const user = row[2] ? row[2].trim() : '';
-          let statusFromSheet = row[3] ? row[3].trim() : '';
-
-          let parsedFormData = {};
-          const jsonCols = [4, 6, 8, 10, 12];
-          jsonCols.forEach(colIdx => {
-            if (row[colIdx]) {
-              let rawJsonStr = row[colIdx].trim();
-              if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
-                rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
-              }
-              if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
-                try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
-              }
+        let parsedFormData = {};
+        const jsonCols = [4, 6, 8, 10, 12];
+        jsonCols.forEach(colIdx => {
+          if (row[colIdx]) {
+            let rawJsonStr = row[colIdx].trim();
+            if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
+              rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
             }
-          });
-
-          const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
-
-          let purposeName = parsedFormData['selected_purpose_name'];
-          if (!purposeName || purposeName === '不保存' || purposeName === '過麻' || purposeName === 'perfusion&decapitation') {
-            purposeName = parsedFormData['field_8_0'] || parsedFormData['field_7_4'] || parsedFormData['field_13_0'] || '';
-          }
-          purposeName = cleanDisplayLabel(purposeName);
-
-          let dynamicInfo = "";
-          if (outlineName && purposeName) {
-            dynamicInfo = `${outlineName} - ${purposeName}`;
-          } else if (outlineName) {
-            dynamicInfo = outlineName;
-          } else {
-            let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
-            if (!dateCandidate && parsedFormData['_time_logs']) {
-              const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
-              if (firstLogTime) dateCandidate = firstLogTime;
-            }
-            if (!dateCandidate) dateCandidate = state.simulatedDate;
-
-            const shortD = formatShortDate(dateCandidate) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
-            dynamicInfo = `${shortD}實驗專案`;
-          }
-
-          const existingLocalRecord = state.dataCenter.find(d => d.expId === expId);
-          let finalStatus = statusFromSheet;
-          if (existingLocalRecord) {
-            const currentRank = STATUS_RANK[existingLocalRecord.status] || 0;
-            const sheetRank = STATUS_RANK[statusFromSheet] || 0;
-            finalStatus = currentRank > sheetRank ? existingLocalRecord.status : statusFromSheet;
-          }
-
-          let expDataFolder = "";
-          for (let c = 0; c < row.length; c++) {
-            const cellVal = String(row[c] || "").trim();
-            if (cellVal.includes("drive.google.com")) {
-              expDataFolder = cellVal;
-              break;
+            if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
+              try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
             }
           }
-          if (!expDataFolder && row.length > 22) {
-            expDataFolder = String(row[22] || "").trim();
-          }
+        });
 
-          const isFolderValid = expDataFolder.startsWith("http");
+        const outlineName = cleanDisplayLabel(parsedFormData['outline_select_val'] || parsedFormData['field_4_4'] || parsedFormData['field_5_0'] || '');
 
-          records.push({
-            expId: expId,
-            date: date,
-            user: user,
-            status: finalStatus,
-            info: dynamicInfo,
-            formData: parsedFormData,
-            expDataFolder: expDataFolder,
-            hasDataUpload: isFolderValid
-          });
+        let purposeName = parsedFormData['selected_purpose_name'];
+        if (!purposeName || purposeName === '不保存' || purposeName === '過麻' || purposeName === 'perfusion&decapitation') {
+          purposeName = parsedFormData['field_8_0'] || parsedFormData['field_7_4'] || parsedFormData['field_13_0'] || '';
         }
+        purposeName = cleanDisplayLabel(purposeName);
+
+        let dynamicInfo = "";
+        if (outlineName && purposeName) {
+          dynamicInfo = `${outlineName} - ${purposeName}`;
+        } else if (outlineName) {
+          dynamicInfo = outlineName;
+        } else {
+          let dateCandidate = date || parsedFormData['field_3_4'] || parsedFormData['null'];
+          if (!dateCandidate && parsedFormData['_time_logs']) {
+            const firstLogTime = Object.values(parsedFormData['_time_logs'])[0];
+            if (firstLogTime) dateCandidate = firstLogTime;
+          }
+          if (!dateCandidate) dateCandidate = state.simulatedDate;
+
+          const shortD = formatShortDate(dateCandidate) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
+          dynamicInfo = `${shortD}實驗專案`;
+        }
+
+        let expDataFolder = "";
+        for (let c = 0; c < row.length; c++) {
+          const cellVal = String(row[c] || "").trim();
+          if (cellVal.includes("drive.google.com")) {
+            expDataFolder = cellVal;
+            break;
+          }
+        }
+        if (!expDataFolder && row.length > 22) {
+          expDataFolder = String(row[22] || "").trim();
+        }
+
+        const isFolderValid = expDataFolder.startsWith("http");
+
+        records.push({
+          expId: expId,
+          date: date,
+          user: user,
+          status: statusFromSheet, // 直接讀取 D 欄，完全忠實反映工作表狀態
+          info: dynamicInfo,
+          formData: parsedFormData,
+          expDataFolder: expDataFolder,
+          hasDataUpload: isFolderValid
+        });
       }
-      state.dataCenter = records;
-    } catch (err) {
-      console.error("同步資料中心失敗:", err);
     }
+    state.dataCenter = records;
+  } catch (err) {
+    console.error("同步資料中心失敗:", err);
   }
+}
 
   function initAuthDropdown() {
     const sel = document.getElementById('selLoginUser');
