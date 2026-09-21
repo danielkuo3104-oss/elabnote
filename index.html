@@ -2635,7 +2635,7 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  // 選定原實驗後：計算 -2 / -3 編號、繼承數據並直通 FORM_004
+  // 選定原實驗後：直接定位原實驗列 (isUpdate: true)，不新增新列，直通 FORM_004
 async function selectExtendedParentExp(parentExpId) {
   closeCustomModal();
   const isZH = state.currentLang === 'ZH';
@@ -2644,30 +2644,22 @@ async function selectExtendedParentExp(parentExpId) {
 
   const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
   const extNoteText = isZH 
-    ? `【延伸實驗】延伸自實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
-    : `【Extended Exp】Extended from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
+    ? `【延伸操作】接續進行延伸實驗 (日期：${state.simulatedDate}，原大綱目的：${parentInfo})`
+    : `【Extended Operation】Continued experiment (Date: ${state.simulatedDate}, Parent: ${parentInfo})`;
 
-  // 1. 自動計算延伸編號（例如原為 B01260921GDC1 -> B01260921GDC1-2）
-  let extSubIndex = 2;
-  let newExpId = `${parentExp.expId}-${extSubIndex}`;
-  while (state.dataCenter.some(d => d.expId === newExpId)) {
-    extSubIndex++;
-    newExpId = `${parentExp.expId}-${extSubIndex}`;
-  }
+  // 1. 完全鎖定為原實驗編號，不另外發號
+  currentFormCtx.data['exp_select_val'] = parentExp.expId;
+  state.activeSelectedExpId = parentExp.expId;
 
-  // 鎖定當前表單的實驗編號為延伸編號
-  currentFormCtx.data['exp_select_val'] = newExpId;
-  state.activeSelectedExpId = newExpId;
-
-  // 2. 自動寫入備註
-  const curNote = currentFormCtx.data['notes'] || '';
-  if (!curNote.includes(parentExp.expId)) {
+  // 2. 承接並合併備註
+  const curNote = parentExp.formData?.notes || currentFormCtx.data['notes'] || '';
+  if (!curNote.includes('【延伸操作】')) {
     currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
+  } else {
+    currentFormCtx.data['notes'] = curNote;
   }
-  currentFormCtx.data['_extended_from'] = parentExp.expId;
-  currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
 
-  // 3. 承接原老鼠之體重、開腦座標、電極與超音波設定
+  // 3. 繼承原實驗數據（體重、Lamda座標、電極位置、超音波參數等）
   if (parentExp.formData) {
     const pData = parentExp.formData;
     const inheritKeys = [
@@ -2683,41 +2675,37 @@ async function selectExtendedParentExp(parentExpId) {
     });
   }
 
-  // 4. 設定狀態為「訊號蒐集中」，建立並同步該筆延伸實驗
+  // 4. 更新該實驗狀態為「訊號蒐集中」
   const targetStatus = "訊號蒐集中";
-  const submitDate = state.simulatedDate;
-  const activeUser = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+  const activeUser = currentFormCtx.data['user_select_val'] || parentExp.user || (state.currentUser ? state.currentUser.name : "Daniel");
 
+  // 【關鍵】：isUpdate 設為 true，更新既有列，不新增列
   await syncToGoogleSheet("submitForm", {
-    expId: newExpId,
-    date: submitDate,
+    expId: parentExp.expId,
+    date: parentExp.date || state.simulatedDate,
     user: activeUser,
     status: targetStatus,
     formColumnName: "FORM_004",
     formJson: JSON.stringify(currentFormCtx.data),
-    isUpdate: false,
+    isUpdate: true,
     formData: currentFormCtx.data
   });
 
-  // 更新記憶體資料中心
-  state.dataCenter.unshift({
-    expId: newExpId,
-    date: submitDate,
-    user: activeUser,
-    status: targetStatus,
-    info: `${parentInfo} (延伸)`,
-    formData: { ...currentFormCtx.data },
-    hasDataUpload: false
-  });
+  // 更新前端記憶體資料中心該筆紀錄
+  parentExp.status = targetStatus;
+  parentExp.formData = { ...parentExp.formData, ...currentFormCtx.data };
 
-  // 直接開啟腦訊號蒐集表單 (FORM_004)
-  openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
+  // 直接進入腦訊號蒐集表單 (FORM_004)
+  openForm("FORM_004", currentFormCtx.isMakeup, parentExp.formData);
+
+  renderMainDashboardUI();
+  renderTimeline();
 
   showCustomAlert(
     isZH ? "已進入延伸實驗" : "Extended Experiment Activated",
     isZH 
-      ? `已建立延伸實驗！\n新編號：[${newExpId}]\n來源實驗：[${parentExp.expId}]\n已自動繼承大鼠數據並直通【腦訊號蒐集】。`
-      : `Extended experiment created: [${newExpId}] from [${parentExp.expId}].`
+      ? `已鎖定原實驗 [${parentExp.expId}]！\n狀態更新為【訊號蒐集中】，已略過事前檢查與手術，直接進入【腦訊號蒐集】。`
+      : `Locked to [${parentExp.expId}]. Status updated to Signal Collection directly.`
   );
 }
 
