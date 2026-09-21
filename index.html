@@ -2635,31 +2635,34 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  // 選定原實驗後：直接定位原實驗列 (isUpdate: true)，不新增新列，直通 FORM_004
+  // 選定被承接的原實驗後：更新「當前實驗」，維持「原實驗」不變，直通 FORM_004
 async function selectExtendedParentExp(parentExpId) {
   closeCustomModal();
   const isZH = state.currentLang === 'ZH';
   const parentExp = state.dataCenter.find(d => d.expId === parentExpId);
   if (!parentExp) return;
 
-  const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
-  const extNoteText = isZH 
-    ? `【延伸操作】接續進行延伸實驗 (日期：${state.simulatedDate}，原大綱目的：${parentInfo})`
-    : `【Extended Operation】Continued experiment (Date: ${state.simulatedDate}, Parent: ${parentInfo})`;
-
-  // 1. 完全鎖定為原實驗編號，不另外發號
-  currentFormCtx.data['exp_select_val'] = parentExp.expId;
-  state.activeSelectedExpId = parentExp.expId;
-
-  // 2. 承接並合併備註
-  const curNote = parentExp.formData?.notes || currentFormCtx.data['notes'] || '';
-  if (!curNote.includes('【延伸操作】')) {
-    currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
-  } else {
-    currentFormCtx.data['notes'] = curNote;
+  // 1. 保留「當前實驗」的真實編號（受修改方），絕不可覆蓋成 parentExpId！
+  const currentExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
+  if (!currentExpId) {
+    showCustomAlert("錯誤", isZH ? "找不到當前進行中實驗編號！" : "Current Exp ID missing!");
+    return;
   }
 
-  // 3. 繼承原實驗數據（體重、Lamda座標、電極位置、超音波參數等）
+  const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
+  const extNoteText = isZH 
+    ? `【延伸操作】接續原實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
+    : `【Extended Operation】Continued from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
+
+  // 2. 備註寫入「當前實驗」
+  const curNote = currentFormCtx.data['notes'] || '';
+  if (!curNote.includes(parentExp.expId)) {
+    currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
+  }
+  currentFormCtx.data['_extended_from'] = parentExp.expId;
+  currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
+
+  // 3. 從被承接的實驗繼承生理數據、開腦座標、電極位置至「當前實驗」
   if (parentExp.formData) {
     const pData = parentExp.formData;
     const inheritKeys = [
@@ -2675,37 +2678,39 @@ async function selectExtendedParentExp(parentExpId) {
     });
   }
 
-  // 4. 更新該實驗狀態為「訊號蒐集中」
+  // 4. 更新「當前實驗」狀態為【訊號蒐集中】，送出時以 currentExpId 為準
   const targetStatus = "訊號蒐集中";
-  const activeUser = currentFormCtx.data['user_select_val'] || parentExp.user || (state.currentUser ? state.currentUser.name : "Daniel");
+  const activeUser = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+  const targetExpInMemory = state.dataCenter.find(d => d.expId === currentExpId);
 
-  // 【關鍵】：isUpdate 設為 true，更新既有列，不新增列
   await syncToGoogleSheet("submitForm", {
-    expId: parentExp.expId,
-    date: parentExp.date || state.simulatedDate,
+    expId: currentExpId, // 正確定位：更新當前實驗
+    date: currentFormCtx.data['date'] || (targetExpInMemory ? targetExpInMemory.date : state.simulatedDate),
     user: activeUser,
     status: targetStatus,
     formColumnName: "FORM_004",
     formJson: JSON.stringify(currentFormCtx.data),
-    isUpdate: true,
+    isUpdate: true, // 更新當前實驗那一列
     formData: currentFormCtx.data
   });
 
-  // 更新前端記憶體資料中心該筆紀錄
-  parentExp.status = targetStatus;
-  parentExp.formData = { ...parentExp.formData, ...currentFormCtx.data };
+  // 5. 更新記憶體中「當前實驗」的狀態，原實驗保持原封不動
+  if (targetExpInMemory) {
+    targetExpInMemory.status = targetStatus;
+    targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
+  }
 
-  // 直接進入腦訊號蒐集表單 (FORM_004)
-  openForm("FORM_004", currentFormCtx.isMakeup, parentExp.formData);
+  // 6. 帶著繼承的資料直接開啟腦訊號蒐集 (FORM_004)
+  openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
 
   renderMainDashboardUI();
   renderTimeline();
 
   showCustomAlert(
-    isZH ? "已進入延伸實驗" : "Extended Experiment Activated",
+    isZH ? "已設定為延伸實驗" : "Extended Experiment Activated",
     isZH 
-      ? `已鎖定原實驗 [${parentExp.expId}]！\n狀態更新為【訊號蒐集中】，已略過事前檢查與手術，直接進入【腦訊號蒐集】。`
-      : `Locked to [${parentExp.expId}]. Status updated to Signal Collection directly.`
+      ? `當前實驗 [${currentExpId}] 已成功關聯原實驗 [${parentExp.expId}]！\n已更新備註並略過事前檢查與手術，直接進入【腦訊號蒐集】。`
+      : `Current experiment [${currentExpId}] extended from [${parentExp.expId}]. Entered Signal Collection directly.`
   );
 }
 
