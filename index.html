@@ -2579,17 +2579,16 @@
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
     const selectedOption = sel.options[sel.selectedIndex];
-    const outlineIdx = selectedOption.getAttribute('data-idx') || 0;
-
-    let outlineCode = String.fromCharCode(65 + parseInt(outlineIdx));
-    if (val.includes("自訂")) {
-      outlineCode = "Z";
-    }
-
+    let outlineIdx = parseInt(selectedOption.getAttribute('data-idx') || 0);
+  
+    // 若選擇自訂大綱，Index 就是「既有選單項目數量（不含自訂本身）」
+    // 自動換算成對應英文字母 (A=65, B=66, C=67...)
+    const outlineCode = String.fromCharCode(65 + outlineIdx);
+  
     currentFormCtx.data['outline_select_val'] = val;
     currentFormCtx.data['outline_code'] = outlineCode;
     saveFormFieldData(fieldId, val, '實驗大綱');
-
+  
     renderFormCurrentPage();
   }
 
@@ -2598,15 +2597,14 @@
     saveFormFieldData(fieldId, cleanedOptName, '實驗目的');
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
-
-    let pCode = String(purposeIdx).padStart(2, '0');
-    if (cleanedOptName.includes("自訂") || cleanedOptName.includes("其他")) {
-      pCode = "99";
-    }
-
+  
+    // purposeIdx 本身就是該選項在清單中的真實順序 (1-based)
+    // 自動格式化為 2 碼 (如 01, 02, 09, 10, 11...)
+    const pCode = String(purposeIdx).padStart(2, '0');
+  
     currentFormCtx.data['purpose_code'] = pCode;
     currentFormCtx.data['selected_purpose_name'] = cleanedOptName;
-
+  
     renderFormCurrentPage();
   }
 
