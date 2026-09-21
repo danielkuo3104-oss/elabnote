@@ -2635,64 +2635,91 @@
     document.getElementById('customModalBackdrop').style.display = 'flex';
   }
 
-  // 選定原實驗後：寫入備註、承接老鼠數據、略過檢查與手術直接跳轉 FORM_004
-  async function selectExtendedParentExp(parentExpId) {
-    closeCustomModal();
-    const isZH = state.currentLang === 'ZH';
-    const parentExp = state.dataCenter.find(d => d.expId === parentExpId);
-    if (!parentExp) return;
+  // 選定原實驗後：計算 -2 / -3 編號、繼承數據並直通 FORM_004
+async function selectExtendedParentExp(parentExpId) {
+  closeCustomModal();
+  const isZH = state.currentLang === 'ZH';
+  const parentExp = state.dataCenter.find(d => d.expId === parentExpId);
+  if (!parentExp) return;
 
-    const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
-    const extNoteText = isZH 
-      ? `【延伸實驗】延伸自實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
-      : `【Extended Exp】Extended from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
+  const parentInfo = formatBilingualText(parentExp.info, state.currentLang);
+  const extNoteText = isZH 
+    ? `【延伸實驗】延伸自實驗：[${parentExp.expId}] (日期：${parentExp.date} - ${parentInfo})`
+    : `【Extended Exp】Extended from: [${parentExp.expId}] (Date: ${parentExp.date} - ${parentInfo})`;
 
-    // 1. 自動寫入備註
-    const curNote = currentFormCtx.data['notes'] || '';
-    if (!curNote.includes(parentExp.expId)) {
-      currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
-    }
-    currentFormCtx.data['_extended_from'] = parentExp.expId;
-    currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
-
-    // 2. 承接原老鼠之生理、體重或座標數據（若原實驗有填）
-    if (parentExp.formData) {
-      const pData = parentExp.formData;
-      const inheritKeys = [
-        'rat_weight', 'field_5_16', 'field_3_16',
-        'field_13_16', 'field_12_16', 'field_9_16', 'field_10_16',
-        'field_15_16', 'field_16_16', 'field_17_16', 'field_20_16', 'field_19_16', 'field_21_16',
-        'field_4_16', 'field_23_16', 'field_31_16', 'field_37_16', 'chk_no_ultrasound', 'no_ultrasound'
-      ];
-      inheritKeys.forEach(k => {
-        if (pData[k] !== undefined && currentFormCtx.data[k] === undefined) {
-          currentFormCtx.data[k] = pData[k];
-        }
-      });
-    }
-
-    // 3. 狀態設定為【訊號蒐集中】，同步後端並直接開啟 FORM_004
-    const curExpId = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId;
-    const targetStatus = "訊號蒐集中";
-
-    let targetExpInMemory = state.dataCenter.find(d => d.expId === curExpId);
-    if (targetExpInMemory) {
-      targetExpInMemory.status = targetStatus;
-      targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
-    }
-
-    await syncInterimStatus(targetStatus);
-
-    // 直接跳轉開啟 FORM_004 (腦訊號蒐集)
-    openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
-
-    showCustomAlert(
-      isZH ? "已進入延伸實驗" : "Extended Experiment Activated",
-      isZH 
-        ? `已成功設定為延伸實驗！\n原實驗：[${parentExp.expId}] (${parentExp.date} - ${parentInfo})\n已自動記入備註，並略過事前檢查與手術，直接開啟【腦訊號蒐集 (FORM_004)】。`
-        : `Successfully set as extended experiment!\nParent: [${parentExp.expId}]\nNotes updated and entered Signal Collection directly.`
-    );
+  // 1. 自動計算延伸編號（例如原為 B01260921GDC1 -> B01260921GDC1-2）
+  let extSubIndex = 2;
+  let newExpId = `${parentExp.expId}-${extSubIndex}`;
+  while (state.dataCenter.some(d => d.expId === newExpId)) {
+    extSubIndex++;
+    newExpId = `${parentExp.expId}-${extSubIndex}`;
   }
+
+  // 鎖定當前表單的實驗編號為延伸編號
+  currentFormCtx.data['exp_select_val'] = newExpId;
+  state.activeSelectedExpId = newExpId;
+
+  // 2. 自動寫入備註
+  const curNote = currentFormCtx.data['notes'] || '';
+  if (!curNote.includes(parentExp.expId)) {
+    currentFormCtx.data['notes'] = curNote ? `${curNote}\n${extNoteText}` : extNoteText;
+  }
+  currentFormCtx.data['_extended_from'] = parentExp.expId;
+  currentFormCtx.data['_extended_from_info'] = `[${parentExp.expId}] ${parentExp.date} - ${parentInfo}`;
+
+  // 3. 承接原老鼠之體重、開腦座標、電極與超音波設定
+  if (parentExp.formData) {
+    const pData = parentExp.formData;
+    const inheritKeys = [
+      'rat_weight', 'field_5_16', 'field_3_16',
+      'field_13_16', 'field_12_16', 'field_9_16', 'field_10_16',
+      'field_15_16', 'field_16_16', 'field_17_16', 'field_20_16', 'field_19_16', 'field_21_16',
+      'field_4_16', 'field_23_16', 'field_31_16', 'field_37_16', 'chk_no_ultrasound', 'no_ultrasound'
+    ];
+    inheritKeys.forEach(k => {
+      if (pData[k] !== undefined && currentFormCtx.data[k] === undefined) {
+        currentFormCtx.data[k] = pData[k];
+      }
+    });
+  }
+
+  // 4. 設定狀態為「訊號蒐集中」，建立並同步該筆延伸實驗
+  const targetStatus = "訊號蒐集中";
+  const submitDate = state.simulatedDate;
+  const activeUser = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+
+  await syncToGoogleSheet("submitForm", {
+    expId: newExpId,
+    date: submitDate,
+    user: activeUser,
+    status: targetStatus,
+    formColumnName: "FORM_004",
+    formJson: JSON.stringify(currentFormCtx.data),
+    isUpdate: false,
+    formData: currentFormCtx.data
+  });
+
+  // 更新記憶體資料中心
+  state.dataCenter.unshift({
+    expId: newExpId,
+    date: submitDate,
+    user: activeUser,
+    status: targetStatus,
+    info: `${parentInfo} (延伸)`,
+    formData: { ...currentFormCtx.data },
+    hasDataUpload: false
+  });
+
+  // 直接開啟腦訊號蒐集表單 (FORM_004)
+  openForm("FORM_004", currentFormCtx.isMakeup, currentFormCtx.data);
+
+  showCustomAlert(
+    isZH ? "已進入延伸實驗" : "Extended Experiment Activated",
+    isZH 
+      ? `已建立延伸實驗！\n新編號：[${newExpId}]\n來源實驗：[${parentExp.expId}]\n已自動繼承大鼠數據並直通【腦訊號蒐集】。`
+      : `Extended experiment created: [${newExpId}] from [${parentExp.expId}].`
+  );
+}
 
   function onOutlineChange(fieldId, val) {
     const sel = event.target;
@@ -3070,10 +3097,12 @@
     let finalExpId = "";
     let isUpdateMode = false;
 
+    // 尋找 submitFormFinal 中的這一段判斷：
     const isReservation = currentFormCtx.formId === "FORM_001_2";
     const isNewProject = selectedExpSelectVal === 'NEW_PROJECT' || selectedExpSelectVal === 'NEW_PAST_PROJECT' || selectedExpSelectVal === 'NEW_PROJECT_ONLY' || !selectedExpSelectVal;
-
-    if (!isReservation && !isNewProject && selectedExpSelectVal.match(/^[A-Z]\d{8,12}/)) {
+    
+    // 修改比對條件：允許結尾帶有 -2, -3 的延伸編號（如 /^[A-Z]\d{8,12}(-\d+)?$/）
+    if (!isReservation && !isNewProject && selectedExpSelectVal.match(/^[A-Z]\d{8,12}(-\d+)?$/)) {
       finalExpId = selectedExpSelectVal;
       isUpdateMode = true;
     } else {
