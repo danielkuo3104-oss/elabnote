@@ -533,8 +533,145 @@
     dynamicForms: {},
     fieldLabelMap: {},
     isSubmitting: false,
-    activeSelectedExpId: null
+    activeSelectedExpId: null,
+    authToken: null,
+    customOptions: []
   };
+
+  // =====================================================================
+  // API 層：即時讀取 + 可讀回應的寫入 + 寫入佇列（避免非同步競態）
+  // =====================================================================
+  const api = {
+    snapshotPromise: null,
+    writeChain: Promise.resolve(),
+    pendingWrites: 0,
+    lastWriteAt: 0
+  };
+
+  // 讀取整份資料（GAS 即時 JSON）；同一時間只會有一個請求在飛，失敗時退回發佈 CSV
+  function loadSnapshot(force = false) {
+    if (api.snapshotPromise && !force) return api.snapshotPromise;
+    api.snapshotPromise = (async () => {
+      try {
+        const res = await fetchWithTimeout(`${GAS_API_URL}?action=getAll&_t=${Date.now()}`, {}, 20000);
+        const json = await res.json();
+        if (json.status !== 'success') throw new Error(json.message || 'getAll failed');
+        state.customOptions = json.customOptions || [];
+        return { source: 'live', members: json.members || [], forms: json.forms || [], data: json.data || [] };
+      } catch (err) {
+        console.warn('即時讀取失敗，改用發佈 CSV（可能有數分鐘延遲）:', err);
+        const [m, f, d] = await Promise.all([URL_MEMBERS, URL_FORMS, URL_DATA].map(u =>
+          fetchWithTimeout(`${u}&_t=${Date.now()}`, {}, 20000).then(r => r.text()).then(parseCSV)
+        ));
+        return { source: 'csv', members: m, forms: f, data: d };
+      }
+    })();
+    const p = api.snapshotPromise;
+    p.finally(() => { setTimeout(() => { if (api.snapshotPromise === p) api.snapshotPromise = null; }, 1500); });
+    return p;
+  }
+
+  async function fetchWithTimeout(url, options = {}, ms = 30000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      return await fetch(url, { ...options, signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 單次 POST：text/plain 不會觸發 CORS preflight，且可讀取 GAS 回應（不再用 no-cors 盲寫）
+  async function apiPost(payload, ms = 45000) {
+    const body = JSON.stringify({
+      ...payload,
+      authUser: state.currentUser ? state.currentUser.name : '',
+      authToken: state.authToken || ''
+    });
+    let res;
+    try {
+      res = await fetchWithTimeout(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body }, ms);
+    } catch (e) {
+      throw new Error(e.name === 'AbortError' ? '連線逾時，請確認網路後重試' : '網路連線失敗，請確認網路後重試');
+    }
+    let json;
+    try { json = await res.json(); } catch (e) { throw new Error('伺服器回應格式錯誤'); }
+    if (json.status !== 'success') {
+      if (json.code === 'AUTH_REQUIRED') handleAuthExpired();
+      const err = new Error(json.message || '伺服器處理失敗');
+      err.code = json.code;
+      throw err;
+    }
+    return json;
+  }
+
+  // 所有寫入依序排隊送出：保證「手術中 → 休息中」這類狀態不會因網路先後顛倒而倒退
+  function syncToGoogleSheet(actionType, payload) {
+    api.pendingWrites++;
+    const run = () => apiPost({ action: actionType, ...payload });
+    const p = api.writeChain.then(run, run);
+    api.writeChain = p.catch(() => {});
+    return p.finally(() => {
+      api.pendingWrites--;
+      api.lastWriteAt = Date.now();
+    });
+  }
+
+  function handleAuthExpired() {
+    localStorage.removeItem('elabnote_user');
+    localStorage.removeItem('elabnote_token');
+    state.authToken = null;
+    setTimeout(() => {
+      showAuthPageOnly();
+      showCustomAlert('請重新登入', '登入已失效（系統已升級驗證機制），請重新登入後再操作。剛才的操作未寫入。');
+    }, 50);
+  }
+
+  function escapeHtml(v) {
+    return String(v === null || v === undefined ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // 放進 onclick="fn('...')" 的字串參數
+  function jsArg(v) {
+    return escapeHtml(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' '));
+  }
+
+  function normalizeDateStr(v) {
+    const s = String(v || '').trim();
+    const m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : s;
+  }
+
+  function todayStr() {
+    return new Date().toLocaleDateString('sv-SE');
+  }
+
+  function showToast(msg, isError = false) {
+    let el = document.getElementById('syncToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'syncToast';
+      el.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);transform:translateX(-50%);max-width:88%;padding:10px 14px;border-radius:10px;font-size:12px;font-weight:700;z-index:99999;box-shadow:0 6px 18px rgba(0,0,0,.15);transition:opacity .3s;';
+      document.body.appendChild(el);
+    }
+    el.style.background = isError ? '#fef2f2' : '#ecfdf5';
+    el.style.color = isError ? '#b91c1c' : '#047857';
+    el.style.border = `1px solid ${isError ? '#fca5a5' : '#a7f3d0'}`;
+    el.innerText = msg;
+    el.style.opacity = '1';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, isError ? 6000 : 2500);
+  }
+
+  // 離開頁面前若仍有未完成的寫入，提醒使用者
+  window.addEventListener('beforeunload', (e) => {
+    if (api.pendingWrites > 0) {
+      e.preventDefault();
+      e.returnValue = '資料仍在同步中，確定要離開嗎？';
+    }
+  });
 
   function formatShortDate(dateStr) {
     if (!dateStr) return '';
@@ -551,16 +688,19 @@
   window.addEventListener('DOMContentLoaded', async () => {
     checkSession();
     applyLanguage();
-    await fetchAndParseFormsFromSheet();
     await refreshDashboard(false);
   });
 
   function checkSession() {
     const savedUser = localStorage.getItem('elabnote_user');
+    state.authToken = localStorage.getItem('elabnote_token');
     if (savedUser) {
       try {
         state.currentUser = JSON.parse(savedUser);
         state.isGuest = state.currentUser.role === 'Guest';
+        // 舊版登入沒有 token → 需重新登入（寫入會被後端拒絕）
+        if (!state.isGuest && !state.authToken) throw new Error('no token');
+        if (state.currentUser.lang) state.currentLang = state.currentUser.lang;
 
         document.getElementById('authPage').style.display = 'none';
         document.getElementById('fabBtn').style.display = 'flex';
@@ -587,19 +727,37 @@
     document.getElementById('userBadge').innerText = "未登入";
   }
 
-  function performLogin() {
+  async function performLogin() {
     const selectedName = document.getElementById('selLoginUser').value;
     const inputPwd = document.getElementById('txtLoginPwd').value.trim();
-    const user = state.membersList.find(m => m.name === selectedName);
+    if (!selectedName) { showCustomAlert("提示", "請選擇會員帳號"); return; }
 
-    if (!user) { showCustomAlert("提示", "請選擇會員帳號"); return; }
-    if (user.password && inputPwd !== user.password) { showCustomAlert("登入失敗", "識別密碼錯誤，請重新輸入！"); return; }
+    const btn = document.getElementById('btnLoginSubmit');
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    const oldText = btn.innerText;
+    btn.innerText = state.currentLang === 'ZH' ? '驗證中...' : 'Verifying...';
+
+    let user;
+    try {
+      // 密碼改由後端比對，前端不再持有任何人的密碼
+      const res = await apiPost({ action: 'login', name: selectedName, password: inputPwd }, 20000);
+      user = res.user;
+      state.authToken = res.token;
+    } catch (err) {
+      showCustomAlert("登入失敗", escapeHtml(err.message));
+      return;
+    } finally {
+      btn.dataset.busy = '';
+      btn.innerText = oldText;
+    }
 
     state.currentUser = user;
     state.isGuest = false;
     state.currentLang = user.lang || "ZH";
 
     localStorage.setItem('elabnote_user', JSON.stringify(user));
+    localStorage.setItem('elabnote_token', state.authToken);
 
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('fabBtn').style.display = 'flex';
@@ -617,6 +775,8 @@
     showCustomConfirm("確認登出", "確定要登出當前帳號嗎？", "取消", "登出", (confirmed) => {
       if (confirmed) {
         localStorage.removeItem('elabnote_user');
+        localStorage.removeItem('elabnote_token');
+        state.authToken = null;
         state.currentUser = null;
         state.isGuest = false;
         document.getElementById('txtLoginPwd').value = "";
@@ -681,39 +841,30 @@
     return parseSingleBilingualStr(statusRaw, lang);
   }
 
+  // 逐字元解析，支援儲存格內換行（舊版先用換行切行，遇到多行備註會整列錯位）
+  // 注意：不過濾空白列，確保列號與試算表一致（field_列_欄 依賴列號）
   function parseCSV(text) {
-    const lines = text.split(/\r\n|\n/);
     const result = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.trim()) continue;
-
-      const row = [];
-      let insideQuote = false;
-      let entry = '';
-
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-        const nextChar = line[j + 1];
-
-        if (char === '"') {
-          if (insideQuote && nextChar === '"') {
-            entry += '"';
-            j++;
-          } else {
-            insideQuote = !insideQuote;
-          }
-        } else if (char === ',' && !insideQuote) {
-          row.push(entry);
-          entry = '';
-        } else {
-          entry += char;
-        }
+    let row = [];
+    let entry = '';
+    let insideQuote = false;
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+      if (char === '"') {
+        if (insideQuote && nextChar === '"') { entry += '"'; i++; }
+        else insideQuote = !insideQuote;
+      } else if (char === ',' && !insideQuote) {
+        row.push(entry); entry = '';
+      } else if ((char === '\r' || char === '\n') && !insideQuote) {
+        if (char === '\r' && nextChar === '\n') i++;
+        row.push(entry); entry = '';
+        result.push(row); row = [];
+      } else {
+        entry += char;
       }
-      row.push(entry);
-      result.push(row);
     }
+    if (entry !== '' || row.length > 0) { row.push(entry); result.push(row); }
     return result;
   }
 
@@ -794,11 +945,10 @@
     }
   }
 
-  async function fetchAndParseFormsFromSheet() {
+  async function fetchAndParseFormsFromSheet(snapshot = null) {
     try {
-      const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+      const snap = snapshot || await loadSnapshot();
+      const rows = snap.forms;
 
       if (rows.length < 2) return;
 
@@ -1017,6 +1167,7 @@
       // 同步為 FORM_001_1 與 FORM_001_2 注入「不使用超音波」與「自訂大綱」支援
       ["FORM_001_1", "FORM_001_2"].forEach(fId => {
         if (parsedForms[fId]) {
+          injectSavedCustomOptions(parsedForms[fId]);
           injectUltrasoundAndCustomFields(parsedForms[fId], fId);
         }
       });
@@ -1025,6 +1176,40 @@
     } catch (err) {
       console.error("動態解析表單失敗:", err);
     }
+  }
+
+  // 後端「自訂選項」工作表的大綱 / 目的 → 注入成下拉與單選選項
+  // （取代舊版直接在表單中心插入儲存格的做法，避免 field_列_欄 編號位移）
+  function injectSavedCustomOptions(pages) {
+    const opts = state.customOptions || [];
+    if (opts.length === 0) return;
+    const optName = o => (typeof o === 'string' ? o : o.name) || '';
+    const exists = (list, name) => list.some(o => cleanDisplayLabel(optName(o)).toLowerCase() === name.toLowerCase());
+    const insertBefore = (list, item, kw) => {
+      const idx = list.findIndex(o => kw.some(k => optName(o).includes(k)));
+      if (idx === -1) list.push(item); else list.splice(idx, 0, item);
+    };
+
+    pages.forEach(p => p.fields.forEach(f => {
+      if (f.type === 'outline_select') {
+        opts.filter(o => o.type === 'outline').forEach(o => {
+          if (!exists(f.options, o.name)) insertBefore(f.options, { name: o.name, hasInput: false, isSavedCustom: true }, ['自訂']);
+        });
+      }
+      if (f.type === 'radio' && /目的|purpose/i.test(f.label || '')) {
+        const template = f.options.find(o => optName(o).includes('其他')) || f.options[f.options.length - 1] || {};
+        opts.filter(o => o.type === 'purpose').forEach(o => {
+          if (!exists(f.options, o.name)) {
+            insertBefore(f.options, { name: o.name, hasInput: false, action: template.action || { type: 'submit' }, statusTag: template.statusTag || null, isSavedCustom: true }, ['其他', '自訂']);
+          }
+        });
+      }
+    }));
+  }
+
+  function isSavedCustomOutline(name) {
+    const n = cleanDisplayLabel(name || '').toLowerCase();
+    return !!n && (state.customOptions || []).some(o => o.type === 'outline' && o.name.toLowerCase() === n);
   }
 
   function injectUltrasoundAndCustomFields(pages, formId) {
@@ -1064,9 +1249,18 @@
     });
   }
 
+  let refreshInFlight = null;
   async function refreshDashboard(showBlur = true) {
+    // 同時只跑一次刷新（定時器 / 切回前景 / 手動按鈕可能同時觸發）
+    if (refreshInFlight) return refreshInFlight;
+    refreshInFlight = doRefreshDashboard(showBlur).finally(() => { refreshInFlight = null; });
+    return refreshInFlight;
+  }
+
+  async function doRefreshDashboard(showBlur) {
     const btnRef = document.getElementById('btnRefresh');
     const blurOverlay = document.getElementById('blurOverlay');
+    state.simulatedDate = todayStr(); // 頁面跨過午夜也能正確判斷「今天」
 
     if (showBlur) {
       btnRef.classList.add('refreshing');
@@ -1077,18 +1271,31 @@
     const now = new Date();
     document.getElementById('txtUpdateTime').innerText = `${state.simulatedDate} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-    await fetchMembersFromSheet();
-    await fetchDataCenterFromSheet();
+    const writesBefore = api.lastWriteAt;
+    try {
+      const snap = await loadSnapshot(true);
+      // 若讀取期間有新寫入，這份快照可能是舊的 → 不覆蓋畫面，下次再刷新
+      if (api.pendingWrites > 0 || api.lastWriteAt !== writesBefore) {
+        return;
+      }
+      if (snap.source === 'csv') showToast('目前使用備援資料來源，畫面可能延遲數分鐘', true);
+      await fetchMembersFromSheet(snap);
+      await fetchDataCenterFromSheet(snap);
+      await fetchAndParseFormsFromSheet(snap); // 每次重解析，讓新的自訂選項即時出現
 
-    renderMainDashboardUI();
-    renderTimeline();
-    updateDashboardButtons();
-
-    if (showBlur) {
-      setTimeout(() => {
-        btnRef.classList.remove('refreshing');
-        blurOverlay.style.display = 'none';
-      }, 300);
+      renderMainDashboardUI();
+      renderTimeline();
+      updateDashboardButtons();
+    } catch (err) {
+      console.error('刷新失敗:', err);
+      if (showBlur) showToast('同步失敗：' + err.message, true);
+    } finally {
+      if (showBlur) {
+        setTimeout(() => {
+          btnRef.classList.remove('refreshing');
+          blurOverlay.style.display = 'none';
+        }, 300);
+      }
     }
   }
 
@@ -1099,11 +1306,9 @@
     return [{ title: "Page 1 基本資訊", fields: [{ id: "fallback_1", label: "同步試算表中...", type: "checkbox" }] }];
   }
 
-  async function fetchMembersFromSheet() {
+  async function fetchMembersFromSheet(snapshot = null) {
     try {
-      const res = await fetch(`${URL_MEMBERS}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+      const rows = (snapshot || await loadSnapshot()).members;
 
       const members = [];
       for(let i = 1; i < rows.length; i++) {
@@ -1113,7 +1318,6 @@
             email: rows[i][1] ? rows[i][1].trim() : '',
             color: rows[i][3] ? rows[i][3].trim() : '#f1f5f9',
             role: rows[i][4] ? rows[i][4].trim() : '協作會員',
-            password: rows[i][5] ? rows[i][5].trim() : '',
             lang: rows[i][6] ? rows[i][6].trim() : 'ZH',
             userCode: rows[i][7] ? rows[i][7].trim().toUpperCase() : ''
           });
@@ -1123,7 +1327,7 @@
       initAuthDropdown();
       initColorDropdown();
 
-      if (state.currentUser || localStorage.getItem('elabnote_user')) {
+      if (state.currentUser) {
         document.getElementById('authPage').style.display = 'none';
         document.getElementById('fabBtn').style.display = 'flex';
       } else {
@@ -1172,28 +1376,27 @@
     selColor.innerHTML = available.map(c => `<option value="${c.hex}">${c.name}</option>`).join('');
   }
 
-  async function fetchDataCenterFromSheet() {
+  async function fetchDataCenterFromSheet(snapshot = null) {
     try {
-      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+      const rows = (snapshot || await loadSnapshot()).data;
 
       const records = [];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (row[0] || row[1]) {
           const expId = row[0] ? row[0].trim() : '未編號';
-          const date = row[1] ? row[1].trim() : '';
+          const date = row[1] ? normalizeDateStr(row[1]) : '';
           const user = row[2] ? row[2].trim() : '';
           
           // 100% 依據試算表 D 欄的真實文字，不再進行任何本地 Rank 覆蓋[cite: 4]
           const statusFromSheet = row[3] ? row[3].trim() : '其他';
 
           let parsedFormData = {};
-          const jsonCols = [4, 6, 8, 10, 12];
+          // FORM_001 ~ FORM_006 + 預留一(取消紀錄)；舊版漏了 FORM_006(index 14)
+          const jsonCols = [4, 6, 8, 10, 12, 14, 16];
           jsonCols.forEach(colIdx => {
             if (row[colIdx]) {
-              let rawJsonStr = row[colIdx].trim();
+              let rawJsonStr = String(row[colIdx]).trim();
               if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) {
                 rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
               }
@@ -1266,7 +1469,9 @@
       sel.innerHTML = `<option value="">無會員資料</option>`;
       return;
     }
-    sel.innerHTML = state.membersList.map(m => `<option value="${m.name}">${m.name} (${m.email})</option>`).join('');
+    const prev = sel.value;
+    sel.innerHTML = state.membersList.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)} (${escapeHtml(m.email)})</option>`).join('');
+    if (prev && state.membersList.some(m => m.name === prev)) sel.value = prev; // 背景刷新不要把使用者已選的帳號洗掉
   }
 
   function renderMainDashboardUI() {
@@ -1289,7 +1494,7 @@
               <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border};">${displayStatus}</span>
               <span class="exp-code-tag">${exp.expId}</span>
             </div>
-            <div class="exp-title-main">${displayInfo || (isZH ? '實驗專案' : 'Experiment Project')}</div>
+            <div class="exp-title-main">${escapeHtml(displayInfo) || (isZH ? '實驗專案' : 'Experiment Project')}</div>
             <div class="exp-meta-bar">
               <span>${isZH?'負責人':'Owner'}：<strong style="background:${userColor}; padding:1px 6px; border-radius:4px; font-weight:700;">${exp.user}</strong></span>
               <span>${isZH?'日期':'Date'}：${exp.date}</span>
@@ -1317,7 +1522,7 @@
         return `
           <div class="schedule-item">
             <span class="schedule-date-tag">${displayDate}</span>
-            <span class="schedule-info" title="${displayInfo}">${displayInfo || (isZH?'預約排程':'Reserved Schedule')}</span>
+            <span class="schedule-info" title="${escapeHtml(displayInfo)}">${escapeHtml(displayInfo) || (isZH?'預約排程':'Reserved Schedule')}</span>
             <span class="schedule-user-tag" style="background:${userColor};">${f.user}</span>
           </div>
         `;
@@ -1388,7 +1593,7 @@
       return `
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:3px;">
           <span style="color:var(--text-muted); font-weight:700;">• ${transSt}:</span>
-          <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${timeVal || '--'}</span>
+          <span class="view-mode-text" style="font-family:ui-monospace, monospace; color:var(--text-primary); font-weight:600;">${escapeHtml(timeVal || '--')}</span>
         </div>
       `;
     }).join('');
@@ -1543,26 +1748,26 @@
           <div class="detail-label" style="width:100%; margin-bottom:6px; font-size:12px; font-weight:800; color:var(--primary); border-bottom:1px solid var(--border-color); padding-bottom:4px;">${isZH ? '填寫數據明細' : 'Field Data Details'}</div>
           <div id="editableFieldsContainer" class="detail-value" style="text-align:left; width:100%; padding:4px 0;">
 
-            <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${freqVal}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${cycleVal}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${voltVal}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${interVal}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${ratWeightDisp}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'頻率':'Frequency'} (HZ)</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(freqVal)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'週期數':'Cycles'}</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(cycleVal)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電壓':'Voltage'} (mV)</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(voltVal)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'間隔':'Interval'} (ms)</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(interVal)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠體重':'Rat Weight'} (g)</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(ratWeightDisp)}</span></div></div>
 
             <div class="detail-row"><div class="detail-label">${isZH?'PTZ/Saline 劑量':'PTZ/Saline'} (uL)</div><div class="detail-value normal-value">${calculatedPTZ} / ${calculatedSaline}</div></div>
 
-            <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">${lamdaPosText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">${elePosText}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'Lamda位置':'Lamda Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(lamdaPosText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電極插入位置':'Electrode Pos'}</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(elePosText)}</span></div></div>
 
-            <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${ratStatusText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${surgeryStatusText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${elecStatusText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${signalStatusText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${sacMethodText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${sacStatusText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${tissueText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${tissueStatusText}</span></div></div>
-            <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${storageText}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'大鼠生理情況':'Rat State'}</div><div class="detail-value ${getConditionClass(ratStatusText)}"><span class="view-mode-text">${escapeHtml(ratStatusText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'手術過程狀況':'Surgery Status'}</div><div class="detail-value ${getConditionClass(surgeryStatusText)}"><span class="view-mode-text">${escapeHtml(surgeryStatusText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'電極插入狀況':'Electrode Status'}</div><div class="detail-value ${getConditionClass(elecStatusText)}"><span class="view-mode-text">${escapeHtml(elecStatusText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'訊號蒐集情況':'Signal Status'}</div><div class="detail-value ${getConditionClass(signalStatusText)}"><span class="view-mode-text">${escapeHtml(signalStatusText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'犧牲方式':'Sacrifice Method'}</div><div class="detail-value ${getConditionClass(sacMethodText)}"><span class="view-mode-text">${escapeHtml(sacMethodText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'犧牲情況':'Sacrifice Status'}</div><div class="detail-value ${getConditionClass(sacStatusText)}"><span class="view-mode-text">${escapeHtml(sacStatusText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'本次摘除組織':'Tissue'}</div><div class="detail-value ${getConditionClass(tissueText)}"><span class="view-mode-text">${escapeHtml(tissueText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'摘除情況':'Excision Status'}</div><div class="detail-value ${getConditionClass(tissueStatusText)}"><span class="view-mode-text">${escapeHtml(tissueStatusText)}</span></div></div>
+            <div class="detail-row"><div class="detail-label">${isZH?'保存方式':'Storage'}</div><div class="detail-value normal-value"><span class="view-mode-text">${escapeHtml(storageText)}</span></div></div>
 
             ${timelineBarHtml}
 
@@ -1584,8 +1789,8 @@
       <div class="detail-list">
         <div class="detail-row"><div class="detail-label">${isZH ? '實驗編號' : 'ID'}</div><div class="detail-value normal-value" style="font-family:ui-monospace, monospace; color:var(--primary);">${exp.expId}</div></div>
         <div class="detail-row"><div class="detail-label">${isZH ? '當前狀態' : 'Status'}</div><div class="detail-value"><span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; border-color:${styleObj.border}; font-size:10px;">${displayStatus}</span></div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${displayInfo}</div></div>
-        <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${exp.user}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH ? '大綱與目的' : 'Outline & Purpose'}</div><div class="detail-value normal-value">${escapeHtml(displayInfo)}</div></div>
+        <div class="detail-row"><div class="detail-label">${isZH ? '負責人' : 'Owner'}</div><div class="detail-value normal-value">${escapeHtml(exp.user)}</div></div>
         <div class="detail-row"><div class="detail-label">${isZH ? '實驗日期' : 'Date'}</div><div class="detail-value normal-value">${exp.date}</div></div>
         ${surgeryDurationHtml}
         <div class="detail-row"><div class="detail-label">${isZH ? '狀態歷程時間' : 'Time Logs'}</div><div class="detail-value" style="text-align:left; width:68%;">${timeLogsHtml}</div></div>
@@ -1594,7 +1799,7 @@
 
         <div class="detail-row" style="flex-direction:column; align-items:stretch;">
           <div class="detail-label" style="width:100%; margin-bottom:4px;">${isZH ? '備註紀錄' : 'Notes'}</div>
-          <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${userNotes || (isZH ? '無' : 'None')}</div>
+          <div id="txtDisplayNote" class="detail-value normal-value" style="white-space:pre-line; text-align:left; font-weight:700; width:100%;">${escapeHtml(userNotes || (isZH ? '無' : 'None'))}</div>
         </div>
       </div>
     `;
@@ -1649,38 +1854,51 @@
           ? `【保留延伸】本受試體保留予接續實驗，不執行犧牲與摘除組織保存。`
           : `【Retained for Extension】This rat is retained for secondary experiment; sacrifice skipped.`;
 
-        if (!targetExp.formData) targetExp.formData = {};
-        
+        // 在副本上修改，確認後端成功後才套用到本地（失敗不會留下假狀態）
+        const newData = JSON.parse(JSON.stringify(targetExp.formData || {}));
+        // 若表單正開著（從 FORM_005 頁面觸發），把尚未提交的填寫內容一起保存
+        if (document.getElementById('formPageContainer').style.display === 'flex' && (currentFormCtx.data['exp_select_val'] === expId)) {
+          Object.assign(newData, JSON.parse(JSON.stringify(currentFormCtx.data)));
+        }
+
         // 1. 合併備註
-        const oldNote = targetExp.formData['notes'] || '';
+        const oldNote = newData['notes'] || '';
         if (!oldNote.includes('【保留延伸】')) {
-          targetExp.formData['notes'] = oldNote ? `${oldNote}\n${tagNote}` : tagNote;
+          newData['notes'] = oldNote ? `${oldNote}\n${tagNote}` : tagNote;
         }
 
         // 2. 標記不犧牲與不保存
-        targetExp.formData['sac_method'] = isZH ? '保留不犧牲(延伸)' : 'Retained (Extended)';
-        targetExp.formData['sac_status'] = isZH ? '良好(未犧牲)' : 'Healthy (Unsacrificed)';
-        targetExp.formData['tissue'] = isZH ? '無(保留本體)' : 'None';
-        targetExp.formData['tissue_status'] = '--';
-        targetExp.formData['storage'] = isZH ? '不保存' : 'None';
-        targetExp.formData['_retained_for_extension'] = true;
+        newData['sac_method'] = isZH ? '保留不犧牲(延伸)' : 'Retained (Extended)';
+        newData['sac_status'] = isZH ? '良好(未犧牲)' : 'Healthy (Unsacrificed)';
+        newData['tissue'] = isZH ? '無(保留本體)' : 'None';
+        newData['tissue_status'] = '--';
+        newData['storage'] = isZH ? '不保存' : 'None';
+        newData['_retained_for_extension'] = true;
 
-        if (!targetExp.formData['_time_logs']) targetExp.formData['_time_logs'] = {};
-        targetExp.formData['_time_logs'][completedStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
+        if (!newData['_time_logs']) newData['_time_logs'] = {};
+        newData['_time_logs'][completedStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
 
+        // 3. 呼叫後端更新（等待真實回應）
+        showToast(isZH ? '同步中...' : 'Syncing...');
+        try {
+          await syncToGoogleSheet("submitForm", {
+            expId: targetExp.expId,
+            date: targetExp.date || state.simulatedDate,
+            user: targetExp.user || (state.currentUser ? state.currentUser.name : ""),
+            status: completedStatus,
+            formColumnName: "FORM_005",
+            formJson: JSON.stringify(newData),
+            isUpdate: true,
+            formData: newData
+          });
+        } catch (err) {
+          showCustomAlert(isZH ? "標示失敗" : "Failed", escapeHtml(err.message));
+          return;
+        }
+
+        targetExp.formData = newData;
         targetExp.status = completedStatus;
-
-        // 3. 呼叫後端更新
-        await syncToGoogleSheet("submitForm", {
-          expId: targetExp.expId,
-          date: targetExp.date || state.simulatedDate,
-          user: targetExp.user || (state.currentUser ? state.currentUser.name : "Daniel"),
-          status: completedStatus,
-          formColumnName: "FORM_005",
-          formJson: JSON.stringify(targetExp.formData),
-          isUpdate: true,
-          formData: targetExp.formData
-        });
+        if (document.getElementById('formPageContainer').style.display === 'flex') closeFormPage();
 
         renderMainDashboardUI();
         renderTimeline();
@@ -1726,22 +1944,28 @@
     if (!targetExp) return;
 
     const cancelStatus = "已取消";
+    const newData = JSON.parse(JSON.stringify(targetExp.formData || {}));
+    if (!newData['_time_logs']) newData['_time_logs'] = {};
+    newData['_time_logs'][cancelStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
+
+    try {
+      // FORM_CANCEL 由後端寫入「預留一」欄，不再覆蓋 FORM_001
+      await syncToGoogleSheet("submitForm", {
+        expId: expId,
+        date: targetExp.date || state.simulatedDate,
+        user: targetExp.user || (state.currentUser ? state.currentUser.name : ""),
+        status: cancelStatus,
+        formColumnName: "FORM_CANCEL",
+        formJson: JSON.stringify(newData),
+        isUpdate: true,
+        formData: newData
+      });
+    } catch (err) {
+      showCustomAlert(state.currentLang === 'ZH' ? "取消失敗" : "Failed", escapeHtml(err.message));
+      return;
+    }
     targetExp.status = cancelStatus;
-
-    if (!targetExp.formData) targetExp.formData = {};
-    if (!targetExp.formData['_time_logs']) targetExp.formData['_time_logs'] = {};
-    targetExp.formData['_time_logs'][cancelStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
-
-    await syncToGoogleSheet("submitForm", {
-      expId: expId,
-      date: targetExp.date || state.simulatedDate,
-      user: targetExp.user || (state.currentUser ? state.currentUser.name : "Daniel"),
-      status: cancelStatus,
-      formColumnName: "FORM_CANCEL",
-      formJson: JSON.stringify(targetExp.formData),
-      isUpdate: true,
-      formData: targetExp.formData
-    });
+    targetExp.formData = newData;
 
     renderMainDashboardUI();
     renderTimeline();
@@ -1806,7 +2030,7 @@
                 ${uploadTagHtml}
               </div>
             </div>
-            <div class="timeline-info-text" title="${displayInfo}">${displayInfo || (isZH?'實驗專案':'Experiment Project')}</div>
+            <div class="timeline-info-text" title="${escapeHtml(displayInfo)}">${escapeHtml(displayInfo) || (isZH?'實驗專案':'Experiment Project')}</div>
             <div class="timeline-exp-id">${isZH?'編號':'ID'}: ${item.expId}</div>
           </div>
         </div>
@@ -1814,16 +2038,6 @@
     });
 
     container.innerHTML = html;
-  }
-
-  async function syncToGoogleSheet(actionType, payload) {
-    try {
-      await fetch(GAS_API_URL, {
-        method: "POST", mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: actionType, ...payload })
-      });
-    } catch(err) { console.error(`同步失敗:`, err); }
   }
 
   function switchAuthTab(tab) {
@@ -1837,8 +2051,10 @@
     const guestObj = { name: "訪客", role: "Guest", color: "#f1f5f9" };
     state.currentUser = guestObj;
     state.isGuest = true;
+    state.authToken = null;
 
     localStorage.setItem('elabnote_user', JSON.stringify(guestObj));
+    localStorage.removeItem('elabnote_token');
 
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('userBadge').innerText = "訪客";
@@ -1868,13 +2084,24 @@
     }
 
     const newUser = { name, userCode, email, role, password, color, lang };
-    state.membersList.push(newUser);
-    await syncToGoogleSheet("registerUser", newUser);
+    const btn = document.getElementById('btnRegisterSubmit');
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    try {
+      await syncToGoogleSheet("registerUser", newUser);
+    } catch (err) {
+      showCustomAlert("註冊失敗", escapeHtml(err.message));
+      return;
+    } finally {
+      btn.dataset.busy = '';
+    }
 
+    state.membersList.push({ name, userCode, email, role, color, lang });
     initAuthDropdown();
     initColorDropdown();
     switchAuthTab('login');
-    showCustomAlert("註冊成功", "註冊資料已同步寫入！請選擇帳號登入。");
+    document.getElementById('selLoginUser').value = name;
+    showCustomAlert("註冊成功", "註冊資料已寫入！請輸入密碼登入。");
   }
 
   function toggleLanguage() {
@@ -1957,7 +2184,7 @@
       optionsHtml += pastUnfinishedExps.map(exp => `
         <div class="option-card" onclick="selectMakeupExp('${exp.expId}')">
           <input type="radio" name="selMakeupExp" id="exp_${exp.expId}" ${state.activeSelectedExpId === exp.expId ? 'checked' : ''}>
-          <label for="exp_${exp.expId}">[${exp.expId}] ${exp.date} - ${formatBilingualText(exp.info, state.currentLang)} (${exp.user})</label>
+          <label for="exp_${exp.expId}">[${exp.expId}] ${exp.date} - ${escapeHtml(formatBilingualText(exp.info, state.currentLang))} (${escapeHtml(exp.user)})</label>
         </div>
       `).join('');
     }
@@ -2063,7 +2290,7 @@
       let optionsHtml = todayActiveExps.map(exp => `
         <div class="option-card" onclick="selectActiveTodayExp('${exp.expId}')">
           <input type="radio" name="selTodayExp" id="exp_${exp.expId}" ${state.activeSelectedExpId === exp.expId ? 'checked' : ''}>
-          <label for="exp_${exp.expId}">[${exp.expId}] ${formatBilingualText(exp.info, state.currentLang)} (${exp.user})</label>
+          <label for="exp_${exp.expId}">[${exp.expId}] ${escapeHtml(formatBilingualText(exp.info, state.currentLang))} (${escapeHtml(exp.user)})</label>
         </div>
       `).join('');
 
@@ -2152,7 +2379,7 @@
       let optionsHtml = tomorrowExps.map(exp => `
         <div class="option-card" onclick="selectActiveTomorrowExp('${exp.expId}')">
           <input type="radio" name="selTomorrowExp" id="exp_${exp.expId}" ${state.activeSelectedExpId === exp.expId ? 'checked' : ''}>
-          <label for="exp_${exp.expId}">[${exp.expId}] ${formatBilingualText(exp.info, state.currentLang)} (${exp.user})</label>
+          <label for="exp_${exp.expId}">[${exp.expId}] ${escapeHtml(formatBilingualText(exp.info, state.currentLang))} (${escapeHtml(exp.user)})</label>
         </div>
       `).join('');
 
@@ -2179,6 +2406,7 @@
     currentFormCtx.selectedAction = null;
     currentFormCtx.selectedStatusTag = null;
     currentFormCtx.disabledGroups = {};
+    currentFormCtx._interimSent = null;
 
     let fullPages = getFormStructure(formId);
 
@@ -2370,7 +2598,7 @@
     page.fields.forEach(field => {
       if (field.dependsOn) {
         const selectedOutline = currentFormCtx.data['outline_select_val'];
-        if (selectedOutline !== field.dependsOn && !String(selectedOutline).includes("自訂")) return;
+        if (selectedOutline !== field.dependsOn && !String(selectedOutline).includes("自訂") && !isSavedCustomOutline(selectedOutline)) return;
       }
 
       let isGroupDisabled = false;
@@ -2466,12 +2694,12 @@
                 const optName = typeof opt === 'string' ? opt : opt.name;
                 const displayOptName = formatBilingualText(optName, state.currentLang);
                 const selected = currentFormCtx.data['outline_select_val'] === optName ? 'selected' : '';
-                return `<option value="${optName}" data-idx="${idx}" ${selected}>${displayOptName}</option>`;
+                return `<option value="${escapeHtml(optName)}" data-idx="${idx}" ${selected}>${escapeHtml(displayOptName)}</option>`;
               }).join('')}
             </select>
             ${isCustomOutline ? `
               <div style="margin-top:8px;">
-                <input type="text" class="form-control" id="inputCustomOutline" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂大綱名稱...' : 'Enter custom outline...'}" value="${currentFormCtx.data['custom_outline_val'] || ''}" oninput="saveFormFieldData('custom_outline_val', this.value)">
+                <input type="text" class="form-control" id="inputCustomOutline" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂大綱名稱...' : 'Enter custom outline...'}" value="${escapeHtml(currentFormCtx.data['custom_outline_val'] || '')}" oninput="saveFormFieldData('custom_outline_val', this.value)">
               </div>
             ` : ''}
           </div>
@@ -2482,8 +2710,8 @@
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}'); saveFormFieldData('user_select_val', this.value);">
-              ${state.membersList.map(m => `<option value="${m.name}" ${selectedUser === m.name ? 'selected' : ''}>${m.name}</option>`).join('')}
+            <select class="form-control" onchange="saveFormFieldData('${field.id}', this.value, '${jsArg(field.label)}'); saveFormFieldData('user_select_val', this.value);">
+              ${state.membersList.map(m => `<option value="${escapeHtml(m.name)}" ${selectedUser === m.name ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
             </select>
           </div>
         `;
@@ -2492,7 +2720,7 @@
         html += `
           <div class="form-group">
             <label>${field.label}</label>
-            <input type="date" class="form-control" value="${val}" onchange="saveFormFieldData('${field.id}', this.value, '${field.label}')">
+            <input type="date" class="form-control" value="${escapeHtml(normalizeDateStr(val))}" onchange="saveFormFieldData('${field.id}', this.value, '${jsArg(field.label)}')">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -2502,7 +2730,7 @@
         html += `
           <div class="form-group" style="${disabledStyle}">
             <label>${field.label}</label>
-            <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${field.label}">${noteVal}</textarea>
+            <textarea id="${field.id}" class="form-control dynamic-input" ${disabledAttr} rows="3" placeholder="${field.placeholder || '請輸入備註...'}" data-field-id="${field.id}" data-label="${escapeHtml(field.label)}">${escapeHtml(noteVal)}</textarea>
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -2511,7 +2739,7 @@
         html += `
           <div class="form-group" style="${disabledStyle}">
             <label>${field.label} ${field.unit ? `(${field.unit})` : ''}</label>
-            <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" ${disabledAttr} value="${val}" placeholder="${field.placeholder || ''}" data-field-id="${field.id}" data-label="${field.label}">
+            <input type="${field.type}" id="${field.id}" class="form-control dynamic-input" ${disabledAttr} value="${escapeHtml(val)}" placeholder="${escapeHtml(field.placeholder || '')}" data-field-id="${field.id}" data-label="${escapeHtml(field.label)}">
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -2519,7 +2747,7 @@
       else if (field.type === "checkbox") {
         const isSelected = !!currentFormCtx.data[field.id];
         const disTag = field.disableGroup ? field.disableGroup.trim() : '';
-        const chkClick = isGroupDisabled ? '' : `toggleOptionCheckbox('${field.id}', '${field.label}', '${disTag}')`;
+        const chkClick = isGroupDisabled ? '' : `toggleOptionCheckbox('${field.id}', '${jsArg(field.label)}', '${jsArg(disTag)}')`;
 
         let fetchBtnHtml = '';
         if (field.fetchDetailType) {
@@ -2533,7 +2761,7 @@
         html += `
           <div class="option-card ${isSelected ? 'selected' : ''}" style="${disabledStyle}" onclick="${chkClick}">
             <input type="checkbox" id="${field.id}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${chkClick};">
-            <label for="${field.id}">${formatBilingualText(field.label, state.currentLang)}</label>
+            <label for="${field.id}">${escapeHtml(formatBilingualText(field.label, state.currentLang))}</label>
             ${fetchBtnHtml}
           </div>
           ${renderFieldDescription(field.desc)}
@@ -2551,21 +2779,21 @@
 
           const isSelected = (currentRadioVal === cleanOptName) || (currentRadioVal === optName);
           const optId = `${field.id}_opt_${idx}`;
-          const radioClick = `selectOptionRadio('${field.id}', '${cleanOptName}', ${JSON.stringify(opt.action || null)}, '${opt.statusTag || ''}', ${idx + 1})`;
+          const radioClick = `selectOptionRadio('${field.id}', '${jsArg(cleanOptName)}', ${escapeHtml(JSON.stringify(opt.action || null))}, '${jsArg(opt.statusTag || '')}', ${idx + 1})`;
 
           const isCustomPurpose = cleanOptName.includes("自訂") || cleanOptName.includes("其他");
 
           html += `
             <div class="option-card ${isSelected ? 'selected' : ''}" onclick="${radioClick}">
-              <input type="radio" name="${field.id}" id="${optId}" value="${cleanOptName}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${radioClick};">
-              <label for="${optId}">${displayOptName}</label>
+              <input type="radio" name="${field.id}" id="${optId}" value="${escapeHtml(cleanOptName)}" ${isSelected ? 'checked' : ''} ${disabledAttr} onclick="event.stopPropagation(); ${radioClick};">
+              <label for="${optId}">${escapeHtml(displayOptName)}</label>
             </div>
             ${(isSelected && isCustomPurpose) ? `
               <div style="margin: -4px 0 8px 0;">
-                <input type="text" class="form-control" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂目的名稱...' : 'Enter custom purpose...'}" value="${currentFormCtx.data['custom_purpose_val'] || ''}" oninput="saveFormFieldData('custom_purpose_val', this.value)">
+                <input type="text" class="form-control" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂目的名稱...' : 'Enter custom purpose...'}" value="${escapeHtml(currentFormCtx.data['custom_purpose_val'] || '')}" oninput="saveFormFieldData('custom_purpose_val', this.value)">
               </div>
             ` : ''}
-            ${(opt.hasInput && isSelected && !isCustomPurpose) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isSelected && !isCustomPurpose) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${escapeHtml(currentFormCtx.data[field.id+'_input'] || '')}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -2586,14 +2814,14 @@
           const optDisabledStyle = isOptDisabled ? 'opacity: 0.35; pointer-events: none; background: #f1f5f9;' : '';
           const disGroupTag = opt.disableGroup || field.disableGroup || '';
 
-          const clickAction = isOptDisabled ? '' : `toggleCheckboxGroupOption('${field.id}', '${cleanOptName}', '${disGroupTag}')`;
+          const clickAction = isOptDisabled ? '' : `toggleCheckboxGroupOption('${field.id}', '${jsArg(cleanOptName)}', '${jsArg(disGroupTag)}')`;
 
           html += `
             <div class="option-card ${isChecked ? 'selected' : ''}" style="${optDisabledStyle}" onclick="${clickAction}">
               <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${optDisabledAttr} onclick="event.stopPropagation(); ${clickAction};">
-              <label for="${field.id}_${idx}">${displayOptName}</label>
+              <label for="${field.id}_${idx}">${escapeHtml(displayOptName)}</label>
             </div>
-            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${currentFormCtx.data[field.id+'_input'] || ''}</textarea>` : ''}
+            ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${escapeHtml(currentFormCtx.data[field.id+'_input'] || '')}</textarea>` : ''}
           `;
         });
         html += `</div>`;
@@ -2611,8 +2839,8 @@
         const stageList = currentFormCtx.data[field.id];
         let stagesHtml = stageList.map((st, sIdx) => `
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-            <input type="text" class="form-control" style="flex:1.3; font-weight:600;" placeholder="區段名稱" value="${st.name}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'name', this.value)">
-            <input type="number" class="form-control" style="flex:0.8;" placeholder="時間" value="${st.time}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'time', this.value)">
+            <input type="text" class="form-control" style="flex:1.3; font-weight:600;" placeholder="區段名稱" value="${escapeHtml(st.name)}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'name', this.value)">
+            <input type="number" class="form-control" style="flex:0.8;" placeholder="時間" value="${escapeHtml(st.time)}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'time', this.value)">
             <span style="font-size:12px; color:var(--text-muted); font-weight:700;">min</span>
             <button type="button" style="background:#fee2e2; color:var(--danger); border:1px solid #fca5a5; border-radius:6px; width:28px; height:28px; font-weight:bold; cursor:pointer;" onclick="removeDynamicStageItem('${field.id}', ${sIdx})">✕</button>
           </div>
@@ -2692,7 +2920,7 @@
             <span class="status-badge-lg" style="background:${styleObj.bg}; color:${styleObj.text}; font-size:10px; padding:2px 6px;">${displayStatus}</span>
           </div>
           <div style="font-size:12px; font-weight:700; color:var(--text-primary); line-height:1.3; text-align:left;">
-            ${displayInfo || (isZH ? '實驗專案' : 'Experiment Project')}
+            ${escapeHtml(displayInfo) || (isZH ? '實驗專案' : 'Experiment Project')}
           </div>
           <div style="display:flex; justify-content:space-between; width:100%; font-size:11px; color:var(--text-muted); margin-top:2px;">
             <span>📅 日期：${exp.date}</span>
@@ -2761,16 +2989,21 @@
     const activeUser = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
     const targetExpInMemory = state.dataCenter.find(d => d.expId === currentExpId);
 
-    await syncToGoogleSheet("submitForm", {
-      expId: currentExpId,
-      date: currentFormCtx.data['date'] || (targetExpInMemory ? targetExpInMemory.date : state.simulatedDate),
-      user: activeUser,
-      status: targetStatus,
-      formColumnName: "FORM_004",
-      formJson: JSON.stringify(currentFormCtx.data),
-      isUpdate: true,
-      formData: currentFormCtx.data
-    });
+    try {
+      await syncToGoogleSheet("submitForm", {
+        expId: currentExpId,
+        date: targetExpInMemory ? targetExpInMemory.date : state.simulatedDate,
+        user: activeUser,
+        status: targetStatus,
+        formColumnName: "FORM_004",
+        formJson: JSON.stringify(currentFormCtx.data),
+        isUpdate: true,
+        formData: currentFormCtx.data
+      });
+    } catch (err) {
+      showCustomAlert(isZH ? "設定延伸實驗失敗" : "Failed", escapeHtml(err.message));
+      return;
+    }
 
     if (targetExpInMemory) {
       targetExpInMemory.status = targetStatus;
@@ -2971,6 +3204,9 @@
     if (!selectedExpId) return;
 
     if (currentFormCtx.formId.startsWith("FORM_001")) return;
+    // 同一次開啟表單只送一次中間狀態（來回翻頁不重複寫入）
+    if (currentFormCtx._interimSent === statusStr) return;
+    currentFormCtx._interimSent = statusStr;
 
     if (!currentFormCtx.data['_time_logs']) {
       currentFormCtx.data['_time_logs'] = {};
@@ -2984,19 +3220,23 @@
 
     const rawFormId = currentFormCtx.formId;
     const mainFormColName = rawFormId.split('_').slice(0, 2).join('_');
+    let targetExpInMemory = state.dataCenter.find(d => d.expId === selectedExpId);
+    const snapshotData = JSON.parse(JSON.stringify(currentFormCtx.data));
 
-    await syncToGoogleSheet("submitForm", {
+    // 不 await：讓使用者可以繼續填下一頁；寫入佇列保證它一定比最終提交先送達
+    syncToGoogleSheet("submitForm", {
       expId: selectedExpId,
-      date: currentFormCtx.data['date'] || state.simulatedDate,
-      user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
+      date: targetExpInMemory ? targetExpInMemory.date : state.simulatedDate,
+      user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : ""),
       status: statusStr,
       formColumnName: mainFormColName,
-      formJson: JSON.stringify(currentFormCtx.data),
+      formJson: JSON.stringify(snapshotData),
       isUpdate: true,
-      formData: currentFormCtx.data
+      formData: snapshotData
+    }).catch(err => {
+      showToast(`「${statusStr}」狀態同步失敗：${err.message}`, true);
     });
 
-    let targetExpInMemory = state.dataCenter.find(d => d.expId === selectedExpId);
     if (targetExpInMemory) {
       targetExpInMemory.status = statusStr;
       targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
@@ -3089,27 +3329,39 @@
     }
   }
 
-  function generateExperimentId(dateStr) {
+  // 編號前綴：大綱碼 + 目的碼 + yyMMdd + 會員簡碼；流水號改由後端在鎖內產生，不會撞號
+  function buildExperimentIdPrefix(dateStr) {
     const outlineCode = currentFormCtx.data['outline_code'] || 'B';
     const purposeCode = currentFormCtx.data['purpose_code'] || '01';
 
-    const activeUserName = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel");
+    const activeUserName = currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "");
     const userObj = state.membersList.find(m => m.name === activeUserName);
-    const userCode = (userObj && userObj.userCode) ? userObj.userCode : "GDC";
+    const userCode = (userObj && userObj.userCode) ? userObj.userCode : ((state.currentUser && state.currentUser.userCode) || "GDC");
 
-    const cleanDate = dateStr.replace(/-/g, '');
-    const fallbackYyMMdd = new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
-    const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : fallbackYyMMdd;
+    const cleanDate = normalizeDateStr(dateStr).replace(/-/g, '');
+    const yyMMdd = cleanDate.length === 8 ? cleanDate.slice(2) : todayStr().replace(/-/g, '').slice(2);
+    return `${outlineCode}${purposeCode}${yyMMdd}${userCode}`.toUpperCase();
+  }
 
-    let sequence = 1;
-    let generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
-
-    while (state.dataCenter.some(d => d.expId === generatedId)) {
-      sequence++;
-      generatedId = `${outlineCode}${purposeCode}${yyMMdd}${userCode}${sequence}`;
+  // 找出目前表單中「日期」型欄位的值（舊版會掃描所有欄位，可能抓到延伸來源的日期）
+  function getFormDateValue() {
+    for (const p of currentFormCtx.pages || []) {
+      for (const f of p.fields || []) {
+        if (f.type === 'date') {
+          const v = normalizeDateStr(currentFormCtx.data[f.id] || '');
+          if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        }
+      }
     }
+    return '';
+  }
 
-    return generatedId;
+  function isExistingExpId(v) {
+    if (!v) return false;
+    if (state.dataCenter.some(d => d.expId === v)) return true;
+    // 舊版 regex /^[A-Z]\d{8,12}(-\d+)?$/ 不接受「A06260922PAN1」這種含會員簡碼的編號，
+    // 導致每次階段提交都被當成新專案而多建一筆幽靈實驗 → 修正為實際編號格式
+    return /^[A-Z]\d{8}[A-Z0-9]{3}\d+(-\d+)?$/.test(v);
   }
 
   async function submitFormFinal() {
@@ -3117,164 +3369,191 @@
 
     state.isSubmitting = true;
     const btnNext = document.getElementById('btnFormNext');
+    const resetBtn = () => {
+      state.isSubmitting = false;
+      if (btnNext) {
+        btnNext.disabled = false;
+        renderFormCurrentPage();
+      }
+    };
     if (btnNext) {
       btnNext.disabled = true;
       btnNext.innerText = state.currentLang === 'ZH' ? "上傳中..." : "Submitting...";
     }
 
-    const selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
-    const isNoParamsProject = selectedExpSelectVal === 'NEW_PROJECT_ONLY';
-
-    let targetStatus = "準備中";
-    let isDeceasedSelected = false;
-
-    Object.keys(currentFormCtx.data).forEach(k => {
-      const v = currentFormCtx.data[k];
-      if (typeof v === 'string' && v.includes('已死亡')) {
-        isDeceasedSelected = true;
-      }
-    });
-
-    if (isNoParamsProject) {
-      targetStatus = "實驗完成";
-    } else if (isDeceasedSelected) {
-      targetStatus = "已死亡";
-    } else if (currentFormCtx.formId === "FORM_001_1") {
-      targetStatus = "準備中";
-    } else if (currentFormCtx.formId === "FORM_001_2") {
-      targetStatus = "已預約";
-    } else if (currentFormCtx.formId === "FORM_002_1" || currentFormCtx.formId === "FORM_002_2") {
-      targetStatus = "準備完成";
-    } else if (currentFormCtx.formId === "FORM_003") {
-      targetStatus = currentFormCtx.selectedStatusTag || "休息中";
-    } else if (currentFormCtx.formId === "FORM_004") {
-      targetStatus = "訊號蒐集完成";
-    } else if (currentFormCtx.formId === "FORM_005") {
-      targetStatus = "實驗善後";
-    } else if (currentFormCtx.formId === "FORM_006") {
-      targetStatus = "實驗完成"; 
-    }
-
-    let submitDate = state.simulatedDate;
-    Object.keys(currentFormCtx.data).forEach(k => {
-      const v = currentFormCtx.data[k];
-      if (typeof v === 'string' && v.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        submitDate = v;
-      }
-    });
-
-    let finalExpId = "";
-    let isUpdateMode = false;
-
-    const isReservation = currentFormCtx.formId === "FORM_001_2";
-    const isNewProject = selectedExpSelectVal === 'NEW_PROJECT' || selectedExpSelectVal === 'NEW_PAST_PROJECT' || selectedExpSelectVal === 'NEW_PROJECT_ONLY' || !selectedExpSelectVal;
-
-    if (!isReservation && !isNewProject && selectedExpSelectVal.match(/^[A-Z]\d{8,12}(-\d+)?$/)) {
-      finalExpId = selectedExpSelectVal;
-      isUpdateMode = true;
-    } else {
-      finalExpId = generateExperimentId(submitDate);
-      isUpdateMode = false;
-    }
-
-    if (!currentFormCtx.data['_time_logs']) {
-      currentFormCtx.data['_time_logs'] = {};
-    }
-
-    if (currentFormCtx.isMakeup) {
-      currentFormCtx.data['_time_logs'][targetStatus] = "--";
-    } else {
-      currentFormCtx.data['_time_logs'][targetStatus] = new Date().toLocaleString('zh-TW', { hour12: false });
-    }
-
-    if (currentFormCtx.data['custom_outline_val']) {
-      currentFormCtx.data['outline_select_val'] = currentFormCtx.data['custom_outline_val'];
-    }
-    if (currentFormCtx.data['custom_purpose_val']) {
-      currentFormCtx.data['selected_purpose_name'] = currentFormCtx.data['custom_purpose_val'];
-    }
-
-    if (currentFormCtx.data['chk_no_ultrasound'] || currentFormCtx.data['no_ultrasound']) {
-      currentFormCtx.data['no_ultrasound'] = true;
-      const ultraKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
-      ultraKeys.forEach(k => delete currentFormCtx.data[k]);
-    }
-
-    if (isNoParamsProject) {
-      const paramKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
-      paramKeys.forEach(k => delete currentFormCtx.data[k]);
-      currentFormCtx.data['_no_parameters'] = true;
-    }
-
-    const rawFormId = currentFormCtx.formId; 
-    const mainFormColName = rawFormId.startsWith("FORM_001") ? "FORM_001" : rawFormId.split('_').slice(0, 2).join('_');
-    const jsonPayloadString = JSON.stringify(currentFormCtx.data);
-
-    await syncToGoogleSheet("submitForm", {
-      expId: finalExpId,
-      date: submitDate,
-      user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
-      status: targetStatus,
-      formColumnName: mainFormColName,
-      formJson: jsonPayloadString,
-      isUpdate: isUpdateMode,
-      formData: currentFormCtx.data
-    });
-
-    let targetExpInMemory = state.dataCenter.find(d => d.expId === finalExpId);
-    if (targetExpInMemory) {
-      targetExpInMemory.status = targetStatus;
-      targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
-    } else {
-      const outlineName = currentFormCtx.data['outline_select_val'] || '';
-      const purposeName = currentFormCtx.data['selected_purpose_name'] || '';
-
-      let defaultDynamicInfo = "";
-      if (outlineName && purposeName) {
-        defaultDynamicInfo = `${outlineName} - ${purposeName}`;
-      } else if (outlineName) {
-        defaultDynamicInfo = outlineName;
-      } else {
-        const shortD = formatShortDate(submitDate) || new Date().toLocaleDateString('sv-SE').replace(/-/g, '').slice(2);
-        defaultDynamicInfo = `${shortD}實驗專案`;
-      }
-
-      state.dataCenter.unshift({
-        expId: finalExpId,
-        date: submitDate,
-        user: currentFormCtx.data['user_select_val'] || (state.currentUser ? state.currentUser.name : "Daniel"),
-        status: targetStatus,
-        info: defaultDynamicInfo,
-        formData: { ...currentFormCtx.data },
-        hasDataUpload: false
+    try {
+      // 把畫面上尚未觸發 input 事件的值補抓進來
+      document.querySelectorAll('#formContent .dynamic-input').forEach(el => {
+        const fId = el.getAttribute('id') || el.getAttribute('data-field-id');
+        if (fId && !el.disabled) currentFormCtx.data[fId] = el.value;
       });
-    }
 
-    const completedMakeup = currentFormCtx.isMakeup;
-    delete state.formDataCache[currentFormCtx.formId];
-    state.isSubmitting = false;
-    closeFormPage();
+      const selectedExpSelectVal = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || "";
+      const isNoParamsProject = selectedExpSelectVal === 'NEW_PROJECT_ONLY';
 
-    if (completedMakeup && targetStatus !== '實驗完成' && targetStatus !== '已完成' && !isNoParamsProject) {
-      const updatedExp = state.dataCenter.find(d => d.expId === finalExpId);
-      if (updatedExp) {
-        setTimeout(() => {
-          startMakeupExpFormByStatus(updatedExp);
-        }, 300);
-        return;
+      let targetStatus = "準備中";
+      let isDeceasedSelected = false;
+
+      Object.keys(currentFormCtx.data).forEach(k => {
+        if (k === 'notes' || k.startsWith('_')) return; // 備註裡提到「已死亡」不代表狀態
+        const v = currentFormCtx.data[k];
+        const vals = Array.isArray(v) ? v : [v];
+        if (vals.some(x => typeof x === 'string' && x.includes('已死亡'))) {
+          isDeceasedSelected = true;
+        }
+      });
+
+      if (isNoParamsProject) {
+        targetStatus = "實驗完成";
+      } else if (isDeceasedSelected) {
+        targetStatus = "已死亡";
+      } else if (currentFormCtx.formId === "FORM_001_1") {
+        targetStatus = "準備中";
+      } else if (currentFormCtx.formId === "FORM_001_2") {
+        targetStatus = "已預約";
+      } else if (currentFormCtx.formId === "FORM_002_1" || currentFormCtx.formId === "FORM_002_2") {
+        targetStatus = "準備完成";
+      } else if (currentFormCtx.formId === "FORM_003") {
+        targetStatus = currentFormCtx.selectedStatusTag || "休息中";
+      } else if (currentFormCtx.formId === "FORM_004") {
+        targetStatus = "訊號蒐集完成";
+      } else if (currentFormCtx.formId === "FORM_005") {
+        targetStatus = "實驗善後";
+      } else if (currentFormCtx.formId === "FORM_006") {
+        targetStatus = "實驗完成";
       }
+
+      const isReservation = currentFormCtx.formId === "FORM_001_2";
+      const isNewProject = ['NEW_PROJECT', 'NEW_PAST_PROJECT', 'NEW_PROJECT_ONLY', ''].includes(selectedExpSelectVal);
+      const isUpdateMode = !isReservation && !isNewProject && isExistingExpId(selectedExpSelectVal);
+
+      const existingRecord = isUpdateMode ? state.dataCenter.find(d => d.expId === selectedExpSelectVal) : null;
+      // 日期：表單日期欄 > 既有紀錄日期 > 今天
+      const submitDate = getFormDateValue() || (existingRecord && existingRecord.date) || state.simulatedDate;
+
+      if (!currentFormCtx.data['_time_logs']) {
+        currentFormCtx.data['_time_logs'] = {};
+      }
+      currentFormCtx.data['_time_logs'][targetStatus] = currentFormCtx.isMakeup
+        ? "--"
+        : new Date().toLocaleString('zh-TW', { hour12: false });
+
+      if (currentFormCtx.data['custom_outline_val']) {
+        currentFormCtx.data['outline_select_val'] = currentFormCtx.data['custom_outline_val'];
+      }
+      if (currentFormCtx.data['custom_purpose_val']) {
+        currentFormCtx.data['selected_purpose_name'] = currentFormCtx.data['custom_purpose_val'];
+      }
+
+      if (currentFormCtx.data['chk_no_ultrasound'] || currentFormCtx.data['no_ultrasound']) {
+        currentFormCtx.data['no_ultrasound'] = true;
+        const ultraKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
+        ultraKeys.forEach(k => delete currentFormCtx.data[k]);
+      }
+
+      if (isNoParamsProject) {
+        const paramKeys = ['freq', 'cycle', 'volt', 'inter', 'field_21_0', 'field_22_0', 'field_23_0', 'field_24_0'];
+        paramKeys.forEach(k => delete currentFormCtx.data[k]);
+        currentFormCtx.data['_no_parameters'] = true;
+      }
+
+      const rawFormId = currentFormCtx.formId;
+      const mainFormColName = rawFormId.startsWith("FORM_001") ? "FORM_001" : rawFormId.split('_').slice(0, 2).join('_');
+      const submitUser = currentFormCtx.data['user_select_val'] || (existingRecord && existingRecord.user) || (state.currentUser ? state.currentUser.name : "");
+
+      const payload = {
+        date: submitDate,
+        user: submitUser,
+        status: targetStatus,
+        formColumnName: mainFormColName,
+        isUpdate: isUpdateMode
+      };
+      const dataToSend = JSON.parse(JSON.stringify(currentFormCtx.data));
+      if (isUpdateMode) {
+        payload.expId = selectedExpSelectVal;
+      } else {
+        payload.autoId = true;
+        payload.idPrefix = buildExperimentIdPrefix(submitDate);
+        // 新專案不應把「NEW_PROJECT」這類選單值寫進資料庫（失敗重送時本地仍保留）
+        delete dataToSend['exp_select_val'];
+      }
+      payload.formData = dataToSend;
+      payload.formJson = JSON.stringify(dataToSend);
+
+      // 等待後端真正回應成功才更新畫面
+      const res = await syncToGoogleSheet("submitForm", payload);
+      const finalExpId = res.expId;
+      currentFormCtx.data['exp_select_val'] = finalExpId;
+
+      let targetExpInMemory = state.dataCenter.find(d => d.expId === finalExpId);
+      if (targetExpInMemory) {
+        targetExpInMemory.status = targetStatus;
+        targetExpInMemory.date = submitDate;
+        targetExpInMemory.formData = { ...targetExpInMemory.formData, ...currentFormCtx.data };
+      } else {
+        const outlineName = currentFormCtx.data['outline_select_val'] || '';
+        const purposeName = currentFormCtx.data['selected_purpose_name'] || '';
+
+        let defaultDynamicInfo = "";
+        if (outlineName && purposeName) {
+          defaultDynamicInfo = `${outlineName} - ${purposeName}`;
+        } else if (outlineName) {
+          defaultDynamicInfo = outlineName;
+        } else {
+          const shortD = formatShortDate(submitDate) || todayStr().replace(/-/g, '').slice(2);
+          defaultDynamicInfo = `${shortD}實驗專案`;
+        }
+
+        state.dataCenter.unshift({
+          expId: finalExpId,
+          date: submitDate,
+          user: submitUser,
+          status: targetStatus,
+          info: defaultDynamicInfo,
+          formData: { ...currentFormCtx.data },
+          hasDataUpload: false
+        });
+      }
+
+      // 新的自訂選項立即加入本地，下次開表單就看得到
+      if (currentFormCtx.data['custom_outline_val']) state.customOptions.push({ type: 'outline', name: currentFormCtx.data['custom_outline_val'], outline: '' });
+      if (currentFormCtx.data['custom_purpose_val']) state.customOptions.push({ type: 'purpose', name: currentFormCtx.data['custom_purpose_val'], outline: currentFormCtx.data['outline_select_val'] || '' });
+
+      const completedMakeup = currentFormCtx.isMakeup;
+      delete state.formDataCache[currentFormCtx.formId];
+      state.isSubmitting = false;
+      closeFormPage();
+
+      if (completedMakeup && targetStatus !== '實驗完成' && targetStatus !== '已完成' && !isNoParamsProject) {
+        const updatedExp = state.dataCenter.find(d => d.expId === finalExpId);
+        if (updatedExp) {
+          setTimeout(() => {
+            startMakeupExpFormByStatus(updatedExp);
+          }, 300);
+          return;
+        }
+      }
+
+      state.activeSelectedExpId = null;
+      renderMainDashboardUI();
+      renderTimeline();
+      updateDashboardButtons();
+
+      const msg = isUpdateMode
+        ? `實驗編號 [${escapeHtml(finalExpId)}] 紀錄已更新！<br>狀態更新為：[${escapeHtml(targetStatus)}]`
+        : `新實驗專案建立成功！<br>實驗編號：[${escapeHtml(finalExpId)}]<br>狀態：[${escapeHtml(targetStatus)}]`;
+
+      showCustomAlert(state.currentLang==='ZH'?"提交成功":"Submitted Successfully", msg);
+    } catch (err) {
+      console.error('提交失敗:', err);
+      resetBtn();
+      showCustomAlert(
+        state.currentLang === 'ZH' ? "提交失敗（資料未寫入）" : "Submit Failed",
+        `${escapeHtml(err.message)}<br><br>${state.currentLang === 'ZH' ? '表單內容仍保留，可直接再按一次提交。' : 'Your input is kept; you can submit again.'}`
+      );
+    } finally {
+      if (state.isSubmitting) state.isSubmitting = false;
     }
-
-    state.activeSelectedExpId = null;
-    renderMainDashboardUI();
-    renderTimeline();
-    updateDashboardButtons();
-
-    const msg = isUpdateMode 
-      ? `實驗編號 [${finalExpId}] 紀錄已更新！\n狀態更新為：[${targetStatus}]` 
-      : `新實驗專案建立成功！\n實驗編號：[${finalExpId}]\n狀態：[${targetStatus}]`;
-
-    showCustomAlert(state.currentLang==='ZH'?"提交成功":"Submitted Successfully", msg);
   }
 
   function showCustomAlert(title, message) {
@@ -3342,6 +3621,8 @@
   });
 
   async function checkAndSilentRefresh() {
+    if (document.visibilityState !== 'visible') return; // 背景分頁不打 API
+    if (api.pendingWrites > 0) return;                   // 寫入中不刷新，避免舊資料蓋掉剛送出的狀態
     const isFormOpen = document.getElementById('formPageContainer').style.display === 'flex';
     if (!isFormOpen) {
       await refreshDashboard(false);
