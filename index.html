@@ -2466,6 +2466,13 @@
       const existingRecord = state.dataCenter.find(d => d.expId === expId);
       if (existingRecord) {
         if (existingRecord.user) saveFormFieldData('user_select_val', existingRecord.user);
+
+        // 日期欄帶入該實驗原本的日期（舊版預設今天，送出後會把明天的預約改成今天）
+        if (existingRecord.date) {
+          currentFormCtx.pages.forEach(pg => (pg.fields || []).forEach(f => {
+            if (f.type === 'date' && !currentFormCtx.data[f.id]) currentFormCtx.data[f.id] = existingRecord.date;
+          }));
+        }
         const savedData = existingRecord.formData || {};
 
         if (savedData['outline_select_val']) currentFormCtx.data['outline_select_val'] = savedData['outline_select_val'];
@@ -2657,6 +2664,12 @@
         }
 
         const currentExpValue = currentFormCtx.data['exp_select_val'] || state.activeSelectedExpId || '';
+
+        // 由「明日準備 / 今日登錄」指定打開的實驗，一定要出現在選單裡（舊版只列今天日期，明天的預約會被濾掉）
+        if (currentExpValue && !activeProjects.some(p => p.expId === currentExpValue)) {
+          const curExp = state.dataCenter.find(d => d.expId === currentExpValue);
+          if (curExp) activeProjects.unshift(curExp);
+        }
 
         let topOptionHtml = '';
         if (isMakeupMode) {
