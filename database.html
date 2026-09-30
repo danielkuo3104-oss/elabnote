@@ -274,9 +274,92 @@
     membersList: [],
     dataCenter: [],
     dynamicForms: {},
+    customOptions: [],
     isStatsCollapsed: false,
     activeViewingExpId: null
   };
+
+  // =====================================================================
+  // API 層（與主頁共用登入 token）
+  // =====================================================================
+  const api = { writeChain: Promise.resolve(), pendingWrites: 0 };
+
+  async function fetchWithTimeout(url, options = {}, ms = 30000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try { return await fetch(url, { ...options, signal: ctrl.signal }); }
+    finally { clearTimeout(timer); }
+  }
+
+  async function loadSnapshot() {
+    try {
+      const res = await fetchWithTimeout(`${GAS_API_URL}?action=getAll&_t=${Date.now()}`, {}, 20000);
+      const json = await res.json();
+      if (json.status !== 'success') throw new Error(json.message || 'getAll failed');
+      state.customOptions = json.customOptions || [];
+      return { source: 'live', members: json.members || [], forms: json.forms || [], data: json.data || [] };
+    } catch (err) {
+      console.warn('即時讀取失敗，改用發佈 CSV（可能有數分鐘延遲）:', err);
+      const [m, f, d] = await Promise.all([URL_MEMBERS, URL_FORMS, URL_DATA].map(u =>
+        fetchWithTimeout(`${u}&_t=${Date.now()}`, {}, 20000).then(r => r.text()).then(parseCSV)
+      ));
+      return { source: 'csv', members: m, forms: f, data: d };
+    }
+  }
+
+  function getAuth() {
+    let user = null;
+    try { user = JSON.parse(localStorage.getItem('elabnote_user') || 'null'); } catch (e) {}
+    return { user, token: localStorage.getItem('elabnote_token') || '' };
+  }
+
+  async function apiPost(payload, ms = 45000) {
+    const auth = getAuth();
+    if (payload.action !== 'checkFolderFileCount' && (!auth.user || !auth.token || auth.user.role === 'Guest')) {
+      throw new Error(state.currentLang === 'ZH' ? '請先回主頁以會員身分登入後再修改資料' : 'Please log in on the home page first');
+    }
+    let res;
+    try {
+      res = await fetchWithTimeout(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ ...payload, authUser: auth.user ? auth.user.name : '', authToken: auth.token })
+      }, ms);
+    } catch (e) {
+      throw new Error(e.name === 'AbortError' ? '連線逾時，請重試' : '網路連線失敗，請重試');
+    }
+    let json;
+    try { json = await res.json(); } catch (e) { throw new Error('伺服器回應格式錯誤'); }
+    if (json.status !== 'success') throw new Error(json.message || '伺服器處理失敗');
+    return json;
+  }
+
+  // 寫入排隊，依序送出
+  function queuedPost(payload, ms) {
+    api.pendingWrites++;
+    const run = () => apiPost(payload, ms);
+    const p = api.writeChain.then(run, run);
+    api.writeChain = p.catch(() => {});
+    return p.finally(() => { api.pendingWrites--; });
+  }
+
+  function escapeHtml(v) {
+    return String(v === null || v === undefined ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function jsArg(v) {
+    return escapeHtml(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' '));
+  }
+  function normalizeDateStr(v) {
+    const s = String(v || '').trim();
+    const m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : s;
+  }
+
+  window.addEventListener('beforeunload', (e) => {
+    if (api.pendingWrites > 0) { e.preventDefault(); e.returnValue = '資料仍在同步中'; }
+  });
 
   // 記憶進入修改模式前的原始值（暴力比對備援）
   let originalOutline = "";
@@ -304,9 +387,10 @@
     }
 
     applyLanguage();
-    await fetchMembersFromSheet();
-    await fetchAndParseFormsFromSheet();
-    await fetchDataCenterFromSheet();
+    const snap = await loadSnapshot();
+    await fetchMembersFromSheet(snap);
+    await fetchAndParseFormsFromSheet(snap);
+    await fetchDataCenterFromSheet(snap);
     
     renderRecordCenterStats();
     renderQuickSearchTags();
@@ -424,9 +508,7 @@
         }
         row.push(entry);
         entry = '';
-        if (row.some(c => c.trim() !== '')) {
-          result.push(row);
-        }
+        result.push(row); // 不過濾空白列：列號需與試算表一致（field_列_欄）
         row = [];
       } else {
         entry += char;
@@ -443,20 +525,16 @@
     return result;
   }
 
-  async function fetchMembersFromSheet() {
+  async function fetchMembersFromSheet(snap) {
     try {
-      const res = await fetch(`${URL_MEMBERS}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+      const rows = snap.members;
       state.membersList = rows.slice(1).map(r => ({ name: r[0]?.trim(), color: r[3]?.trim() || '#f1f5f9' })).filter(m => m.name);
     } catch(e) { console.error("讀取會員列表失敗:", e); }
   }
 
-  async function fetchAndParseFormsFromSheet() {
+  async function fetchAndParseFormsFromSheet(snap) {
     try {
-      const res = await fetch(`${URL_FORMS}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+      const rows = snap.forms;
       if (rows.length < 2) return;
 
       const headerRow = rows[0];
@@ -492,11 +570,9 @@
     } catch (err) { console.error("解析動態表單架構失敗:", err); }
   }
 
-  async function fetchDataCenterFromSheet() {
+  async function fetchDataCenterFromSheet(snap) {
     try {
-      const res = await fetch(`${URL_DATA}&_t=${Date.now()}`);
-      const csvText = await res.text();
-      const rows = parseCSV(csvText);
+      const rows = snap.data;
       const records = [];
 
       for (let i = 1; i < rows.length; i++) {
@@ -504,15 +580,16 @@
         if (!row) continue;
         if (row[0] || row[1]) {
           const expId = row[0] ? row[0].trim() : '未編號';
-          const date = row[1] ? row[1].trim() : '';
+          const date = row[1] ? normalizeDateStr(row[1]) : '';
           const user = row[2] ? row[2].trim() : '';
           const status = row[3] ? row[3].trim() : '未知';
           
           let parsedFormData = {};
-          const jsonCols = [4, 6, 8, 10, 12];
+          // FORM_001 ~ FORM_006 + 預留一(取消紀錄)；舊版漏了 FORM_006
+          const jsonCols = [4, 6, 8, 10, 12, 14, 16];
           jsonCols.forEach(colIdx => {
             if (row[colIdx]) {
-              let rawJsonStr = row[colIdx].trim();
+              let rawJsonStr = String(row[colIdx]).trim();
               if (rawJsonStr.startsWith('"') && rawJsonStr.endsWith('"')) rawJsonStr = rawJsonStr.slice(1, -1).replace(/""/g, '"');
               if (rawJsonStr.startsWith('{') && rawJsonStr.endsWith('}')) {
                 try { parsedFormData = { ...parsedFormData, ...JSON.parse(rawJsonStr) }; } catch (e) {}
@@ -598,16 +675,16 @@
       const bgCol = userObj ? userObj.color : '#f1f5f9';
       const resText = count.reserved > 0 ? `<span style="color:var(--text-muted); font-size:11px;">(+${count.reserved})</span>` : '';
       return `
-        <div class="stat-interactive-item" onclick="applyQuickSearch('${usr}')" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px;">
-          <span style="background:${bgCol}; padding:1px 6px; border-radius:4px; font-weight:700;">${usr}</span>
+        <div class="stat-interactive-item" onclick="applyQuickSearch('${jsArg(usr)}')" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:6px;">
+          <span style="background:${bgCol}; padding:1px 6px; border-radius:4px; font-weight:700;">${escapeHtml(usr)}</span>
           <span style="font-weight:700;">${count.active} ${isZH?'件':'cases'} ${resText}</span>
         </div>
       `;
     }).join('');
 
     let topicHtml = Object.entries(topicStats).map(([tpc, count]) => `
-      <div class="stat-interactive-item" onclick="applyQuickSearch('${tpc}')" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:600; color:var(--text-secondary); max-width:80%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${tpc}</span>
+      <div class="stat-interactive-item" onclick="applyQuickSearch('${jsArg(tpc)}')" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:600; color:var(--text-secondary); max-width:80%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(tpc)}</span>
         <span style="font-weight:700; color:var(--primary); font-family:ui-monospace, monospace;">${count} ${isZH?'個案':'cases'}</span>
       </div>
     `).join('');
@@ -633,7 +710,7 @@
     ["實驗完成", "已上傳", "已預約", "已死亡"].forEach(s => tagsSet.add(getStatusText(s, state.currentLang)));
 
     tagContainer.innerHTML = Array.from(tagsSet).slice(0, 10).map(tag => `
-      <button type="button" class="tag-btn" onclick="applyQuickSearch('${tag}')">${tag}</button>
+      <button type="button" class="tag-btn" onclick="applyQuickSearch('${jsArg(tag)}')">${escapeHtml(tag)}</button>
     `).join('');
   }
 
@@ -785,7 +862,7 @@
             <div class="timeline-date-head">
               <div class="timeline-date-title">
                 <span>${item.date}</span>
-                <span class="timeline-user-badge" style="background:${userColor};">${item.user}</span>
+                <span class="timeline-user-badge" style="background:${userColor};">${escapeHtml(item.user)}</span>
                 ${timeTotalText}
               </div>
               <div class="timeline-status-group">
@@ -793,7 +870,7 @@
                 ${uploadTagHtml}
               </div>
             </div>
-            <div class="timeline-info-text">${displayInfo || '實驗專案'}</div>
+            <div class="timeline-info-text">${escapeHtml(displayInfo) || '實驗專案'}</div>
             ${timeLogCalculations.miniBarHtml}
             <div class="timeline-exp-id">ID: ${item.expId}</div>
           </div>
@@ -850,6 +927,12 @@
       if (pur && !pur.includes("自訂") && !pur.includes("其他") && pur !== '不保存' && pur !== '過麻') {
         purposes.add(pur);
       }
+    });
+
+    // 1b. 後端「自訂選項」工作表
+    (state.customOptions || []).forEach(o => {
+      if (o.type === 'outline' && o.name) outlines.add(o.name);
+      if (o.type === 'purpose' && o.name) purposes.add(o.name);
     });
 
     // 2. 預設常見項目補充
@@ -1242,6 +1325,9 @@
     if (!exp) return;
 
     if (!exp.formData) exp.formData = {};
+    if (api.pendingWrites > 0) return; // 避免連點重複送出
+    const backupFormData = JSON.parse(JSON.stringify(exp.formData));
+    const backupInfo = exp.info;
 
     // 1. 取得新大綱文字（支援自訂）
     const selOutline = document.getElementById('edit_outline_select');
@@ -1254,7 +1340,7 @@
         exp.formData['custom_outline_val'] = newOutlineVal;
       } else if (selOutline.value !== '__CUSTOM__') {
         newOutlineVal = cleanDisplayLabel(selOutline.value);
-        delete exp.formData['custom_outline_val'];
+        exp.formData['custom_outline_val'] = ''; // 設空字串（而非 delete），後端才會一併清掉各階段舊值
       }
     }
 
@@ -1269,7 +1355,7 @@
         exp.formData['custom_purpose_val'] = newPurposeVal;
       } else if (selPurpose.value !== '__CUSTOM__') {
         newPurposeVal = cleanDisplayLabel(selPurpose.value);
-        delete exp.formData['custom_purpose_val'];
+        exp.formData['custom_purpose_val'] = '';
       }
     }
 
@@ -1423,17 +1509,17 @@
         formJson: JSON.stringify(exp.formData)
       };
 
-      await fetch(GAS_API_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      });
-
+      await queuedPost(payload);
       alert(isZH ? "大綱、目的與數據修改已成功儲存並同步至雲端！" : "Successfully saved!");
     } catch (err) {
       console.error("雲端同步失敗：", err);
-      alert(isZH ? "本地已更新，但雲端同步失敗。" : "Failed to sync with cloud.");
+      // 還原本地資料，避免畫面顯示「已修改」但雲端其實沒存
+      exp.formData = backupFormData;
+      if (targetIndex !== -1) {
+        state.dataCenter[targetIndex].formData = JSON.parse(JSON.stringify(backupFormData));
+        state.dataCenter[targetIndex].info = backupInfo;
+      }
+      alert((isZH ? "儲存失敗，資料未寫入雲端（已還原）：\n" : "Save failed (reverted):\n") + err.message);
     }
 
     isEditingActiveModal = false;
@@ -1454,21 +1540,12 @@
     const isZH = state.currentLang === 'ZH';
 
     try {
-      await fetch(GAS_API_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "deleteRecord",
-          expId: expId
-        })
-      });
-
+      const res = await queuedPost({ action: "deleteRecord", expId: expId });
       state.dataCenter = state.dataCenter.filter(d => d.expId !== expId);
-      alert(isZH ? "實驗紀錄已成功從後端資料庫抹除！" : "Record deleted!");
+      alert(res.message || (isZH ? "實驗紀錄已刪除" : "Record deleted!"));
     } catch (err) {
       console.error("刪除失敗：", err);
-      alert(isZH ? "刪除請求發送失敗，請重試。" : "Delete action failed.");
+      alert((isZH ? "刪除失敗：" : "Delete failed: ") + err.message);
     }
     
     closeCustomModal();
@@ -1848,30 +1925,22 @@
       try {
         const base64 = await readFileAsBase64(file);
 
-        const payloadString = JSON.stringify({
+        if (file.size > 35 * 1024 * 1024) {
+          throw new Error("檔案超過 35MB（Apps Script 單次請求上限約 50MB，base64 會再放大 33%）");
+        }
+        const extMime = { csv: 'text/csv', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        const resJson = await queuedPost({
           action: "uploadSingleFile",
           expId: expId,
           fileName: file.name,
-          mimeType: file.type || "image/jpeg",
+          mimeType: file.type || extMime[ext] || "application/octet-stream",
           fileData: base64
-        });
+        }, 180000);
 
-        const response = await fetch(GAS_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: payloadString
-        });
-
-        const resText = await response.text();
-        let resJson = {};
-        try { resJson = JSON.parse(resText); } catch(e) {}
-
-        if (resJson.status === "success") {
-          uploadSuccessCount++;
-          if (resJson.folderUrl) latestFolderUrl = resJson.folderUrl;
-        } else {
-          throw new Error(resJson.message || "後端處理失敗");
-        }
+        uploadSuccessCount++;
+        if (resJson.folderUrl) latestFolderUrl = resJson.folderUrl;
 
       } catch (err) {
         console.error(`檔案 ${file.name} 上傳失敗:`, err);
@@ -1913,12 +1982,7 @@
     }
 
     try {
-      const res = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "checkFolderFileCount", expId: expId })
-      });
-      const data = await res.json();
+      const data = await apiPost({ action: "checkFolderFileCount", expId: expId }, 30000);
       
       const targetExp = state.dataCenter.find(d => d.expId === expId);
       if (targetExp) {
