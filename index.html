@@ -1207,6 +1207,25 @@
     }));
   }
 
+  // 把既有實驗紀錄的大綱 / 目的補進目前開啟的表單選項（只影響這次開啟的表單副本）
+  function ensureRecordOptionsInForm(outline, purpose) {
+    const optName = o => (typeof o === 'string' ? o : o.name) || '';
+    const same = (a, b) => cleanDisplayLabel(a).toLowerCase() === cleanDisplayLabel(b).toLowerCase();
+    (currentFormCtx.pages || []).forEach(p => (p.fields || []).forEach(f => {
+      if (outline && f.type === 'outline_select' && !f.options.some(o => same(optName(o), outline))) {
+        const idx = f.options.findIndex(o => optName(o).includes('自訂'));
+        const item = { name: outline, hasInput: false, isSavedCustom: true };
+        if (idx === -1) f.options.push(item); else f.options.splice(idx, 0, item);
+      }
+      if (purpose && f.type === 'radio' && /目的|purpose/i.test(f.label || '') && !f.options.some(o => same(optName(o), purpose))) {
+        const template = f.options.find(o => optName(o).includes('其他')) || {};
+        const idx = f.options.findIndex(o => optName(o).includes('其他') || optName(o).includes('自訂'));
+        const item = { name: purpose, hasInput: false, action: template.action || null, statusTag: template.statusTag || null, isSavedCustom: true };
+        if (idx === -1) f.options.push(item); else f.options.splice(idx, 0, item);
+      }
+    }));
+  }
+
   function isSavedCustomOutline(name) {
     const n = cleanDisplayLabel(name || '').toLowerCase();
     return !!n && (state.customOptions || []).some(o => o.type === 'outline' && o.name.toLowerCase() === n);
@@ -2481,12 +2500,15 @@
         if (savedData['notes']) currentFormCtx.data['notes'] = savedData['notes'];
 
         const targetPurpose = cleanDisplayLabel(savedData['selected_purpose_name'] || '');
+        const targetOutline = savedData['outline_select_val'] || '';
+        // 該實驗用過的大綱 / 目的若不在表單選項中（例如自訂新增的），自動補進選項，才能正確顯示為已選
+        ensureRecordOptionsInForm(targetOutline, targetPurpose);
         if (targetPurpose) {
           currentFormCtx.data['selected_purpose_name'] = targetPurpose;
           const page = currentFormCtx.pages[currentFormCtx.currentPageIdx];
           if (page && page.fields) {
             page.fields.forEach(f => {
-              if (f.type === 'radio') {
+              if (f.type === 'radio' && /目的|purpose/i.test(f.label || '')) {
                 currentFormCtx.data[f.id] = targetPurpose;
               }
             });
