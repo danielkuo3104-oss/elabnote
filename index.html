@@ -1172,6 +1172,8 @@
         }
       });
 
+      CUSTOM_FIELD_RULES.forEach(r => { if (parsedForms[r.formId]) injectCustomFieldOptions(parsedForms[r.formId], r.formId); });
+
       state.dynamicForms = parsedForms;
     } catch (err) {
       console.error("動態解析表單失敗:", err);
@@ -1289,6 +1291,62 @@
         : (g.times.size === 1 ? `${[...g.times][0]}m × ${g.count} = ${total}m` : `${g.count} 段，共 ${total}m`);
       return `<span style="color:${colorMap[k]};">■ ${escapeHtml(g.name)}: ${detail}</span>`;
     }).join('');
+  }
+
+  // ===== 欄位型自訂選項：摘除組織、保存方式 =====
+  const CUSTOM_ENTRY_NAME = '自訂 / Custom';
+  const CUSTOM_FIELD_RULES = [
+    { type: 'tissue', formId: 'FORM_005', label: /^摘除組織/ },
+    { type: 'storage', formId: 'FORM_005', label: /^保存方式/ }
+  ];
+  function getCustomFieldRule(formId, field) {
+    if (!field || (field.type !== 'checkbox_group' && field.type !== 'radio')) return null;
+    return CUSTOM_FIELD_RULES.find(r => r.formId === formId && r.label.test(field.label || '')) || null;
+  }
+  // 把「自訂選項」工作表中已存的值注入成正式選項，最後再放一個「自訂」輸入項（可重複呼叫）
+  function injectCustomFieldOptions(pages, formId) {
+    const optName = o => (typeof o === 'string' ? o : o.name) || '';
+    (pages || []).forEach(p => (p.fields || []).forEach(f => {
+      const rule = getCustomFieldRule(formId, f);
+      if (!rule) return;
+      f.options = f.options.filter(o => !o.isCustomEntry);
+      const template = f.options[f.options.length - 1] || {};
+      (state.customOptions || []).filter(o => o.type === rule.type).forEach(o => {
+        if (!f.options.some(x => cleanDisplayLabel(optName(x)).toLowerCase() === o.name.toLowerCase())) {
+          f.options.push({ name: o.name, hasInput: false, action: template.action || null, statusTag: null, isSavedCustom: true });
+        }
+      });
+      f.options.push({ name: CUSTOM_ENTRY_NAME, hasInput: false, isCustomEntry: true, customType: rule.type, action: template.action || null });
+    }));
+  }
+
+  function renderCustomEntryInput(fieldId) {
+    const isZH = state.currentLang === 'ZH';
+    return `<div style="margin:-4px 0 8px 0;" onclick="event.stopPropagation();">
+      <input type="text" class="form-control" placeholder="${isZH ? '請輸入自訂名稱（提交後會加入選項，下次可直接勾選）' : 'Enter custom name (saved as an option after submit)'}"
+        value="${escapeHtml(currentFormCtx.data[fieldId + '_custom'] || '')}" oninput="saveFormFieldData('${fieldId}_custom', this.value)">
+    </div>`;
+  }
+
+  // 提交前：把「自訂」換成實際輸入的文字，並回傳要寫入「自訂選項」的清單
+  function resolveCustomFieldEntries(target) {
+    const newOpts = [];
+    (currentFormCtx.pages || []).forEach(p => (p.fields || []).forEach(f => {
+      const rule = getCustomFieldRule(currentFormCtx.formId, f);
+      if (!rule) return;
+      const customText = String(target[f.id + '_custom'] || '').trim();
+      const val = target[f.id];
+      if (f.type === 'checkbox_group' && Array.isArray(val) && val.includes(CUSTOM_ENTRY_NAME)) {
+        const rest = val.filter(v => v !== CUSTOM_ENTRY_NAME);
+        if (customText && !rest.includes(customText)) rest.push(customText);
+        target[f.id] = rest;
+        if (customText) newOpts.push({ type: rule.type, name: customText });
+      } else if (f.type === 'radio' && val === CUSTOM_ENTRY_NAME) {
+        target[f.id] = customText;
+        if (customText) newOpts.push({ type: rule.type, name: customText });
+      }
+    }));
+    return newOpts;
   }
 
   function isSavedCustomOutline(name) {
@@ -2886,7 +2944,7 @@
           const optId = `${field.id}_opt_${idx}`;
           const radioClick = `selectOptionRadio('${field.id}', '${jsArg(cleanOptName)}', ${escapeHtml(JSON.stringify(opt.action || null))}, '${jsArg(opt.statusTag || '')}', ${idx + 1})`;
 
-          const isCustomPurpose = cleanOptName.includes("自訂") || cleanOptName.includes("其他");
+          const isCustomPurpose = !opt.isCustomEntry && /目的|purpose/i.test(field.label || '') && (cleanOptName.includes("自訂") || cleanOptName.includes("其他"));
 
           html += `
             <div class="option-card ${isSelected ? 'selected' : ''}" onclick="${radioClick}">
@@ -2898,6 +2956,7 @@
                 <input type="text" class="form-control" placeholder="${state.currentLang === 'ZH' ? '請輸入自訂目的名稱...' : 'Enter custom purpose...'}" value="${escapeHtml(currentFormCtx.data['custom_purpose_val'] || '')}" oninput="saveFormFieldData('custom_purpose_val', this.value)">
               </div>
             ` : ''}
+            ${(opt.isCustomEntry && isSelected) ? renderCustomEntryInput(field.id) : ''}
             ${(opt.hasInput && isSelected && !isCustomPurpose) ? `<textarea class="form-control dynamic-input" ${disabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他細節說明">${escapeHtml(currentFormCtx.data[field.id+'_input'] || '')}</textarea>` : ''}
           `;
         });
@@ -2926,6 +2985,7 @@
               <input type="checkbox" id="${field.id}_${idx}" ${isChecked ? 'checked' : ''} ${optDisabledAttr} onclick="event.stopPropagation(); ${clickAction};">
               <label for="${field.id}_${idx}">${escapeHtml(displayOptName)}</label>
             </div>
+            ${(opt.isCustomEntry && isChecked) ? renderCustomEntryInput(field.id) : ''}
             ${(opt.hasInput && isChecked) ? `<textarea class="form-control dynamic-input" ${optDisabledAttr} rows="2" style="margin: -4px 0 8px 0;" placeholder="${opt.placeholder || ''}" data-field-id="${field.id}_input" data-label="其他說明" onclick="event.stopPropagation();" oninput="saveFormFieldData('${field.id}_input', this.value)">${escapeHtml(currentFormCtx.data[field.id+'_input'] || '')}</textarea>` : ''}
           `;
         });
@@ -3153,9 +3213,12 @@
     currentFormCtx.selectedAction = action;
     if (statusTag) currentFormCtx.selectedStatusTag = statusTag;
 
-    const pCode = String(purposeIdx).padStart(2, '0');
-    currentFormCtx.data['purpose_code'] = pCode;
-    currentFormCtx.data['selected_purpose_name'] = cleanedOptName;
+    // 只有「目的」單選才更新實驗目的（舊版選「保存方式=不保存」也會把目的改成「不保存」）
+    const radioLabel = (state.fieldLabelMap && state.fieldLabelMap[fieldId]) || '';
+    if (/目的|purpose/i.test(radioLabel)) {
+      currentFormCtx.data['purpose_code'] = String(purposeIdx).padStart(2, '0');
+      currentFormCtx.data['selected_purpose_name'] = cleanedOptName;
+    }
 
     renderFormCurrentPage();
   }
@@ -3606,6 +3669,8 @@
         isUpdate: isUpdateMode
       };
       const dataToSend = JSON.parse(JSON.stringify(currentFormCtx.data));
+      // 在送出副本上把「自訂」換成實際文字；失敗重送時本地仍保留「自訂」勾選與輸入
+      const newCustomOptions = resolveCustomFieldEntries(dataToSend);
       if (isUpdateMode) {
         payload.expId = selectedExpSelectVal;
       } else {
@@ -3616,10 +3681,12 @@
       }
       payload.formData = dataToSend;
       payload.formJson = JSON.stringify(dataToSend);
+      if (newCustomOptions.length) payload.newCustomOptions = newCustomOptions;
 
       // 等待後端真正回應成功才更新畫面
       const res = await syncToGoogleSheet("submitForm", payload);
       const finalExpId = res.expId;
+      resolveCustomFieldEntries(currentFormCtx.data);
       currentFormCtx.data['exp_select_val'] = finalExpId;
 
       let targetExpInMemory = state.dataCenter.find(d => d.expId === finalExpId);
@@ -3655,6 +3722,13 @@
       // 新的自訂選項立即加入本地，下次開表單就看得到
       if (currentFormCtx.data['custom_outline_val']) state.customOptions.push({ type: 'outline', name: currentFormCtx.data['custom_outline_val'], outline: '' });
       if (currentFormCtx.data['custom_purpose_val']) state.customOptions.push({ type: 'purpose', name: currentFormCtx.data['custom_purpose_val'], outline: currentFormCtx.data['outline_select_val'] || '' });
+      // 新的摘除組織 / 保存方式自訂值：立即加入選項，不必重新整理
+      newCustomOptions.forEach(o => {
+        if (!state.customOptions.some(x => x.type === o.type && x.name.toLowerCase() === o.name.toLowerCase())) state.customOptions.push({ ...o, outline: '' });
+      });
+      if (newCustomOptions.length) {
+        CUSTOM_FIELD_RULES.forEach(r => { if (state.dynamicForms[r.formId]) injectCustomFieldOptions(state.dynamicForms[r.formId], r.formId); });
+      }
 
       const completedMakeup = currentFormCtx.isMakeup;
       delete state.formDataCache[currentFormCtx.formId];
