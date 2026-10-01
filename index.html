@@ -1226,6 +1226,41 @@
     }));
   }
 
+  // ===== 「本次不搜集腦訊號」→ 僅刺激區間模式 =====
+  function getNoSignalFieldId() {
+    for (const p of currentFormCtx.pages || []) {
+      for (const f of p.fields || []) {
+        if (f.type === 'checkbox' && /不(搜|收|蒐)集腦訊號/.test(f.label || '')) return f.id;
+      }
+    }
+    return null;
+  }
+
+  function isStimOnlyMode() {
+    if (currentFormCtx.formId !== 'FORM_004') return false;
+    const id = getNoSignalFieldId();
+    return !!(id && currentFormCtx.data[id]);
+  }
+
+  function isStimStage(st) {
+    return /stim|刺激/i.test((st && st.name) || '');
+  }
+
+  function recordHasNoElectrode(data) {
+    const v = (data || {})['field_37_16'];
+    return Array.isArray(v) ? v.some(x => String(x).includes('本次無需插入電極')) : String(v || '').includes('本次無需插入電極');
+  }
+
+  // 進入僅刺激模式時，確保至少有一個刺激區段可填
+  function ensureStimStage(fieldId) {
+    const list = currentFormCtx.data[fieldId];
+    if (!Array.isArray(list)) {
+      currentFormCtx.data[fieldId] = [{ name: 'Stimulate', time: '' }];
+    } else if (!list.some(isStimStage)) {
+      list.push({ name: 'Stimulate', time: '' });
+    }
+  }
+
   function isSavedCustomOutline(name) {
     const n = cleanDisplayLabel(name || '').toLowerCase();
     return !!n && (state.customOptions || []).some(o => o.type === 'outline' && o.name.toLowerCase() === n);
@@ -1754,7 +1789,7 @@
           });
           timelineBarHtml = `
             <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
-              <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">訊號蒐集時間軸 (總長: ${totalMin} min)</div>
+              <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px;">${formData['_stim_only'] ? '刺激區間（未蒐集腦訊號）' : '訊號蒐集時間軸'} (總長: ${totalMin} min)</div>
               <div style="display:flex; width:100%; height:10px; border-radius:5px; overflow:hidden;">${bars}</div>
               <div style="display:flex; gap:12px; font-size:10px; margin-top:4px; font-weight:600; flex-wrap:wrap;">${legends}</div>
             </div>
@@ -2250,9 +2285,10 @@
       const isControlGroup = targetExp.info.includes("控制組") || Object.values(formData).some(v => String(v).includes("控制組"));
       targetFormId = isControlGroup ? "FORM_002_2" : "FORM_002_1";
     } else if (status === '準備完成' || status === '手術中') {
-      targetFormId = (isNoElectrode || isDeceased) ? "FORM_005" : "FORM_003";
+      targetFormId = isDeceased ? "FORM_005" : "FORM_003";
     } else if (status === '休息中' || status === '訊號蒐集中') {
-      targetFormId = (isNoElectrode || isDeceased) ? "FORM_005" : "FORM_004";
+      // 未插電極仍會做刺激 → 進入 FORM_004 的「僅刺激區間」模式，而非直接跳到犧牲
+      targetFormId = isDeceased ? "FORM_005" : "FORM_004";
     } else if (status === '已死亡' || status === '訊號蒐集完成' || status === '犧牲中') {
       targetFormId = "FORM_005";
     } else if (status === '實驗善後') {
@@ -2353,17 +2389,10 @@
         Object.values(formData).some(v => String(v).includes("控制組"));
       targetFormId = isControlGroup ? "FORM_002_2" : "FORM_002_1";
     } else if (status === '準備完成' || status === '手術中') {
-      if (isNoElectrode || isDeceased) {
-        targetFormId = "FORM_005";
-      } else {
-        targetFormId = "FORM_003";
-      }
+      targetFormId = isDeceased ? "FORM_005" : "FORM_003";
     } else if (status === '休息中' || status === '訊號蒐集中') {
-      if (isNoElectrode || isDeceased) {
-        targetFormId = "FORM_005";
-      } else {
-        targetFormId = "FORM_004";
-      }
+      // 未插電極仍會做刺激 → 進入 FORM_004 的「僅刺激區間」模式，而非直接跳到犧牲
+      targetFormId = isDeceased ? "FORM_005" : "FORM_004";
     } else if (status === '已死亡' || status === '訊號蒐集完成' || status === '犧牲中') {
       targetFormId = "FORM_005";
     } else if (status === '實驗善後') {
@@ -2451,6 +2480,17 @@
     }
 
     currentFormCtx.currentPageIdx = 0;
+
+    if (formId === 'FORM_004') {
+      const noSigId = getNoSignalFieldId();
+      if (noSigId) {
+        // 舊版「不搜集」會把整個時間區段 disable；新版改為只開放刺激區間
+        delete currentFormCtx.disabledGroups['腦訊號時間'];
+        if (recordHasNoElectrode(currentFormCtx.data) && currentFormCtx.data[noSigId] === undefined) {
+          currentFormCtx.data[noSigId] = true;
+        }
+      }
+    }
 
     renderFormSidebar();
     renderFormCurrentPage();
@@ -2871,8 +2911,10 @@
           ];
         }
 
+        const stimOnly = isStimOnlyMode();
+        if (stimOnly) ensureStimStage(field.id);
         const stageList = currentFormCtx.data[field.id];
-        let stagesHtml = stageList.map((st, sIdx) => `
+        let stagesHtml = stageList.map((st, sIdx) => (stimOnly && !isStimStage(st)) ? '' : `
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
             <input type="text" class="form-control" style="flex:1.3; font-weight:600;" placeholder="區段名稱" value="${escapeHtml(st.name)}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'name', this.value)">
             <input type="number" class="form-control" style="flex:0.8;" placeholder="時間" value="${escapeHtml(st.time)}" oninput="updateDynamicStageItem('${field.id}', ${sIdx}, 'time', this.value)">
@@ -2881,11 +2923,14 @@
           </div>
         `).join('');
 
+        const stimBanner = stimOnly ? `
+            <div class="desc-alert info" style="margin-bottom:8px;">本次不搜集腦訊號：仍會進行刺激，請只填寫<b>刺激區間</b>（其他訊號區段已隱藏，下一頁的訊號標記也會略過）。</div>` : '';
         html += `
-          <div class="form-group" style="${disabledStyle}">
-            <label>${field.label}</label>
+          <div class="form-group">
+            <label>${stimOnly ? '刺激區間' : field.label}</label>
+            ${stimBanner}
             <div>${stagesHtml}</div>
-            <button type="button" class="btn-action btn-tomorrow" style="width:100%; padding:8px; margin-top:4px; font-size:12px; font-weight:700;" onclick="addDynamicStageItem('${field.id}')">➕ 新增搜集區段</button>
+            <button type="button" class="btn-action btn-tomorrow" style="width:100%; padding:8px; margin-top:4px; font-size:12px; font-weight:700;" onclick="addDynamicStageItem('${field.id}')">➕ ${stimOnly ? '新增刺激區段' : '新增搜集區段'}</button>
             ${renderFieldDescription(field.desc)}
           </div>
         `;
@@ -2924,7 +2969,7 @@
       btnNext.innerText = state.currentLang === 'ZH' ? '提交專案' : 'Submit Project';
     } else {
       const isLastPage = currentFormCtx.currentPageIdx === currentFormCtx.pages.length - 1;
-      const isSubmit = isLastPage || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
+      const isSubmit = isLastPage || isStimOnlyMode() || (currentFormCtx.selectedAction && currentFormCtx.selectedAction.type === 'submit');
       btnNext.innerText = isSubmit ? (state.currentLang==='ZH'?'提交':'Submit') : (state.currentLang==='ZH'?'下一頁':'Next');
     }
     btnNext.disabled = state.isSubmitting;
@@ -3088,6 +3133,13 @@
     const currentVal = !currentFormCtx.data[fieldId];
     saveFormFieldData(fieldId, currentVal, label);
 
+    if (currentFormCtx.formId === 'FORM_004' && fieldId === getNoSignalFieldId()) {
+      currentFormCtx.data['_stim_only'] = currentVal;
+      renderFormSidebar();
+      renderFormCurrentPage();
+      return;
+    }
+
     if (fieldId === 'chk_no_ultrasound') {
       currentFormCtx.data['no_ultrasound'] = currentVal;
     }
@@ -3179,9 +3231,11 @@
     if (page && page.fields) {
       page.fields.forEach(f => {
         const el = document.getElementById(f.id);
-        if (el && el.value !== undefined) {
-          currentFormCtx.data[f.id] = el.value;
-        }
+        if (!el || el.value === undefined) return;
+        // 勾選框要讀 checked（舊版讀 value，未勾選也會存成 "on"）
+        if (el.type === 'checkbox') currentFormCtx.data[f.id] = el.checked;
+        else if (el.type === 'radio') return;
+        else currentFormCtx.data[f.id] = el.value;
       });
     }
 
@@ -3205,6 +3259,11 @@
       if (interimStatus) {
         syncInterimStatus(interimStatus);
       }
+    }
+
+    if (isStimOnlyMode()) {
+      checkFormAndSubmit();
+      return;
     }
 
     if (currentFormCtx.selectedAction) {
@@ -3492,6 +3551,18 @@
         currentFormCtx.data['_no_parameters'] = true;
       }
 
+      if (currentFormCtx.formId === 'FORM_004') {
+        const stimOnly = isStimOnlyMode();
+        currentFormCtx.data['_stim_only'] = stimOnly;
+        if (stimOnly) {
+          (currentFormCtx.pages || []).forEach(p => (p.fields || []).forEach(f => {
+            if (f.type === 'dynamic_stages' && Array.isArray(currentFormCtx.data[f.id])) {
+              currentFormCtx.data[f.id] = currentFormCtx.data[f.id].filter(isStimStage);
+            }
+          }));
+        }
+      }
+
       const rawFormId = currentFormCtx.formId;
       const mainFormColName = rawFormId.startsWith("FORM_001") ? "FORM_001" : rawFormId.split('_').slice(0, 2).join('_');
       const submitUser = currentFormCtx.data['user_select_val'] || (existingRecord && existingRecord.user) || (state.currentUser ? state.currentUser.name : "");
@@ -3666,7 +3737,7 @@
 
   function addDynamicStageItem(fieldId) {
     if (!currentFormCtx.data[fieldId]) currentFormCtx.data[fieldId] = [];
-    currentFormCtx.data[fieldId].push({ name: "", time: "" });
+    currentFormCtx.data[fieldId].push({ name: isStimOnlyMode() ? "Stimulate" : "", time: "" });
     renderFormCurrentPage();
   }
 
