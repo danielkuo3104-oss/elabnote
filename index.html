@@ -1242,8 +1242,9 @@
     return !!(id && currentFormCtx.data[id]);
   }
 
+  // 用標記判斷是否為刺激區段（舊版用名稱判斷，改名後該列會被隱藏，看起來像「跳回去」）
   function isStimStage(st) {
-    return /stim|刺激/i.test((st && st.name) || '');
+    return !!(st && (st.stim || /stim|刺激/i.test(st.name || '')));
   }
 
   function recordHasNoElectrode(data) {
@@ -1253,12 +1254,11 @@
 
   // 進入僅刺激模式時，確保至少有一個刺激區段可填
   function ensureStimStage(fieldId) {
-    const list = currentFormCtx.data[fieldId];
-    if (!Array.isArray(list)) {
-      currentFormCtx.data[fieldId] = [{ name: 'Stimulate', time: '' }];
-    } else if (!list.some(isStimStage)) {
-      list.push({ name: 'Stimulate', time: '' });
-    }
+    let list = currentFormCtx.data[fieldId];
+    if (!Array.isArray(list)) list = currentFormCtx.data[fieldId] = [];
+    // 第一次進入時依名稱認定刺激列，之後靠 stim 標記，改名也不會消失
+    list.forEach(st => { if (isStimStage(st)) st.stim = true; });
+    if (!list.some(st => st.stim)) list.push({ name: 'Stimulate', time: '', stim: true });
   }
 
   function isSavedCustomOutline(name) {
@@ -2945,6 +2945,7 @@
         input.dataset.bound = 'true';
         input.addEventListener('input', (e) => {
           const fId = e.target.getAttribute('id') || e.target.getAttribute('data-field-id');
+          if (!fId) return; // 刺激/訊號區段等自行處理的輸入框（舊版會寫進 data["null"]）
           const fLabel = e.target.getAttribute('data-label') || '';
           saveFormFieldData(fId, e.target.value, fLabel);
           triggerRealtimeFormulaCalculation();
@@ -3737,7 +3738,7 @@
 
   function addDynamicStageItem(fieldId) {
     if (!currentFormCtx.data[fieldId]) currentFormCtx.data[fieldId] = [];
-    currentFormCtx.data[fieldId].push({ name: isStimOnlyMode() ? "Stimulate" : "", time: "" });
+    currentFormCtx.data[fieldId].push(isStimOnlyMode() ? { name: "Stimulate", time: "", stim: true } : { name: "", time: "" });
     renderFormCurrentPage();
   }
 
