@@ -361,6 +361,36 @@
     if (api.pendingWrites > 0) { e.preventDefault(); e.returnValue = '資料仍在同步中'; }
   });
 
+  // ===== 區段配色：同名區段同色；圖例每個名稱只列一次（次數 × 每段時間 / 合計）=====
+  const STAGE_PALETTE = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#0891b2', '#db2777', '#65a30d'];
+  function stageKey(name) { return String(name || '(未命名)').trim().toLowerCase(); }
+  function stageColorMap(stages) {
+    const map = {};
+    let n = 0;
+    (stages || []).forEach(s => {
+      const k = stageKey(s.name);
+      if (!(k in map)) map[k] = STAGE_PALETTE[n++ % STAGE_PALETTE.length];
+    });
+    return map;
+  }
+  function buildStageLegend(stages, colorMap) {
+    const groups = {};
+    const order = [];
+    (stages || []).forEach(s => {
+      const k = stageKey(s.name);
+      const t = parseFloat(s.time) || 0;
+      if (!groups[k]) { groups[k] = { name: String(s.name || '(未命名)').trim(), count: 0, total: 0, times: new Set() }; order.push(k); }
+      groups[k].count++; groups[k].total += t; groups[k].times.add(t);
+    });
+    return order.map(k => {
+      const g = groups[k];
+      const total = Math.round(g.total * 100) / 100;
+      const detail = g.count === 1 ? `${total}m`
+        : (g.times.size === 1 ? `${[...g.times][0]}m × ${g.count} = ${total}m` : `${g.count} 段，共 ${total}m`);
+      return `<span style="color:${colorMap[k]};">■ ${escapeHtml(g.name)}: ${detail}</span>`;
+    }).join('');
+  }
+
   // 記憶進入修改模式前的原始值（暴力比對備援）
   let originalOutline = "";
   let originalPurpose = "";
@@ -1123,15 +1153,15 @@
         let totalMin = 0;
         stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
         if (totalMin > 0) {
-          const colors = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
+          const colorMap = stageColorMap(stages);
           let bars = '';
           let legends = '';
           stages.forEach((s, idx) => {
             const t = parseFloat(s.time) || 0;
             const pct = ((t / totalMin) * 100).toFixed(1);
-            const c = colors[idx % colors.length];
-            bars += `<div style="width:${pct}%; background:${c};" title="${s.name}: ${t}m"></div>`;
-            legends += `<span style="color:${c};">■ ${s.name}: ${t}m</span>`;
+            const c = colorMap[stageKey(s.name)];
+            bars += `<div style="width:${pct}%; background:${c};" title="${escapeHtml(s.name)}: ${t}m"></div>`;
+            legends = buildStageLegend(stages, colorMap);
           });
           timelineBarHtml = `
             <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:6px; border:1px solid #e2e8f0;">
@@ -1707,15 +1737,15 @@
       let totalMin = 0;
       stages.forEach(s => totalMin += (parseFloat(s.time) || 0));
       if (totalMin > 0) {
-        const colors = ['#2563eb', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
+        const colorMap = stageColorMap(stages);
         let bars = '';
         let legends = '';
         stages.forEach((s, idx) => {
           const t = parseFloat(s.time) || 0;
           const pct = ((t / totalMin) * 100).toFixed(1);
-          const c = colors[idx % colors.length];
-          bars += `<div style="width:${pct}%; background:${c};" title="${s.name}: ${t}m"></div>`;
-          legends += `<span style="color:${c};">■ ${s.name}: ${t}m</span>`;
+          const c = colorMap[stageKey(s.name)];
+          bars += `<div style="width:${pct}%; background:${c};" title="${escapeHtml(s.name)}: ${t}m"></div>`;
+          legends = buildStageLegend(stages, colorMap);
         });
         signalTimelineHtml = `
           <div style="margin-top:8px; padding:8px; background:#fff; border-radius:6px; border:1px solid #e2e8f0;">
